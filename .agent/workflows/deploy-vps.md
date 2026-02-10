@@ -40,8 +40,7 @@ npm install
 # Setup Environment Variables
 nano .env
 # Add DATABASE_URL="file:./dev.db"
-# Add NEXTAUTH_SECRET="your-secret-here"
-# Add NEXTAUTH_URL="https://your-domain.com"
+# Add JWT_SECRET="your-super-long-random-secret-string"
 ```
 
 ## 3. Database Initialization

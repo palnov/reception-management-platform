@@ -62,7 +62,6 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
     selection,
     onMouseDown,
     onMouseEnter,
-    onMouseLeave,
     onContextMenu,
     isInSelection,
     currentUser
