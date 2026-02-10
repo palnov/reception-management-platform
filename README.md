@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Администраторы ДМЦ
 
-## Getting Started
+Специализированная платформа для управления персоналом, графиком смен и автоматического расчета заработной платы.
 
-First, run the development server:
+## Основные возможности
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **График смен**: Интерактивная таблица в стиле Excel с поддержкой Drag-and-Drop и массового заполнения.
+- **Сотрудники**: Управление базой персонала, должностями (Администратор, Старший смены) и окладами по филиалам.
+- **KPI и Зарплата**: Автоматический учет коэффициентов, работы в выходные дни, бонусов за продажи и качественных показателей.
+- **Продажи**: Регистрация акционных продаж с автоматическим начислением бонуса (7%).
+- **Оформление**: Контроль качества заполнения карт и чек-листов.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Технологический стек
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Frontend**: Next.js 16 (App Router), Tailwind CSS, Lucide React, dnd-kit.
+- **Backend/DB**: Prisma ORM, SQLite.
+- **Data**: Гибкое хранение дат (String-based) для обеспечения максимальной совместимости.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Запуск проекта
 
-## Learn More
+1. Установите зависимости (если еще не установлены):
+   ```bash
+   npm install
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+2. Сгенерируйте клиент базы данных:
+   ```bash
+   npx prisma generate
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Запустите сервер разработки:
+   ```bash
+   npm run dev
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. Откройте [http://localhost:3000](http://localhost:3000) в браузере.
 
-## Deploy on Vercel
+## Структура проекта
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `app/` — Маршруты и страницы приложения.
+- `components/` — Общие React компоненты.
+- `prisma/` — Схема базы данных и файлы миграций.
+- `lib/` — Общие библиотеки (Prisma client singleton).
+- `scripts/` — Вспомогательные скрипты для импорта и анализа данных.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+Разработано для ДМЦ.
