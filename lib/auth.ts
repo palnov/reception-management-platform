@@ -13,7 +13,7 @@ export async function login(employee: { id: string, name: string, role: string }
     const cookieStore = await cookies();
     cookieStore.set('session', session, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: false, // Changed from process.env.NODE_ENV === 'production' to allow HTTP
         expires: expiresAt,
         sameSite: 'lax',
         path: '/',
@@ -63,7 +63,7 @@ export async function updateSession(request: NextRequest) {
         name: 'session',
         value: await encrypt(parsed),
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: false, // Changed from process.env.NODE_ENV === 'production' to allow HTTP
         expires: parsed.expiresAt,
         sameSite: 'lax',
         path: '/',
