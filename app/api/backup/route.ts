@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import fs from 'fs';
+import path from 'path';
 
 export async function GET() {
     const session = await getSession();
@@ -45,6 +47,16 @@ export async function POST(request: Request) {
         if (!backup.employees || !backup.shifts) {
             return NextResponse.json({ error: 'Invalid backup format' }, { status: 400 });
         }
+
+        // --- SAFETY SNAPSHOT BEFORE RESTORE ---
+        const DB_PATH = path.join(process.cwd(), 'prisma', 'dev.db');
+        const SNAPSHOTS_DIR = path.join(process.cwd(), 'prisma', 'snapshots');
+        if (fs.existsSync(DB_PATH)) {
+            if (!fs.existsSync(SNAPSHOTS_DIR)) fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true });
+            const safetyName = `auto_before_json_restore_${new Date().toISOString().replace(/[:.]/g, '-')}.db`;
+            fs.copyFileSync(DB_PATH, path.join(SNAPSHOTS_DIR, safetyName));
+        }
+        // --------------------------------------
 
         // Helper to chunk array
         const chunkArray = (arr: any[], size: number) => {
