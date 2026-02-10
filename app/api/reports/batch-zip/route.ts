@@ -19,7 +19,10 @@ export async function POST(request: Request) {
     try {
         const zip = new JSZip();
         const employees = await prisma.employee.findMany({
-            where: { id: { in: employeeIds } }
+            where: {
+                id: { in: employeeIds },
+                role: { not: 'MANAGER' }
+            }
         });
 
         // Generate reports in parallel

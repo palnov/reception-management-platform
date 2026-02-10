@@ -11,17 +11,24 @@ export class ReportService {
 
         const startDate = startOfMonth(parseISO(date));
         const endDate = endOfMonth(parseISO(date));
+        const daysInMonth = endDate.getDate();
+
         const dateFilter = {
             gte: format(startDate, 'yyyy-MM-dd'),
             lte: format(endDate, 'yyyy-MM-dd')
         };
-        const monthStr = format(startDate, 'yyyy-MM');
+        const monthStr = format(startDate, 'yyyy-MM'); // e.g. "2026-02"
 
-        const empFilter = employeeId ? { id: employeeId } : {};
+        const empFilter: any = employeeId ? { id: employeeId } : { role: { not: 'MANAGER' } };
         const employees = await prisma.employee.findMany({
             where: empFilter,
             orderBy: { sortOrder: 'asc' }
         });
+
+        // If specific employeeId was provided, double check it's not a MANAGER
+        if (employeeId && employees.length > 0 && employees[0].role === 'MANAGER') {
+            return workbook; // Return empty or handle as "no report for manager"
+        }
 
         const normRecord = await prisma.monthlyNorm.findUnique({
             where: { month: monthStr }
@@ -31,7 +38,7 @@ export class ReportService {
         // Styles
         const headerStyle: Partial<ExcelJS.Style> = {
             font: { bold: true, size: 12, color: { argb: 'FFFFFFFF' } },
-            fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } }, // Indigo 600
+            fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } },
             alignment: { horizontal: 'center', vertical: 'middle' },
             border: { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }
         };
@@ -39,86 +46,151 @@ export class ReportService {
             border: { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } },
             alignment: { vertical: 'middle' }
         };
+        const centerStyle: Partial<ExcelJS.Style> = {
+            ...cellStyle,
+            alignment: { horizontal: 'center', vertical: 'middle' }
+        };
 
-        const applyHeader = (sheet: ExcelJS.Worksheet) => {
-            sheet.getRow(1).height = 30;
-            sheet.getRow(1).eachCell((cell) => {
+        const applyHeader = (sheet: ExcelJS.Worksheet, rowIdx: number = 1) => {
+            const row = sheet.getRow(rowIdx);
+            row.height = 30;
+            row.eachCell((cell) => {
                 cell.style = headerStyle;
             });
         };
 
-        // 1. SCHEDULE SHEET
-        // We need Shift Cost for formulas
+        // =============================================
+        // 1. SCHEDULE SHEET (manual rows — mirrors UI)
+        // =============================================
         if (type === 'FULL' || type === 'SCHEDULE') {
             const sheet = workbook.addWorksheet('График');
-            sheet.columns = [
-                { header: 'Дата', key: 'date', width: 12, style: cellStyle },
-                { header: 'Сотрудник', key: 'employee', width: 25, style: cellStyle },
-                { header: 'Тип', key: 'type', width: 15, style: cellStyle },
-                { header: 'Часы', key: 'hours', width: 10, style: cellStyle },
-                { header: 'Коэф.', key: 'coeff', width: 10, style: cellStyle },
-                { header: 'Ставка/ч', key: 'rate', width: 12, style: cellStyle }, // New
-                { header: 'Сумма', key: 'cost', width: 12, style: cellStyle }, // New
-                { header: 'Кабинеты', key: 'cabinet', width: 15, style: cellStyle },
-                { header: 'Комментарий', key: 'comment', width: 30, style: cellStyle },
-            ];
 
+            // UI-matching fill colors
+            const fillRegular: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }; // blue-100
+            const fillDayOff: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } }; // amber-100
+            const fillSick: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }; // red-100
+            const fillVacation: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } }; // green-100
+
+            // Row 1: Month name in Russian (e.g. "Февраль")
+            const monthName = format(startDate, 'LLLL', { locale: ru });
+            sheet.getCell('A1').value = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+            sheet.getCell('A1').font = { bold: true, size: 16 };
+
+            // Row 2: Norm hours
+            sheet.getCell('A2').value = `Норма часов: ${monthNorm}`;
+            sheet.getCell('A2').font = { bold: true, size: 11 };
+
+            // Row 3: spacer (empty)
+
+            // Row 4: Table header — "Сотрудник" + day numbers
+            sheet.getColumn(1).width = 25;
+            const hdrRow = sheet.getRow(4);
+            hdrRow.getCell(1).value = 'Сотрудник';
+            hdrRow.getCell(1).style = headerStyle;
+            for (let d = 1; d <= daysInMonth; d++) {
+                const col = d + 1;
+                sheet.getColumn(col).width = 5;
+                hdrRow.getCell(col).value = d;
+                hdrRow.getCell(col).style = headerStyle;
+            }
+            hdrRow.height = 24;
+
+            // Fetch ONLY active (non-deleted) shifts
             const shifts = await prisma.shift.findMany({
-                where: { date: dateFilter, employeeId: employeeId || undefined },
+                where: {
+                    date: dateFilter,
+                    isDeleted: false,
+                    employee: employeeId ? { id: employeeId } : { role: { not: 'MANAGER' } },
+                },
                 include: { employee: true },
-                orderBy: [{ date: 'asc' }, { employee: { sortOrder: 'asc' } }]
             });
 
-            shifts.forEach(s => {
-                let shiftCost = 0;
-                let hourlyRate = 0;
+            // Pre-index shifts by "employeeId|date" for O(1) lookup
+            const shiftMap = new Map<string, typeof shifts[0]>();
+            for (const s of shifts) {
+                // IMPORTANT: Normalize date string from DB (it might contain T00:00:00)
+                const normalizedDate = s.date.substring(0, 10);
+                const key = `${s.employeeId}|${normalizedDate}`;
+                shiftMap.set(key, s);
+            }
 
-                if (s.type === 'REGULAR') {
-                    hourlyRate = (s.employee.baseSalary / monthNorm) * s.coefficient;
-                    shiftCost = hourlyRate * s.hours;
-                } else if (s.type === 'DAY_OFF_WORK') {
-                    hourlyRate = 3500 / 11;
-                    shiftCost = hourlyRate * s.hours;
+            // Fill employee rows (starting at row 5)
+            const reportEmployees = employees.filter(e => e.role !== 'MANAGER');
+            let rowIdx = 5;
+
+            for (const emp of reportEmployees) {
+                const row = sheet.getRow(rowIdx);
+
+                // Column A: employee name
+                row.getCell(1).value = emp.name;
+                row.getCell(1).style = cellStyle;
+                row.getCell(1).font = { bold: true };
+
+                // Day columns
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const col = d + 1;
+                    const dayStr = `${monthStr}-${String(d).padStart(2, '0')}`; // Results in YYYY-MM-DD
+                    const shift = shiftMap.get(`${emp.id}|${dayStr}`);
+                    const cell = row.getCell(col);
+
+                    // Base cell styling
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    cell.border = cellStyle.border;
+
+                    if (shift) {
+                        if (shift.type === 'REGULAR') {
+                            cell.value = shift.hours;
+                            cell.fill = fillRegular;
+                            cell.font = { bold: true, color: { argb: 'FF1E3A5F' } };
+                        } else if (shift.type === 'DAY_OFF_WORK') {
+                            cell.value = shift.hours;
+                            cell.fill = fillDayOff;
+                            cell.font = { bold: true, color: { argb: 'FF78350F' } };
+                        } else if (shift.type === 'SICK') {
+                            cell.value = 'Б';
+                            cell.fill = fillSick;
+                            cell.font = { bold: true, color: { argb: 'FF7F1D1D' } };
+                        } else if (shift.type === 'VACATION') {
+                            cell.value = 'О';
+                            cell.fill = fillVacation;
+                            cell.font = { bold: true, color: { argb: 'FF064E3B' } };
+                        }
+                    }
                 }
 
-                sheet.addRow({
-                    date: s.date,
-                    employee: s.employee.name,
-                    type: s.type === 'REGULAR' ? 'Смена' : s.type === 'SICK' ? 'Больничный' : s.type === 'VACATION' ? 'Отпуск' : 'Доп. смена',
-                    hours: s.hours,
-                    coeff: s.coefficient,
-                    rate: hourlyRate,
-                    cost: shiftCost,
-                    cabinet: s.cabinetClosed ? 'Да (+250)' : 'Нет',
-                    comment: s.comment || ''
-                });
-            });
-            applyHeader(sheet);
+                row.height = 22;
+                rowIdx++;
+            }
         }
 
+        // =============================================
         // 2. SALES SHEET
+        // =============================================
         if (type === 'FULL' || type === 'SALES') {
             const sheet = workbook.addWorksheet('Продажи');
             sheet.columns = [
-                { header: 'Дата', key: 'date', width: 12, style: cellStyle },
-                { header: 'Сотрудник', key: 'employee', width: 25, style: cellStyle },
+                { header: 'Дата', key: 'date', width: 12, style: { ...cellStyle, numFmt: 'dd.mm.yy' } },
                 { header: 'Пациент', key: 'patient', width: 25, style: cellStyle },
+                { header: 'Сотрудник', key: 'employee', width: 25, style: cellStyle },
                 { header: 'Товар', key: 'product', width: 30, style: cellStyle },
-                { header: 'Цена', key: 'price', width: 12, style: cellStyle },
-                { header: 'Бонус', key: 'bonus', width: 12, style: cellStyle },
+                { header: 'Цена', key: 'price', width: 12, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'Бонус', key: 'bonus', width: 12, style: { ...cellStyle, numFmt: '#,##0' } },
             ];
 
             const sales = await prisma.promotionSale.findMany({
-                where: { date: dateFilter, employeeId: employeeId || undefined },
+                where: {
+                    date: dateFilter,
+                    employee: employeeId ? { id: employeeId } : { role: { not: 'MANAGER' } }
+                },
                 include: { employee: true },
                 orderBy: { date: 'asc' }
             });
 
             sales.forEach(s => {
                 sheet.addRow({
-                    date: s.date,
-                    employee: s.employee.name,
+                    date: parseISO(s.date),
                     patient: s.patientId || '-',
+                    employee: s.employee.name,
                     product: s.productName,
                     price: s.price,
                     bonus: s.bonus
@@ -127,22 +199,27 @@ export class ReportService {
             applyHeader(sheet);
         }
 
+        // =============================================
         // 3. REGISTRATIONS SHEET
+        // =============================================
         if (type === 'FULL' || type === 'REGISTRATION') {
             const sheet = workbook.addWorksheet('Первички');
             sheet.columns = [
-                { header: 'Дата', key: 'date', width: 12, style: cellStyle },
-                { header: 'Сотрудник', key: 'employee', width: 25, style: cellStyle },
+                { header: 'Дата', key: 'date', width: 12, style: { ...cellStyle, numFmt: 'dd.mm.yy' } },
                 { header: 'Пациент', key: 'patient', width: 25, style: cellStyle },
-                { header: 'Критерий 1', key: 'c1', width: 10, style: cellStyle },
-                { header: 'Критерий 2', key: 'c2', width: 10, style: cellStyle },
-                { header: 'Критерий 3', key: 'c3', width: 10, style: cellStyle },
-                { header: 'Итог', key: 'total', width: 10, style: cellStyle },
-                { header: '%', key: 'percent', width: 10, style: cellStyle }, // New
+                { header: 'Сотрудник', key: 'employee', width: 25, style: cellStyle },
+                { header: 'Критерий 1', key: 'c1', width: 10, style: centerStyle },
+                { header: 'Критерий 2', key: 'c2', width: 10, style: centerStyle },
+                { header: 'Критерий 3', key: 'c3', width: 10, style: centerStyle },
+                { header: 'Итог', key: 'total', width: 10, style: centerStyle },
+                { header: '%', key: 'percent', width: 10, style: { ...centerStyle, numFmt: '0.0%' } },
             ];
 
             const regs = await prisma.registrationKpi.findMany({
-                where: { date: dateFilter, employeeId: employeeId || undefined },
+                where: {
+                    date: dateFilter,
+                    employee: employeeId ? { id: employeeId } : { role: { not: 'MANAGER' } }
+                },
                 include: { employee: true },
                 orderBy: { date: 'asc' }
             });
@@ -150,9 +227,9 @@ export class ReportService {
             regs.forEach(r => {
                 const percent = r.maxScore > 0 ? r.totalScore / r.maxScore : 0;
                 sheet.addRow({
-                    date: r.date,
-                    employee: r.employee.name,
+                    date: parseISO(r.date),
                     patient: r.patientId || '-',
+                    employee: r.employee.name,
                     c1: r.criterion1,
                     c2: r.criterion2,
                     c3: r.criterion3,
@@ -161,139 +238,86 @@ export class ReportService {
                 });
             });
             applyHeader(sheet);
-            sheet.getColumn('percent').numFmt = '0%';
         }
 
-        // 4. KPI & SALARY SHEET (Calculated via Formulas)
+        // =============================================
+        // 4. KPI & SALARY SHEET
+        // =============================================
         if (type === 'FULL' || type === 'KPI') {
             const sheet = workbook.addWorksheet('Зарплата');
             sheet.columns = [
                 { header: 'Сотрудник', key: 'name', width: 25, style: cellStyle },
-                { header: 'Оклад', key: 'base', width: 15, style: cellStyle },
-                { header: 'Часы', key: 'hours', width: 15, style: cellStyle },
-                { header: 'Смены (Руб)', key: 'shiftPay', width: 15, style: cellStyle },
-                { header: 'Кабинеты', key: 'cabinets', width: 20, style: cellStyle },
-                { header: 'Продажи', key: 'sales', width: 15, style: cellStyle },
-                { header: 'Качество', key: 'quality', width: 15, style: cellStyle }, // New: Show avg %
-                { header: 'KPI бонус', key: 'kpi', width: 15, style: cellStyle },
-                { header: 'ИТОГО', key: 'total', width: 15, style: { ...cellStyle, font: { bold: true } } },
+                { header: 'Оклад', key: 'base', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'Часы', key: 'hours', width: 12, style: { ...cellStyle, numFmt: '0.0' } },
+                { header: 'Смены (Руб)', key: 'shiftPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'Кабинеты', key: 'cabinets', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'Качество', key: 'quality', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
+                { header: 'KPI бонус', key: 'kpi', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'ИТОГО', key: 'total', width: 15, style: { ...cellStyle, font: { bold: true }, numFmt: '#,##0' } },
             ];
 
-            // Legacy KPI Bonus fetch (if any) to add to Sales or KPI?
-            // "Sales Bonus" in code included legacy KpiRecord.salesBonus.
-            // "Quality" included legacy KpiRecord.qualityScore.
-            // Using formulas makes mixing Legacy + New hard.
-            // Assumption: We rely on New (Sheets based) data primarily.
-            // If we want to include Legacy, we'd need a hidden sheet or explicit values.
-            // For now, I will use FORMULAS for the new Referencing logic.
-            // If `type !== FULL`, we can't reference sheets that don't exist!
-            // CHECK: If type is 'KPI', do we generate other sheets?
-            // The code above generates sheets if `type === FULL || type === ...`.
-            // If user selects 'KPI', other sheets are NOT generated. Formulas will BREAK.
-            // SOLUTION: If type is NOT FULL, we must fall back to VALUES.
-
-            const useFormulas = type === 'FULL';
-
-            // Re-fetch data for Values Fallback (or just use same logic as before if !useFormulas)
-            const allShifts = await prisma.shift.findMany({ where: { date: dateFilter, employeeId: employeeId || undefined } });
+            const allShifts = await prisma.shift.findMany({
+                where: { date: dateFilter, isDeleted: false, ...(employeeId ? { employeeId } : {}) }
+            });
             const allSales = await prisma.promotionSale.findMany({ where: { date: dateFilter, employeeId: employeeId || undefined } });
-            const allKpi = await prisma.kpiRecord.findMany({ where: { date: dateFilter, employeeId: employeeId || undefined } }); // Legacy KPI
+            const allKpi = await prisma.kpiRecord.findMany({ where: { date: dateFilter, employeeId: employeeId || undefined } });
             const allRegs = await prisma.registrationKpi.findMany({ where: { date: dateFilter, employeeId: employeeId || undefined } });
 
             for (const emp of employees) {
                 if (emp.role === 'MANAGER') continue;
 
-                const rowNum = sheet.rowCount + 1;
-                const empName = emp.name; // Assuming unique names or consistent naming
+                const empShifts = allShifts.filter(s => s.employeeId === emp.id);
+                const empSales = allSales.filter(s => s.employeeId === emp.id);
+                const empRegs = allRegs.filter(r => r.employeeId === emp.id);
+                const empLegacyKpi = allKpi.filter(k => k.employeeId === emp.id);
 
-                if (useFormulas) {
-                    // FORMULAS
-                    // Hours: SUMIF('График'!B:B, name, 'График'!D:D)
-                    // ShiftPay: SUMIF('График'!B:B, name, 'График'!G:G)  (Col 7 is G: Cost)
-                    // Cabinets: COUNTIFS('График'!B:B, name, 'График'!H:H, "Да (+250)") * 250 (Col 8 is H)
-                    // Sales: SUMIF('Продажи'!B:B, name, 'Продажи'!F:F) (Col 6 is F)
-                    // Quality: AVERAGEIF('Первички'!B:B, name, 'Первички'!H:H) (Col 8 is H: %)
-                    // KPI: IF(Quality >= 0.95, 5000, IF(Quality >= 0.90, 2500, 0))
+                let hoursWorked = 0;
+                let shiftPay = 0;
+                let cabinetBonuses = 0;
+                const hourlyBase = emp.baseSalary / monthNorm;
 
-                    sheet.addRow({
-                        name: empName,
-                        base: emp.baseSalary,
-                        hours: { formula: `SUMIF('График'!B:B, A${rowNum}, 'График'!D:D)` },
-                        shiftPay: { formula: `SUMIF('График'!B:B, A${rowNum}, 'График'!G:G)` },
-                        cabinets: { formula: `COUNTIFS('График'!B:B, A${rowNum}, 'График'!H:H, "Да (+250)")*250` },
-                        sales: { formula: `SUMIF('Продажи'!B:B, A${rowNum}, 'Продажи'!F:F)` },
-                        quality: { formula: `IFERROR(AVERAGEIF('Первички'!B:B, A${rowNum}, 'Первички'!I:I), 0)` }, // Column I is %
-                        kpi: { formula: `IF(G${rowNum}>=0.95, 5000, IF(G${rowNum}>=0.9, 2500, 0))` },
-                        total: { formula: `D${rowNum} + E${rowNum} + F${rowNum} + H${rowNum}` } // Base (B) is NOT included? 
-                        // Wait, Formula for Total Pay: Base + ShiftPay + Cabinets + Sales + KPI?
-                        // Actually, ShiftPay usually INCLUDES Base calculation components (Hourly * Hours).
-                        // In code: `basePay += hourlyBase * s.hours`.
-                        // So `ShiftPay` (Col D) IS the salary for time worked.
-                        // We DO NOT add `Base` (Col B) again. `Base` column is just for reference/calculation of rate.
-                        // SO: Total = D + E + F + H.
-                        // (Col D is ShiftPay, E is Cabinets, F is Sales, H is KPI).
-                    });
-                } else {
-                    // FALLBACK TO VALUES (Simple logic from before)
-                    // ... reuse previous logic ...
-                    // For brevity in this edit, I'll essentially paste the logic from previous step, 
-                    // but simplified or reused.
-                    // Since I'm replacing the whole function, I need to include it.
-
-                    const empShifts = allShifts.filter(s => s.employeeId === emp.id);
-                    const empSales = allSales.filter(s => s.employeeId === emp.id);
-                    const empRegs = allRegs.filter(r => r.employeeId === emp.id);
-                    const empLegacyKpi = allKpi.filter(k => k.employeeId === emp.id);
-
-                    let hoursWorked = 0;
-                    let shiftPay = 0;
-                    let cabinetBonuses = 0;
-                    const hourlyBase = emp.baseSalary / monthNorm;
-
-                    empShifts.forEach(s => {
-                        if (s.type === 'REGULAR') {
-                            hoursWorked += s.hours;
-                            shiftPay += hourlyBase * s.hours * s.coefficient;
-                        } else if (s.type === 'DAY_OFF_WORK') {
-                            shiftPay += (3500 / 11) * s.hours;
-                        }
-                        if (s.cabinetClosed) cabinetBonuses += 250;
-                    });
-
-                    const salesBonus = empLegacyKpi.reduce((sum, k) => sum + k.salesBonus, 0) +
-                        empSales.reduce((sum, s) => sum + s.bonus, 0);
-
-                    // Quality
-                    const regCount = empRegs.length;
-                    let avgQuality = 0;
-                    if (regCount > 0) {
-                        avgQuality = (empRegs.reduce((sum, r) => sum + (r.totalScore / r.maxScore), 0) / regCount);
-                    } else if (empLegacyKpi.length > 0) { // Fallback to legacy if no new registrations
-                        avgQuality = empLegacyKpi.reduce((sum, k) => sum + k.qualityScore, 0) / empLegacyKpi.length / 100; // Legacy was 0-100
+                empShifts.forEach(s => {
+                    if (s.type === 'REGULAR') {
+                        hoursWorked += s.hours;
+                        shiftPay += hourlyBase * s.hours * s.coefficient;
+                    } else if (s.type === 'DAY_OFF_WORK') {
+                        shiftPay += (3500 / 11) * s.hours;
                     }
+                    if (s.cabinetClosed) cabinetBonuses += 250;
+                });
 
-                    let kpiBonus = 0;
-                    if (avgQuality >= 0.95) kpiBonus = 5000;
-                    else if (avgQuality >= 0.90) kpiBonus = 2500;
+                const salesBonus = empLegacyKpi.reduce((sum, k) => sum + k.salesBonus, 0) +
+                    empSales.reduce((sum, s) => sum + s.bonus, 0);
 
-                    sheet.addRow({
-                        name: empName,
-                        base: emp.baseSalary,
-                        hours: hoursWorked,
-                        shiftPay: shiftPay,
-                        cabinets: cabinetBonuses,
-                        sales: salesBonus,
-                        quality: avgQuality,
-                        kpi: kpiBonus,
-                        total: shiftPay + cabinetBonuses + salesBonus + kpiBonus
-                    });
+                const regCount = empRegs.length;
+                let avgQuality = 0;
+                if (regCount > 0) {
+                    avgQuality = (empRegs.reduce((sum, r) => sum + (r.totalScore / r.maxScore), 0) / regCount);
+                } else if (empLegacyKpi.length > 0) {
+                    avgQuality = empLegacyKpi.reduce((sum, k) => sum + k.qualityScore, 0) / empLegacyKpi.length / 100;
+                } else {
+                    avgQuality = 1; // Default 100%
                 }
+
+                let kpiBonus = 0;
+                if (avgQuality >= 0.95) kpiBonus = 5000;
+                else if (avgQuality >= 0.90) kpiBonus = 2500;
+
+                sheet.addRow({
+                    name: emp.name,
+                    base: emp.baseSalary,
+                    hours: hoursWorked,
+                    shiftPay: Math.round(shiftPay),
+                    cabinets: cabinetBonuses,
+                    sales: salesBonus,
+                    quality: avgQuality,
+                    kpi: kpiBonus,
+                    total: Math.round(shiftPay + cabinetBonuses + salesBonus + kpiBonus)
+                });
             }
 
             applyHeader(sheet);
-            sheet.getColumn('quality').numFmt = '0%';
-            sheet.getColumn('shiftPay').numFmt = '#,##0.00';
-            sheet.getColumn('total').numFmt = '#,##0.00';
         }
 
         return workbook;

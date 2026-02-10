@@ -15,7 +15,8 @@ export default function DataPage() {
     // Export State
     const [exportDate, setExportDate] = useState(format(new Date(), 'yyyy-MM'));
     const [reportType, setReportType] = useState('FULL'); // FULL, SCHEDULE, SALES, REGISTRATION, KPI
-    const [isExporting, setIsExporting] = useState(false);
+    const [isExportingGeneral, setIsExportingGeneral] = useState(false);
+    const [isExportingBatch, setIsExportingBatch] = useState(false);
     const [employees, setEmployees] = useState<{ id: string, name: string }[]>([]);
 
     // Backup State
@@ -71,7 +72,9 @@ export default function DataPage() {
     const session = { employee: user }; // mimic session structure if needed, or just use user
 
     const handleExport = async (mode: 'GENERAL' | 'INDIVIDUAL') => {
-        setIsExporting(true);
+        if (mode === 'GENERAL') setIsExportingGeneral(true);
+        else setIsExportingBatch(true);
+
         try {
             const date = exportDate + '-01'; // First day of month
 
@@ -115,7 +118,8 @@ export default function DataPage() {
             console.error(e);
             alert('Ошибка при экспорте');
         } finally {
-            setIsExporting(false);
+            setIsExportingGeneral(false);
+            setIsExportingBatch(false);
         }
     };
 
@@ -281,11 +285,11 @@ export default function DataPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <button
                                     onClick={() => handleExport('GENERAL')}
-                                    disabled={isExporting}
+                                    disabled={isExportingGeneral || isExportingBatch}
                                     className="p-6 border-2 border-zinc-100 rounded-2xl hover:border-green-200 hover:bg-green-50 transition-all text-left group"
                                 >
                                     <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4 text-green-600 group-hover:scale-110 transition-transform">
-                                        {isExporting ? <Loader2 className="w-6 h-6 animate-spin" /> : <FileSpreadsheet className="w-6 h-6" />}
+                                        {isExportingGeneral ? <Loader2 className="w-6 h-6 animate-spin" /> : <FileSpreadsheet className="w-6 h-6" />}
                                     </div>
                                     <div className="font-bold text-lg text-zinc-900">Общая таблица</div>
                                     <div className="text-sm text-zinc-500 mt-1">Единый файл со всеми данными на разных листах</div>
@@ -293,11 +297,11 @@ export default function DataPage() {
 
                                 <button
                                     onClick={() => handleExport('INDIVIDUAL')}
-                                    disabled={isExporting}
+                                    disabled={isExportingGeneral || isExportingBatch}
                                     className="p-6 border-2 border-zinc-100 rounded-2xl hover:border-blue-200 hover:bg-blue-50 transition-all text-left group"
                                 >
                                     <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform">
-                                        {isExporting ? <Loader2 className="w-6 h-6 animate-spin" /> : <Archive className="w-6 h-6" />}
+                                        {isExportingBatch ? <Loader2 className="w-6 h-6 animate-spin" /> : <Archive className="w-6 h-6" />}
                                     </div>
                                     <div className="font-bold text-lg text-zinc-900">По сотрудникам (ZIP)</div>
                                     <div className="text-sm text-zinc-500 mt-1">Отдельные файлы для каждого сотрудника в архиве</div>
