@@ -309,7 +309,10 @@ export default function KpiPage() {
                                     <tr
                                         key={calc.empId}
                                         className="hover:bg-zinc-50 cursor-pointer"
-                                        onClick={() => handleRowClick(calc.empId)}
+                                        onClick={(e) => {
+                                            if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
+                                            handleRowClick(calc.empId);
+                                        }}
                                     >
                                         <td className="px-4 py-3 font-medium text-zinc-900">
                                             <div className="flex items-center gap-2">

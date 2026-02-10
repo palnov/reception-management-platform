@@ -131,28 +131,43 @@ export function InfoTooltip({ logs, className = "", onAuditClick, currentUser, c
         </div>
     ) : null;
 
+    const stop = (e: React.MouseEvent | React.PointerEvent) => {
+        e.stopPropagation();
+        if (e.nativeEvent) e.nativeEvent.stopImmediatePropagation();
+    };
+
+    const handleIconClick = (e: React.MouseEvent) => {
+        stop(e);
+        e.preventDefault();
+        onAuditClick?.();
+        setShowHistory(true);
+        setIsVisible(false);
+    };
+
     return (
         <>
             <div
                 ref={iconRef}
-                className={`absolute top-0.5 right-0.5 z-[30] audit-tooltip-trigger ${className}`}
+                className={`absolute top-0.5 right-0.5 z-[30] audit-tooltip-trigger cursor-pointer ${className}`}
                 data-audit-ignore="true"
                 onMouseEnter={() => setIsVisible(true)}
                 onMouseLeave={() => setIsVisible(false)}
-                onMouseDownCapture={(e) => {
-                    e.stopPropagation();
-                }}
-                onPointerDownCapture={(e) => {
-                    e.stopPropagation();
-                }}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onAuditClick?.();
-                    setShowHistory(true);
-                    setIsVisible(false);
-                }}
+                // Capture phase guards
+                onMouseDownCapture={stop}
+                onMouseUpCapture={stop}
+                onPointerDownCapture={stop}
+                onPointerUpCapture={stop}
+                onContextMenuCapture={stop}
+                onClickCapture={handleIconClick}
+                // Bubble phase guards
+                onMouseDown={stop}
+                onMouseUp={stop}
+                onPointerDown={stop}
+                onPointerUp={stop}
+                onContextMenu={stop}
+                onClick={handleIconClick}
             >
-                <div className="cursor-pointer text-blue-400/80 hover:text-blue-600 transition-colors">
+                <div className="text-blue-400/80 hover:text-blue-600 transition-colors pointer-events-none">
                     <Info className="w-2.5 h-2.5" />
                 </div>
             </div>

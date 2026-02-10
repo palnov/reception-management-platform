@@ -157,10 +157,14 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                             ${isSelected ? 'ring-2 ring-blue-500 ring-inset z-20 bg-blue-500/10' : ''}
                         `}
                         onMouseDown={(e) => {
+                            if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
                             if (e.button === 0) onMouseDown(emp.id, dateKey);
                         }}
                         onMouseEnter={() => onMouseEnter(emp.id, dateKey)}
-                        onContextMenu={(e) => onContextMenu(e, emp.id, dateKey, shift)}
+                        onContextMenu={(e) => {
+                            if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
+                            onContextMenu(e, emp.id, dateKey, shift);
+                        }}
                     >
                         {/* If shift exists and NOT deleted, render normal content */}
                         {shift && !shift.isDeleted && (

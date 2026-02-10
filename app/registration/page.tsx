@@ -211,7 +211,8 @@ export default function RegistrationPage() {
                             <tr
                                 key={r.id}
                                 className="hover:bg-zinc-50 transition-colors cursor-pointer group"
-                                onClick={() => {
+                                onClick={(e) => {
+                                    if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
                                     setFormData({
                                         id: r.id,
                                         date: format(new Date(r.date), 'yyyy-MM-dd'),
