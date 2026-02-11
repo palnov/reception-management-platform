@@ -81,18 +81,19 @@ model RegistrationKpi {
   criterion3 Float    @default(0)
   totalScore Float    @default(0)
   maxScore   Float    @default(0)
+  count      Int      @default(0)
   createdAt  String   @default("")
   createdBy  String?
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
-  id            String   @id @default(uuid())
-  entityType    String   // SHIFT, KPI, SALE, REGISTRATION
+  id            String  @id @default(uuid())
+  entityType    String
   entityId      String
-  action        String   // CREATE, UPDATE, DELETE
-  changedBy     String   // Employee name
-  changedByRole String   // For visibility logic
+  action        String
+  changedBy     String
+  changedByRole String
   timestamp     String
-  details       String?  // Optional JSON string of changes
+  details       String?
 }

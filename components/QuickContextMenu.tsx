@@ -3,16 +3,17 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Stethoscope, Palmtree, Trash2 } from 'lucide-react';
+import { Stethoscope, Palmtree, Trash2, Layers } from 'lucide-react';
 
 interface QuickContextMenuProps {
     x: number;
     y: number;
     onClose: () => void;
-    onAction: (action: 'SICK' | 'VACATION' | 'DELETE') => void;
+    onAction: (action: 'SICK' | 'VACATION' | 'DELETE' | 'BATCH_EDIT') => void;
+    showBatchOption?: boolean;
 }
 
-export function QuickContextMenu({ x, y, onClose, onAction }: QuickContextMenuProps) {
+export function QuickContextMenu({ x, y, onClose, onAction, showBatchOption }: QuickContextMenuProps) {
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -42,6 +43,24 @@ export function QuickContextMenu({ x, y, onClose, onAction }: QuickContextMenuPr
             }}
             onClick={(e) => e.stopPropagation()}
         >
+            {showBatchOption && (
+                <>
+                    <button
+                        onClick={() => onAction('BATCH_EDIT')}
+                        className="w-full px-4 py-2 text-left hover:bg-zinc-800 flex items-center gap-3 transition-colors text-sm group text-blue-400"
+                    >
+                        <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:bg-blue-500/30 transition-colors">
+                            <Layers className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <div className="font-semibold">Изменить</div>
+                            <div className="text-[10px] text-zinc-500">Выбранные ячейки</div>
+                        </div>
+                    </button>
+                    <div className="my-1 border-t border-zinc-800/50" />
+                </>
+            )}
+
             <button
                 onClick={() => onAction('SICK')}
                 className="w-full px-4 py-2 text-left hover:bg-zinc-800 flex items-center gap-3 transition-colors text-sm group"

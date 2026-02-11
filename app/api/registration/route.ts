@@ -51,22 +51,24 @@ export async function PUT(request: Request) {
         if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const body = await request.json();
-        const { id, date, employeeId, patientId, scores, totalScore, maxScore } = body;
+        const { id, date, employeeId, count, totalScore } = body;
 
         if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
 
         const existing = await prisma.registrationKpi.findUnique({ where: { id } });
         if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+        const registrationCount = Number(count) || 0;
         const newData = {
             date,
             employeeId,
-            patientId: patientId || '',
-            criterion1: Number(scores?.criterion1) || 0,
-            criterion2: Number(scores?.criterion2) || 0,
-            criterion3: Number(scores?.criterion3) || 0,
+            count: registrationCount,
             totalScore: Number(totalScore) || 0,
-            maxScore: Number(maxScore) || 0
+            maxScore: registrationCount * 3,
+            patientId: '', // Reset/Not used anymore
+            criterion1: 0,
+            criterion2: 0,
+            criterion3: 0
         };
 
         const diff = calculateDiff(existing, newData);
@@ -91,24 +93,27 @@ export async function POST(request: Request) {
         if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const body = await request.json();
-        const { date, employeeId, patientId, scores, totalScore, maxScore } = body;
+        const { date, employeeId, count, totalScore } = body;
 
+        const registrationCount = Number(count) || 0;
         const record = await prisma.registrationKpi.create({
             data: {
                 date: date,
                 employeeId,
-                patientId: patientId || '',
-                criterion1: Number(scores?.criterion1) || 0,
-                criterion2: Number(scores?.criterion2) || 0,
-                criterion3: Number(scores?.criterion3) || 0,
+                count: registrationCount,
                 totalScore: Number(totalScore) || 0,
-                maxScore: Number(maxScore) || 0,
+                maxScore: registrationCount * 3,
+                patientId: '',
+                criterion1: 0,
+                criterion2: 0,
+                criterion3: 0,
                 createdBy: session.employee.name
             } as any
         });
 
         await logAudit('REGISTRATION', record.id, 'CREATE', {
-            patientId, totalScore, criterion1: scores?.criterion1, criterion2: scores?.criterion2, criterion3: scores?.criterion3
+            count: record.count,
+            totalScore: record.totalScore
         }, session);
         return NextResponse.json(record);
     } catch (error: any) {

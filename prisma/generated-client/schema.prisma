@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated-client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Employee {
+  id               String            @id @default(uuid())
+  name             String
+  role             String            @default("ADMIN")
+  password         String            @default("1234")
+  baseSalary       Float             @default(0)
+  hourlyRate       Float             @default(0)
+  branch           String?
+  sortOrder        Int               @default(0)
+  createdAt        String            @default("")
+  kpiRecords       KpiRecord[]
+  promotionSales   PromotionSale[]
+  registrationKpis RegistrationKpi[]
+  shifts           Shift[]
+}
+
+model Shift {
+  id            String   @id @default(uuid())
+  date          String
+  employeeId    String
+  type          String   @default("REGULAR")
+  hours         Float    @default(0)
+  cabinetClosed Boolean  @default(false)
+  centerClosed  Boolean  @default(false)
+  coefficient   Float    @default(1.0)
+  comment       String?
+  createdAt     String   @default("")
+  createdBy     String?
+  isDeleted     Boolean  @default(false)
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model KpiRecord {
+  id           String   @id @default(uuid())
+  date         String
+  employeeId   String
+  qualityScore Float    @default(0)
+  errorsCount  Int      @default(0)
+  salesBonus   Float    @default(0)
+  checkList    Boolean  @default(false)
+  createdAt    String   @default("")
+  createdBy    String?
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model MonthlyNorm {
+  month     String @id
+  hours     Float  @default(176)
+  createdAt String @default("")
+}
+
+model PromotionSale {
+  id          String   @id @default(uuid())
+  date        String
+  patientId   String?
+  employeeId  String
+  productName String
+  price       Float    @default(0)
+  bonus       Float    @default(0)
+  createdAt   String   @default("")
+  createdBy   String?
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model RegistrationKpi {
+  id         String   @id @default(uuid())
+  date       String
+  patientId  String?
+  employeeId String
+  criterion1 Float    @default(0)
+  criterion2 Float    @default(0)
+  criterion3 Float    @default(0)
+  totalScore Float    @default(0)
+  maxScore   Float    @default(0)
+  count      Int      @default(0)
+  createdAt  String   @default("")
+  createdBy  String?
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id            String  @id @default(uuid())
+  entityType    String
+  entityId      String
+  action        String
+  changedBy     String
+  changedByRole String
+  timestamp     String
+  details       String?
+}

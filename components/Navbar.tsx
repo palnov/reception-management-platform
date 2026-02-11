@@ -63,7 +63,7 @@ export function Navbar() {
                     <ShoppingCart className="w-4 h-4" /> Продажи
                 </Link>
                 <Link href="/registration" className={`flex items-center gap-2 hover:text-blue-600 transition-colors ${pathname === '/registration' ? 'text-blue-600' : ''}`}>
-                    <FileCheck className="w-4 h-4" /> Первички
+                    <FileCheck className="w-4 h-4" /> Качество оформления
                 </Link>
                 <Link href="/kpi" className={`flex items-center gap-2 hover:text-blue-600 transition-colors ${pathname === '/kpi' ? 'text-blue-600' : ''}`}>
                     <BarChart3 className="w-4 h-4" /> KPI и Зарплата

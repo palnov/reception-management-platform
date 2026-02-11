@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, X, DoorOpen, MapPin, GripVertical, User, Crown, BadgeCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, DoorOpen, MapPin, GripVertical, User, Crown, BadgeCheck, Clock, Briefcase, CheckSquare, Activity, LayoutList, Timer, Percent, Layers } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
 import { QuickContextMenu } from '@/components/QuickContextMenu';
 import {
@@ -54,16 +53,78 @@ const BRANCH_CODES: Record<string, string> = {
     'Юбилейный (Менякина 1)': 'ЮБ'
 };
 
+// --- Selection Overlay Component ---
+const SelectionOverlay = memo(function SelectionOverlay({
+    bounds,
+    tableRef,
+    containerRef,
+    onFillStart
+}: {
+    bounds: { minEmpIdx: number, maxEmpIdx: number, minDateIdx: number, maxDateIdx: number } | null,
+    tableRef: React.RefObject<HTMLTableSectionElement | null>,
+    containerRef: React.RefObject<HTMLDivElement | null>,
+    onFillStart: (e: React.MouseEvent) => void
+}) {
+    if (!bounds || !tableRef.current || !containerRef.current) return null;
+
+    const tbody = tableRef.current;
+    const container = containerRef.current;
+    const rows = tbody.querySelectorAll('tr');
+    if (!rows.length) return null;
+
+    const startRow = rows[bounds.minEmpIdx];
+    const endRow = rows[bounds.maxEmpIdx];
+    if (!startRow || !endRow) return null;
+
+    const startCell = startRow.querySelectorAll('td')[bounds.minDateIdx + 1]; // +1 for sticky name column
+    const endCell = endRow.querySelectorAll('td')[bounds.maxDateIdx + 1];
+    if (!startCell || !endCell) return null;
+
+    const containerRect = container.getBoundingClientRect();
+    const startRect = startCell.getBoundingClientRect();
+    const endRect = endCell.getBoundingClientRect();
+
+    const top = Math.round(startRect.top - containerRect.top + container.scrollTop);
+    const left = Math.round(startRect.left - containerRect.left + container.scrollLeft);
+    const width = Math.round(endRect.right - startRect.left);
+    const height = Math.round(endRect.bottom - startRect.top);
+
+    return (
+        <div
+            className="absolute border-2 border-blue-500 bg-blue-500/10 pointer-events-none z-50"
+            style={{
+                top,
+                left,
+                width,
+                height
+            }}
+        >
+            <div
+                className="absolute -bottom-[5px] -right-[5px] w-2.5 h-2.5 bg-blue-500 border border-white pointer-events-none shadow-sm z-[60]"
+            />
+        </div>
+    );
+});
+
+async function getEmployees() {
+    const response = await fetch('/api/employees');
+    if (!response.ok) throw new Error('Failed to fetch employees');
+    return response.json();
+}
+
 // --- Sortable Row Component ---
 const SortableEmployeeRow = memo(function SortableEmployeeRow({
     emp,
     days,
     empShifts,
     openModal,
-    selection,
     onMouseDown,
     onMouseEnter,
     onContextMenu,
+    onHandleHover,
+    onHandleMouseDown,
+    handleCell,
+    selection,
     isInSelection,
     currentUser
 }: {
@@ -71,10 +132,13 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
     days: Date[],
     empShifts: Record<string, Shift>, // Map of ISO Date String -> Shift
     openModal: (date: Date, empId: string, shift?: Shift) => void,
-    selection: any,
-    onMouseDown: (empId: string, dateKey: string) => void,
+    onMouseDown: (e: React.MouseEvent, empId: string, dateKey: string) => void,
     onMouseEnter: (empId: string, dateKey: string) => void,
     onContextMenu: (e: React.MouseEvent, empId: string, dateKey: string, shift?: Shift) => void,
+    onHandleHover: (empId: string | null, dateKey: string | null) => void,
+    onHandleMouseDown: (e: React.MouseEvent) => void,
+    handleCell: { empId: string, dateKey: string } | null,
+    selection: any,
     isInSelection: (empId: string, dateKey: string) => boolean,
     currentUser: any // Typed as Employee or similar
 }) {
@@ -134,7 +198,6 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                 const dateKey = format(day, 'yyyy-MM-dd');
                 const shift = empShifts[dateKey];
                 const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-                const isSelected = isInSelection(emp.id, dateKey);
 
                 let bgClass = '';
                 let textClass = '';
@@ -151,15 +214,18 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                 return (
                     <td
                         key={dateKey}
-                        className={`border-r border-zinc-200 text-center cursor-pointer transition-all relative h-12 w-11 p-0 select-none
-                            ${shift && !shift.isDeleted ? bgClass : (isWeekend ? 'bg-red-50/20' : '')}
+                        className={`border-r border-zinc-200 text-center cursor-pointer relative h-12 w-11 p-0 select-none transition-all
+                            ${shift && !shift.isDeleted ? bgClass : (isWeekend ? 'bg-red-50/30' : '')}
                             ${shift && !shift.isDeleted ? textClass : ''}
-                            ${!shift || shift.isDeleted ? 'hover:bg-blue-50' : 'hover:brightness-95'}
-                            ${isSelected ? 'ring-2 ring-blue-500 ring-inset z-20 bg-blue-500/10' : ''}
+                            ${!shift || shift.isDeleted ? 'hover:bg-blue-50/50' : 'hover:brightness-95'}
+                            ${day.getDay() === 6 ? 'border-l-2 border-zinc-400' : ''}
+                            ${day.getDay() === 0 ? 'border-r-2 border-zinc-400' : ''}
+                            ${(handleCell?.empId === emp.id && handleCell?.dateKey === dateKey) ||
+                                (selection && isInSelection(emp.id, dateKey)) ? 'z-30' : ''}
                         `}
                         onMouseDown={(e) => {
                             if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
-                            if (e.button === 0) onMouseDown(emp.id, dateKey);
+                            if (e.button === 0) onMouseDown(e, emp.id, dateKey);
                         }}
                         onMouseEnter={() => onMouseEnter(emp.id, dateKey)}
                         onContextMenu={(e) => {
@@ -167,6 +233,13 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                             onContextMenu(e, emp.id, dateKey, shift);
                         }}
                     >
+                        {/* Hover handle trigger (bottom-right corner) - Exactly matches visual handle position */}
+                        <div
+                            className="absolute -bottom-[5px] -right-[5px] w-2.5 h-2.5 z-40 cursor-crosshair"
+                            onMouseEnter={() => onHandleHover(emp.id, dateKey)}
+                            onMouseLeave={() => onHandleHover(null, null)}
+                            onMouseDown={onHandleMouseDown}
+                        />
                         {/* If shift exists and NOT deleted, render normal content */}
                         {shift && !shift.isDeleted && (
                             <div className="relative h-full w-full flex items-center justify-center leading-none">
@@ -251,20 +324,31 @@ export default function SchedulePage() {
         end: { empId: string, date: string }
     } | null>(null);
     const [isDragging, setIsDragging] = useState(false);
+    const [isFilling, setIsFilling] = useState(false);
+    const [fillSource, setFillSource] = useState<{ minEmpIdx: number, maxEmpIdx: number, minDateIdx: number, maxDateIdx: number } | null>(null);
     const [showBatchModal, setShowBatchModal] = useState(false);
+    const [handleCell, setHandleCell] = useState<{ empId: string, dateKey: string } | null>(null);
     const [contextMenu, setContextMenu] = useState<{
         x: number;
         y: number;
         empId: string;
         dateKey: string;
         shift?: Shift;
+        showBatchOption?: boolean;
     } | null>(null);
 
     // Track whether audit icon was clicked to prevent modal
     const auditIconClickedRef = useRef(false);
+    const tableBodyRef = useRef<HTMLTableSectionElement>(null);
+    const gridContainerRef = useRef<HTMLDivElement>(null);
+    const blockModalRef = useRef(false);
 
     const sensors = useSensors(
-        useSensor(PointerSensor),
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 1, // Minimum 1px move to start drag, avoiding accidental drag on click
+            },
+        }),
         useSensor(KeyboardSensor, {
             coordinateGetter: sortableKeyboardCoordinates,
         })
@@ -389,8 +473,8 @@ export default function SchedulePage() {
         setShowModal(true);
     }, []);
 
-    const handleSaveShift = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSaveShift = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
         if (!selectedDate || !selectedEmployeeId) return;
 
         const existingShift = shifts.find(s =>
@@ -446,11 +530,16 @@ export default function SchedulePage() {
 
     // Selection Bounds Memo
     const selectionBounds = useMemo(() => {
-        if (!selection) return null;
-        const startEmpIdx = empIdToIndex.get(selection.start.empId) ?? -1;
-        const endEmpIdx = empIdToIndex.get(selection.end.empId) ?? -1;
-        const startDateIdx = dateKeyToIndex.get(selection.start.date) ?? -1;
-        const endDateIdx = dateKeyToIndex.get(selection.end.date) ?? -1;
+        const active = selection || (handleCell ? {
+            start: { empId: handleCell.empId, date: handleCell.dateKey },
+            end: { empId: handleCell.empId, date: handleCell.dateKey }
+        } : null);
+        if (!active) return null;
+
+        const startEmpIdx = empIdToIndex.get(active.start.empId) ?? -1;
+        const endEmpIdx = empIdToIndex.get(active.end.empId) ?? -1;
+        const startDateIdx = dateKeyToIndex.get(active.start.date) ?? -1;
+        const endDateIdx = dateKeyToIndex.get(active.end.date) ?? -1;
 
         if (startEmpIdx === -1 || endEmpIdx === -1 || startDateIdx === -1 || endDateIdx === -1) return null;
 
@@ -460,7 +549,7 @@ export default function SchedulePage() {
             minDateIdx: Math.min(startDateIdx, endDateIdx),
             maxDateIdx: Math.max(startDateIdx, endDateIdx)
         };
-    }, [selection, empIdToIndex, dateKeyToIndex]);
+    }, [selection, handleCell, empIdToIndex, dateKeyToIndex]);
 
     // Helper to get all cells in a selection rectangle
     const getSelectedRange = useCallback((sel: NonNullable<typeof selection>) => {
@@ -496,8 +585,8 @@ export default function SchedulePage() {
         return grouped;
     }, [shifts]);
 
-    const handleBatchSave = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleBatchSave = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
         if (!selection) return;
 
         const range = getSelectedRange(selection);
@@ -529,7 +618,28 @@ export default function SchedulePage() {
         fetchShifts();
     };
 
-    // Optimized selection helper
+    const handleBatchDelete = async () => {
+        if (!selection) return;
+        const range = getSelectedRange(selection);
+        const deleteIds = range
+            .map(cell => shiftsByEmployee[cell.empId]?.[cell.date]?.id)
+            .filter(Boolean) as string[];
+
+        if (deleteIds.length > 0) {
+            const res = await fetch('/api/shifts/batch', {
+                method: 'POST',
+                body: JSON.stringify({ deleteIds })
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                console.error('Batch delete failed:', err);
+            }
+        }
+        setShowBatchModal(false);
+        setSelection(null);
+        fetchShifts();
+    };
+
     const isInSelection = useCallback((empId: string, dateKey: string) => {
         if (!selectionBounds) return false;
 
@@ -544,72 +654,123 @@ export default function SchedulePage() {
             currentDateIdx <= selectionBounds.maxDateIdx;
     }, [selectionBounds, empIdToIndex, dateKeyToIndex]);
 
-    // Mouse Handlers for Selection
-    const handleMouseDown = useCallback((empId: string, date: string) => {
+    const handleMouseDown = useCallback((e: React.MouseEvent, empId: string, date: string) => {
+        e.preventDefault();
         const sourceShift = shiftsByEmployee[empId]?.[date];
+
+        const isRange = selection && (selection.start.empId !== selection.end.empId || selection.start.date !== selection.end.date);
+        if (isRange || contextMenu) {
+            blockModalRef.current = true;
+        }
+
+        if (contextMenu) setContextMenu(null);
+
         setSelection({
             start: { empId, date, shift: sourceShift },
             end: { empId, date }
         });
         setIsDragging(true);
-    }, [shiftsByEmployee]);
+        setIsFilling(false);
+        setHandleCell(null);
+    }, [shiftsByEmployee, selection, contextMenu]);
 
     const handleMouseEnter = useCallback((empId: string, date: string) => {
-        if (!isDragging) return;
+        if (!isDragging && !isFilling) return;
         setSelection(prev => prev ? { ...prev, end: { empId, date } } : null);
-    }, [isDragging]);
+    }, [isDragging, isFilling]);
 
     const handleMouseUp = useCallback(async () => {
-        if (!isDragging || !selection) {
-            setIsDragging(false);
+        if (!isDragging && !isFilling) {
             return;
         }
 
-        const { start, end } = selection;
+        const currentSelection = selection;
+        const wasFilling = isFilling;
+        const currentFillSource = fillSource;
+
+        setIsDragging(false);
+        setIsFilling(false);
+        setFillSource(null);
+
+        if (!currentSelection) return;
+
+        const { start, end } = currentSelection;
         const isSingleCell = start.empId === end.empId && start.date === end.date;
 
-        if (isSingleCell) {
-            openModal(parseISO(start.date), start.empId, start.shift);
-            setSelection(null);
-        } else {
-            // Range selected
-            const range = getSelectedRange(selection);
+        if (wasFilling && currentFillSource) {
+            const range = getSelectedRange(currentSelection);
 
-            if (start.shift) {
-                // Drag-to-fill: Copy source shift to any range (now includes OVERWRITING)
-                const operations = range.map(cell => ({
+            const patternWidth = currentFillSource.maxDateIdx - currentFillSource.minDateIdx + 1;
+            const patternHeight = currentFillSource.maxEmpIdx - currentFillSource.minEmpIdx + 1;
+
+            const operations = range.map(cell => {
+                const cellEmpIdx = empIdToIndex.get(cell.empId)!;
+                const cellDateIdx = dateKeyToIndex.get(cell.date)!;
+
+                const relEmpIdx = (cellEmpIdx - currentFillSource.minEmpIdx) % patternHeight;
+                const relDateIdx = (cellDateIdx - currentFillSource.minDateIdx) % patternWidth;
+
+                const finalEmpIdx = currentFillSource.minEmpIdx + (relEmpIdx < 0 ? relEmpIdx + patternHeight : relEmpIdx);
+                const finalDateIdx = currentFillSource.minDateIdx + (relDateIdx < 0 ? relDateIdx + patternWidth : relDateIdx);
+
+                const sourceEmpId = employees[finalEmpIdx].id;
+                const sourceDate = format(days[finalDateIdx], 'yyyy-MM-dd');
+                const sourceShift = shiftsByEmployee[sourceEmpId]?.[sourceDate];
+
+                if (!sourceShift) {
+                    const existingShiftId = shiftsByEmployee[cell.empId]?.[cell.date]?.id;
+                    return existingShiftId ? { id: existingShiftId, delete: true } : null;
+                }
+
+                return {
                     date: cell.date,
                     employeeId: cell.empId,
-                    type: start.shift!.type,
-                    hours: start.shift!.hours,
-                    cabinetClosed: start.shift!.cabinetClosed,
-                    centerClosed: start.shift!.centerClosed,
-                    coefficient: start.shift!.coefficient,
+                    type: sourceShift.type,
+                    hours: sourceShift.hours,
+                    cabinetClosed: sourceShift.cabinetClosed,
+                    centerClosed: sourceShift.centerClosed,
+                    coefficient: sourceShift.coefficient,
                     id: shiftsByEmployee[cell.empId]?.[cell.date]?.id
-                }));
+                };
+            }).filter(Boolean);
 
+            const updates = operations.filter(op => !op!.delete);
+            const deletes = operations.filter(op => op!.delete).map(op => op!.id);
+
+            if (updates.length > 0) {
                 await fetch('/api/shifts/batch', {
                     method: 'POST',
                     body: JSON.stringify({
-                        operations: operations.map(op => ({
+                        operations: (updates as any[]).map(op => ({
                             ...op,
-                            coefficient: Math.min(parseFloat(op.coefficient.toString() || '1.0'), 1.5).toString()
+                            coefficient: Math.min(parseFloat(op.coefficient?.toString() || '1.0'), 1.5).toString()
                         }))
                     })
                 });
-                setSelection(null);
-                fetchShifts();
-            } else if (!start.shift) {
-                // Check if any cell in the range has data. If yes, just select. If no, show batch modal.
-                const anyData = range.some(cell => shiftsByEmployee[cell.empId]?.[cell.date]);
-                if (!anyData) {
-                    setShowBatchModal(true);
+            }
+
+            if (deletes.length > 0) {
+                await fetch('/api/shifts/batch', {
+                    method: 'POST',
+                    body: JSON.stringify({ deleteIds: deletes })
+                });
+            }
+
+            setSelection(null);
+            fetchShifts();
+        } else {
+            if (isSingleCell) {
+                if (!blockModalRef.current) {
+                    openModal(parseISO(start.date), start.empId, start.shift);
+                    setSelection(null);
+                } else {
+                    setSelection(null);
                 }
             }
         }
 
-        setIsDragging(false);
-    }, [isDragging, selection, openModal, shiftsByEmployee, getSelectedRange, fetchShifts]);
+        blockModalRef.current = false;
+    }, [isDragging, isFilling, fillSource, selection, employees, days, shiftsByEmployee, getSelectedRange, fetchShifts, openModal, empIdToIndex, dateKeyToIndex]);
 
     const handleKeyDown = useCallback(async (e: KeyboardEvent) => {
         if (!selection || isDragging) return;
@@ -639,19 +800,60 @@ export default function SchedulePage() {
 
     const handleContextMenu = useCallback((e: React.MouseEvent, empId: string, dateKey: string, shift?: Shift) => {
         e.preventDefault();
+
+        const isPointInSelection = isInSelection(empId, dateKey);
+        const isRange = selection && (selection.start.empId !== selection.end.empId || selection.start.date !== selection.end.date);
+
         setContextMenu({
             x: e.clientX,
             y: e.clientY,
             empId,
             dateKey,
-            shift
+            shift,
+            showBatchOption: !!(isPointInSelection && isRange)
         });
-    }, []);
+    }, [isInSelection, selection]);
 
-    const handleQuickAction = useCallback(async (action: 'SICK' | 'VACATION' | 'DELETE') => {
+    const handleQuickAction = useCallback(async (action: 'SICK' | 'VACATION' | 'DELETE' | 'BATCH_EDIT') => {
         if (!contextMenu) return;
-        const { empId, dateKey, shift } = contextMenu;
+        const { empId, dateKey, shift, showBatchOption } = contextMenu;
         setContextMenu(null);
+
+        if (action === 'BATCH_EDIT') {
+            setShowBatchModal(true);
+            return;
+        }
+
+        if (showBatchOption && selection) {
+            const range = getSelectedRange(selection);
+            if (action === 'DELETE') {
+                const deleteIds = range
+                    .map(cell => shiftsByEmployee[cell.empId]?.[cell.date]?.id)
+                    .filter(Boolean) as string[];
+
+                if (deleteIds.length > 0) {
+                    await fetch('/api/shifts/batch', {
+                        method: 'POST',
+                        body: JSON.stringify({ deleteIds })
+                    });
+                }
+            } else {
+                const operations = range.map(cell => ({
+                    date: cell.date,
+                    employeeId: cell.empId,
+                    type: action,
+                    hours: action === 'VACATION' ? 0 : 8,
+                    id: shiftsByEmployee[cell.empId]?.[cell.date]?.id
+                }));
+                await fetch('/api/shifts/batch', {
+                    method: 'POST',
+                    body: JSON.stringify({ operations })
+                });
+            }
+            setSelection(null);
+            fetchShifts();
+            return;
+        }
 
         if (action === 'DELETE') {
             if (shift?.id) {
@@ -667,7 +869,7 @@ export default function SchedulePage() {
             date: dateKey,
             employeeId: empId,
             type: action,
-            hours: 11, // Standard default for quick status
+            hours: 11,
             cabinetClosed: false,
             coefficient: 1.0,
             id: shift?.id
@@ -677,11 +879,37 @@ export default function SchedulePage() {
             method: 'POST',
             body: JSON.stringify({
                 ...payload,
-                coefficient: Math.min(parseFloat(payload.coefficient.toString() || '1.0'), 1.5)
+                coefficient: Math.min(parseFloat(payload.coefficient.toString() || '1.0'), 1.5).toString()
             })
         });
         fetchShifts();
-    }, [contextMenu, fetchShifts]);
+    }, [contextMenu, selection, getSelectedRange, shiftsByEmployee, fetchShifts]);
+
+    const handleHandleHover = useCallback((empId: string | null, dateKey: string | null) => {
+        if (!isDragging && !isFilling) {
+            setHandleCell(empId && dateKey ? { empId, dateKey } : null);
+        }
+    }, [isDragging, isFilling]);
+
+    const handleHandleMouseDown = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (handleCell && !selection) {
+            const bounds = selectionBounds;
+            if (bounds) {
+                setSelection({
+                    start: { empId: handleCell.empId, date: handleCell.dateKey },
+                    end: { empId: handleCell.empId, date: handleCell.dateKey }
+                });
+                setIsFilling(true);
+                setFillSource(bounds);
+                setHandleCell(null);
+            }
+        } else if (selectionBounds) {
+            setIsFilling(true);
+            setFillSource(selectionBounds);
+        }
+    }, [handleCell, selection, selectionBounds]);
 
     useEffect(() => {
         window.addEventListener('mouseup', handleMouseUp);
@@ -713,7 +941,10 @@ export default function SchedulePage() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-xl border border-zinc-200/60 overflow-x-auto flex-1 pb-4 relative">
+            <div
+                ref={gridContainerRef}
+                className={`bg-white rounded-2xl shadow-xl border border-zinc-200/60 overflow-x-auto flex-1 pb-4 relative ${(isDragging || isFilling) ? 'select-none' : ''}`}
+            >
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -730,15 +961,23 @@ export default function SchedulePage() {
                                     const isToday = isSameDay(day, new Date());
                                     const dateKey = format(day, 'yyyy-MM-dd');
                                     return (
-                                        <th key={dateKey} className={`border-b border-r border-zinc-200 p-2 text-center min-w-[44px] ${isWeekend ? 'bg-red-50 text-red-600' : 'bg-transparent text-zinc-700'} ${isToday ? 'bg-blue-50 text-blue-600' : ''}`}>
+                                        <th
+                                            key={dateKey}
+                                            className={`border-b border-r border-zinc-200 p-2 text-center min-w-[44px] transition-colors
+                                                ${isWeekend ? 'bg-red-100/50 text-red-700' : 'bg-transparent text-zinc-700'}
+                                                ${day.getDay() === 6 ? 'border-l-2 border-zinc-400' : ''}
+                                                ${day.getDay() === 0 ? 'border-r-2 border-zinc-400' : ''}
+                                                ${isToday ? 'ring-2 ring-inset ring-blue-500 bg-blue-50 !text-blue-700' : ''}
+                                            `}
+                                        >
                                             <div className="font-bold text-xs">{format(day, 'd')}</div>
-                                            <div className="text-[9px] uppercase font-medium opacity-60">{format(day, 'EEEEEE', { locale: ru })}</div>
+                                            <div className="text-[9px] uppercase font-bold opacity-70">{format(day, 'EEEEEE', { locale: ru })}</div>
                                         </th>
                                     )
                                 })}
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody ref={tableBodyRef} className="relative">
                             <SortableContext
                                 items={employees.map((emp) => emp.id)}
                                 strategy={verticalListSortingStrategy}
@@ -750,12 +989,15 @@ export default function SchedulePage() {
                                         days={days}
                                         empShifts={shiftsByEmployee[emp.id] || {}}
                                         openModal={openModal}
-                                        selection={selection}
                                         onMouseDown={handleMouseDown}
                                         onMouseEnter={handleMouseEnter}
-                                        isInSelection={isInSelection}
                                         currentUser={currentUser}
                                         onContextMenu={handleContextMenu}
+                                        onHandleHover={handleHandleHover}
+                                        onHandleMouseDown={handleHandleMouseDown}
+                                        handleCell={handleCell}
+                                        selection={selection}
+                                        isInSelection={isInSelection}
                                     />
                                 ))}
                             </SortableContext>
@@ -765,169 +1007,171 @@ export default function SchedulePage() {
                         </tbody>
                     </table>
                 </DndContext>
+
+                <SelectionOverlay
+                    bounds={selectionBounds}
+                    tableRef={tableBodyRef}
+                    containerRef={gridContainerRef}
+                    onFillStart={(e) => {
+                        if (selectionBounds) {
+                            setIsFilling(true);
+                            setFillSource(selectionBounds);
+                        }
+                    }}
+                />
             </div>
 
             {/* Norm Edit Modal */}
             {showNormModal && (
-                <div
-                    className="fixed inset-0 bg-zinc-900/60 backdrop-blur-md flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setShowNormModal(false);
-                    }}
-                >
-                    <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm">
-                        <h2 className="text-xl font-bold mb-4">Установить норму часов</h2>
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-zinc-500 mb-2">Норма для {format(currentMonth, 'LLLL yyyy', { locale: ru })}</label>
-                            <input
-                                type="number"
-                                value={tempNorm}
-                                onChange={(e) => setTempNorm(e.target.value)}
-                                className="w-full px-4 py-3 border-2 border-zinc-100 rounded-xl focus:border-blue-500 outline-none font-bold"
-                            />
-                        </div>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm p-4" onMouseDown={() => setShowNormModal(false)}>
+                    <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full animate-in fade-in zoom-in duration-300" onMouseDown={e => e.stopPropagation()}>
+                        <h2 className="text-2xl font-bold mb-6 text-zinc-900">Норма часов</h2>
+                        <input
+                            type="number"
+                            value={tempNorm}
+                            onChange={(e) => setTempNorm(e.target.value)}
+                            className="w-full text-4xl font-bold text-center py-6 border-2 border-zinc-100 rounded-2xl focus:border-blue-500 focus:ring-0 transition-all mb-8 bg-zinc-50/50"
+                        />
                         <div className="flex gap-4">
-                            <button onClick={() => setShowNormModal(false)} className="flex-1 py-3 border-2 border-zinc-100 rounded-xl font-bold hover:bg-zinc-50 transition-colors">Отмена</button>
-                            <button onClick={handleSaveNorm} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors">Сохранить</button>
+                            <button
+                                onClick={() => setShowNormModal(false)}
+                                className="flex-1 py-4 border-2 border-zinc-100 rounded-xl text-zinc-500 font-bold hover:bg-zinc-50 transition-all"
+                            >
+                                Отмена
+                            </button>
+                            <button
+                                onClick={handleSaveNorm}
+                                className="flex-1 bg-blue-600 text-white py-4 rounded-xl hover:bg-blue-700 transition-all font-bold shadow-lg shadow-blue-200"
+                            >
+                                Сохранить
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {showModal && selectedDate && (
-                <div
-                    className="fixed inset-0 bg-zinc-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-300"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setShowModal(false);
-                    }}
-                >
-                    <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
-                        <div className="flex justify-between items-start mb-8">
-                            <div>
-                                <h2 className="text-2xl font-bold text-zinc-900">Смена</h2>
-                                <div className="text-zinc-500 font-medium mt-1">
-                                    {format(selectedDate, 'd MMMM yyyy', { locale: ru })}
-                                    {selectedEmployeeId && (
-                                        <div className="text-blue-600 text-sm font-semibold">
-                                            {employees.find(e => e.id === selectedEmployeeId)?.name}
-                                        </div>
-                                    )}
+            {/* Shift Edit Modal */}
+            {showModal && selectedEmployeeId && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] backdrop-blur-md p-4 animate-in fade-in duration-300" onMouseDown={() => setShowModal(false)}>
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-in slide-in-from-bottom-8 duration-500" onMouseDown={e => e.stopPropagation()}>
+                        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 text-white relative">
+                            <div className="absolute top-6 right-6 cursor-pointer opacity-80 hover:opacity-100 transition-opacity" onClick={() => setShowModal(false)}>
+                                <X className="w-5 h-5" />
+                            </div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
+                                    <Clock className="w-5 h-5" />
                                 </div>
-                                {(() => {
-                                    const s = shifts.find(s =>
-                                        s.employeeId === selectedEmployeeId &&
-                                        format(parseISO(s.date), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
-                                    );
-
-                                    // Find the real creator from audit logs (first CREATE action)
-                                    const createLog = s?.auditLogs?.find((log: any) => log.action === 'CREATE');
-                                    const actualCreator = createLog?.changedBy || s?.createdBy;
-
-                                    return actualCreator ? (
-                                        <div className="mt-2 text-[10px] font-bold text-zinc-400 uppercase tracking-widest bg-zinc-50 inline-block px-2 py-1 rounded-md border border-zinc-200">
-                                            Автор: {actualCreator}
-                                        </div>
-                                    ) : null;
-                                })()}
+                                <div>
+                                    <h2 className="text-xl font-bold tracking-tight">Настройка смены</h2>
+                                    <p className="opacity-80 text-sm font-medium">
+                                        {employees.find(e => e.id === selectedEmployeeId)?.name} • {selectedDate && format(selectedDate, 'd MMMM', { locale: ru })}
+                                    </p>
+                                </div>
                             </div>
-                            <button onClick={() => setShowModal(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-colors">
-                                <X className="w-6 h-6 text-zinc-400" />
-                            </button>
                         </div>
-                        <form onSubmit={handleSaveShift} className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-bold text-zinc-700 mb-2">Тип смены</label>
-                                <select
-                                    value={formData.type}
-                                    onChange={e => {
-                                        const newType = e.target.value;
-                                        setFormData(prev => ({
-                                            ...prev,
-                                            type: newType,
-                                            hours: newType === 'DAY_OFF_WORK' ? '11' : prev.hours
-                                        }));
-                                    }}
-                                    className="w-full px-4 py-3 border-2 border-zinc-100 rounded-xl focus:border-blue-500 outline-none bg-zinc-50/50 font-medium transition-all"
-                                >
-                                    <option value="REGULAR">Обычная смена</option>
-                                    <option value="DAY_OFF_WORK">Работа в выходной</option>
-                                    <option value="SICK">Больничный</option>
-                                    <option value="VACATION">Отпуск</option>
-                                </select>
+
+                        <form onSubmit={handleSaveShift} className="p-6 space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2 col-span-2">
+                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Тип смены</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {[
+                                            { id: 'REGULAR', label: 'Рабочая', icon: Briefcase, borderColor: 'border-blue-500', bgColor: 'bg-blue-50', iconBg: 'bg-blue-500', textColor: 'text-blue-900' },
+                                            { id: 'DAY_OFF_WORK', label: 'Работа в вых.', icon: CheckSquare, borderColor: 'border-amber-500', bgColor: 'bg-amber-50', iconBg: 'bg-amber-500', textColor: 'text-amber-900' },
+                                            { id: 'SICK', label: 'Больничный', icon: Activity, borderColor: 'border-red-500', bgColor: 'bg-red-50', iconBg: 'bg-red-500', textColor: 'text-red-900' },
+                                            { id: 'VACATION', label: 'Отпуск', icon: LayoutList, borderColor: 'border-emerald-500', bgColor: 'bg-emerald-50', iconBg: 'bg-emerald-500', textColor: 'text-emerald-900' }
+                                        ].map(type => (
+                                            <div
+                                                key={type.id}
+                                                onClick={() => setFormData(prev => ({ ...prev, type: type.id as any }))}
+                                                className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all cursor-pointer group
+                                                    ${formData.type === type.id
+                                                        ? `${type.borderColor} ${type.bgColor}`
+                                                        : 'border-zinc-100 bg-zinc-50/50 hover:border-zinc-200 hover:bg-zinc-50'}`}
+                                            >
+                                                <div className={`p-1.5 rounded-lg transition-colors
+                                                    ${formData.type === type.id ? `${type.iconBg} text-white` : 'bg-white text-zinc-400 group-hover:text-zinc-500'}`}>
+                                                    <type.icon className="w-3.5 h-3.5" />
+                                                </div>
+                                                <span className={`text-sm font-bold ${formData.type === type.id ? type.textColor : 'text-zinc-600'}`}>{type.label}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Часы</label>
+                                    <div className="relative group">
+                                        <input
+                                            type="number"
+                                            value={formData.hours}
+                                            onChange={e => setFormData(prev => ({ ...prev, hours: e.target.value }))}
+                                            className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"
+                                        />
+                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
+                                            <Timer className="w-4 h-4" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Коэффициент</label>
+                                    <div className="relative group">
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            max="1.5"
+                                            value={formData.coefficient}
+                                            onChange={e => setFormData(prev => ({ ...prev, coefficient: e.target.value }))}
+                                            className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"
+                                        />
+                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
+                                            <Percent className="w-4 h-4" />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            {formData.type !== 'SICK' && formData.type !== 'VACATION' && (
-                                <>
-                                    <div className={`grid ${formData.type === 'DAY_OFF_WORK' ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
-                                        <div>
-                                            <label className="block text-sm font-bold text-zinc-700 mb-2">Часы</label>
-                                            <input
-                                                type="number"
-                                                step="0.5"
-                                                value={formData.hours}
-                                                onChange={e => setFormData({ ...formData, hours: e.target.value })}
-                                                className="w-full px-4 py-3 border-2 border-zinc-100 rounded-xl focus:border-blue-500 outline-none bg-zinc-50/50 font-medium transition-all"
-                                            />
-                                        </div>
-                                        {formData.type !== 'DAY_OFF_WORK' && (
-                                            <div>
-                                                <label className="block text-sm font-bold text-zinc-700 mb-2">Коэф.</label>
-                                                <input
-                                                    type="number"
-                                                    step="0.1"
-                                                    min="1.0"
-                                                    max="1.5"
-                                                    value={formData.coefficient}
-                                                    onChange={e => setFormData({ ...formData, coefficient: e.target.value })}
-                                                    className="w-full px-4 py-3 border-2 border-zinc-100 rounded-xl focus:border-blue-500 outline-none bg-zinc-50/50 font-medium transition-all"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
+                            <div className="grid grid-cols-1 gap-3">
+                                <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, cabinetClosed: !prev.cabinetClosed }))}>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.cabinetClosed}
+                                        readOnly
+                                        className="w-5 h-5 text-blue-600 rounded-lg focus:ring-blue-500 border-zinc-300 transition-all pointer-events-none"
+                                    />
+                                    <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
+                                        <span>Открытие/Закрытие</span>
+                                        <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">+250р.</span>
+                                    </label>
+                                </div>
+                                <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, centerClosed: !prev.centerClosed }))}>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.centerClosed}
+                                        readOnly
+                                        className="w-5 h-5 text-emerald-600 rounded-lg focus:ring-emerald-500 border-zinc-300 transition-all pointer-events-none"
+                                    />
+                                    <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
+                                        <span>Открытие + Закрытие</span>
+                                        <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">+500р.</span>
+                                    </label>
+                                </div>
+                            </div>
 
-                                    <div className="grid grid-cols-1 gap-2">
-                                        <div className="flex items-center p-3 bg-zinc-50 rounded-2xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, cabinetClosed: !prev.cabinetClosed }))}>
-                                            <input
-                                                type="checkbox"
-                                                id="cabinet"
-                                                checked={formData.cabinetClosed}
-                                                readOnly
-                                                className="w-5 h-5 text-blue-600 rounded-lg focus:ring-blue-500 border-zinc-300 transition-all pointer-events-none"
-                                            />
-                                            <label htmlFor="cabinet" className="text-xs font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center gap-2">
-                                                <DoorOpen className="w-3.5 h-3.5 text-zinc-400" />
-                                                Закрытие кабинетов (+250 ₽)
-                                            </label>
-                                        </div>
-
-                                        <div className="flex items-center p-3 bg-zinc-50 rounded-2xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, centerClosed: !prev.centerClosed }))}>
-                                            <input
-                                                type="checkbox"
-                                                id="center"
-                                                checked={formData.centerClosed}
-                                                readOnly
-                                                className="w-5 h-5 text-emerald-600 rounded-lg focus:ring-emerald-500 border-zinc-300 transition-all pointer-events-none"
-                                            />
-                                            <label htmlFor="center" className="text-xs font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center gap-2">
-                                                <DoorOpen className="w-3.5 h-3.5 text-emerald-400" />
-                                                Закрытие центра (+500 ₽)
-                                            </label>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-
-                            <div className="flex gap-4 pt-4">
+                            <div className="flex gap-3 pt-2">
                                 <button
                                     type="button"
                                     onClick={handleDeleteShift}
-                                    className="px-6 py-3 border-2 border-red-50 rounded-xl text-red-500 bg-red-50/50 hover:bg-red-50 hover:border-red-100 transition-all font-bold"
+                                    className="px-6 py-3 border-2 border-red-50 rounded-xl text-red-500 bg-red-50/50 hover:bg-red-50 hover:border-red-100 transition-all font-bold text-sm"
                                 >
                                     Удалить
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-200 font-bold"
+                                    className="flex-1 bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-200 font-bold text-sm"
                                 >
                                     Сохранить
                                 </button>
@@ -936,105 +1180,131 @@ export default function SchedulePage() {
                     </div>
                 </div>
             )}
-            {/* Batch Action Modal */}
-            {showBatchModal && (
-                <div
-                    className="fixed inset-0 bg-zinc-900/60 backdrop-blur-md flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setShowBatchModal(false);
-                    }}
-                >
-                    <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-zinc-900">Массовое действие</h2>
-                            <button onClick={() => setShowBatchModal(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-colors">
-                                <X className="w-6 h-6 text-zinc-400" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleBatchSave} className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-bold text-zinc-700 mb-2">Тип смен</label>
-                                <select
-                                    value={formData.type}
-                                    onChange={e => {
-                                        const newType = e.target.value;
-                                        setFormData(prev => ({
-                                            ...prev,
-                                            type: newType,
-                                            hours: newType === 'DAY_OFF_WORK' ? '11' : prev.hours
-                                        }));
-                                    }}
-                                    className="w-full px-4 py-3 border-2 border-zinc-100 rounded-xl focus:border-blue-500 outline-none bg-zinc-50/50 font-medium transition-all"
-                                >
-                                    <option value="REGULAR">Обычная смена</option>
-                                    <option value="DAY_OFF_WORK">Работа в выходной</option>
-                                    <option value="SICK">Больничный</option>
-                                    <option value="VACATION">Отпуск</option>
-                                </select>
-                            </div>
 
-                            {formData.type !== 'SICK' && formData.type !== 'VACATION' && (
-                                <div className={`grid ${formData.type === 'DAY_OFF_WORK' ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
-                                    <div>
-                                        <label className="block text-sm font-bold text-zinc-700 mb-2">Часы</label>
+            {/* Batch Edit Modal - Compact Version */}
+            {showBatchModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] backdrop-blur-md p-4 animate-in fade-in duration-300" onMouseDown={() => setShowBatchModal(false)}>
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-in slide-in-from-bottom-8 duration-500" onMouseDown={e => e.stopPropagation()}>
+                        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 text-white relative">
+                            <div className="absolute top-6 right-6 cursor-pointer opacity-80 hover:opacity-100 transition-opacity" onClick={() => setShowBatchModal(false)}>
+                                <X className="w-5 h-5" />
+                            </div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
+                                    <Layers className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold tracking-tight">Массовое изменение</h2>
+                                    <p className="opacity-80 text-sm font-medium">Выбрано ячеек: {selection ? getSelectedRange(selection).length : 0}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <form onSubmit={handleBatchSave} className="p-6 space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2 col-span-2">
+                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Тип смены (для всех)</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {[
+                                            { id: 'REGULAR', label: 'Рабочая', icon: Briefcase, borderColor: 'border-blue-500', bgColor: 'bg-blue-50', iconBg: 'bg-blue-500', textColor: 'text-blue-900' },
+                                            { id: 'DAY_OFF_WORK', label: 'Работа в вых.', icon: CheckSquare, borderColor: 'border-amber-500', bgColor: 'bg-amber-50', iconBg: 'bg-amber-500', textColor: 'text-amber-900' },
+                                            { id: 'SICK', label: 'Больничный', icon: Activity, borderColor: 'border-red-500', bgColor: 'bg-red-50', iconBg: 'bg-red-500', textColor: 'text-red-900' },
+                                            { id: 'VACATION', label: 'Отпуск', icon: LayoutList, borderColor: 'border-emerald-500', bgColor: 'bg-emerald-50', iconBg: 'bg-emerald-500', textColor: 'text-emerald-900' }
+                                        ].map(type => (
+                                            <div
+                                                key={type.id}
+                                                onClick={() => setFormData(prev => ({ ...prev, type: type.id as any }))}
+                                                className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all cursor-pointer group
+                                                    ${formData.type === type.id
+                                                        ? `${type.borderColor} ${type.bgColor}`
+                                                        : 'border-zinc-100 bg-zinc-50/50 hover:border-zinc-200 hover:bg-zinc-50'}`}
+                                            >
+                                                <div className={`p-1.5 rounded-lg transition-colors
+                                                    ${formData.type === type.id ? `${type.iconBg} text-white` : 'bg-white text-zinc-400 group-hover:text-zinc-500'}`}>
+                                                    <type.icon className="w-3.5 h-3.5" />
+                                                </div>
+                                                <span className={`text-sm font-bold ${formData.type === type.id ? type.textColor : 'text-zinc-600'}`}>{type.label}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Часы</label>
+                                    <div className="relative group">
                                         <input
                                             type="number"
-                                            step="0.5"
                                             value={formData.hours}
-                                            onChange={e => setFormData({ ...formData, hours: e.target.value })}
-                                            className="w-full px-4 py-3 border-2 border-zinc-100 rounded-xl focus:border-blue-500 outline-none bg-zinc-50/50 font-medium transition-all"
+                                            onChange={e => setFormData(prev => ({ ...prev, hours: e.target.value }))}
+                                            className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"
                                         />
-                                    </div>
-                                    {formData.type !== 'DAY_OFF_WORK' && (
-                                        <div>
-                                            <label className="block text-sm font-bold text-zinc-700 mb-2">Коэф.</label>
-                                            <input
-                                                type="number"
-                                                step="0.1"
-                                                min="1.0"
-                                                max="1.5"
-                                                value={formData.coefficient}
-                                                onChange={e => setFormData({ ...formData, coefficient: e.target.value })}
-                                                className="w-full px-4 py-3 border-2 border-zinc-100 rounded-xl focus:border-blue-500 outline-none bg-zinc-50/50 font-medium transition-all"
-                                            />
+                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
+                                            <Timer className="w-4 h-4" />
                                         </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {formData.type === 'REGULAR' && (
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="flex items-center p-3 bg-zinc-50 rounded-2xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, cabinetClosed: !prev.cabinetClosed }))}>
-                                        <input
-                                            type="checkbox"
-                                            checked={formData.cabinetClosed}
-                                            readOnly
-                                            className="w-5 h-5 text-blue-600 rounded-lg focus:ring-blue-500 border-zinc-300 transition-all pointer-events-none"
-                                        />
-                                        <label className="text-[10px] font-bold text-zinc-700 ml-2 cursor-pointer select-none">
-                                            Кабинеты (+250)
-                                        </label>
-                                    </div>
-                                    <div className="flex items-center p-3 bg-zinc-50 rounded-2xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, centerClosed: !prev.centerClosed }))}>
-                                        <input
-                                            type="checkbox"
-                                            checked={formData.centerClosed}
-                                            readOnly
-                                            className="w-5 h-5 text-emerald-600 rounded-lg focus:ring-emerald-500 border-zinc-300 transition-all pointer-events-none"
-                                        />
-                                        <label className="text-[10px] font-bold text-zinc-700 ml-2 cursor-pointer select-none">
-                                            Центр (+500)
-                                        </label>
                                     </div>
                                 </div>
-                            )}
 
-                            <button
-                                type="submit"
-                                className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-200 font-bold"
-                            >
-                                Применить ко всем
-                            </button>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Коэффициент</label>
+                                    <div className="relative group">
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            max="1.5"
+                                            value={formData.coefficient}
+                                            onChange={e => setFormData(prev => ({ ...prev, coefficient: e.target.value }))}
+                                            className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"
+                                        />
+                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
+                                            <Percent className="w-4 h-4" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-3">
+                                <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, cabinetClosed: !prev.cabinetClosed }))}>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.cabinetClosed}
+                                        readOnly
+                                        className="w-5 h-5 text-blue-600 rounded-lg focus:ring-blue-500 border-zinc-300 transition-all pointer-events-none"
+                                    />
+                                    <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
+                                        <span>Открытие/Закрытие</span>
+                                        <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">+250р.</span>
+                                    </label>
+                                </div>
+                                <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, centerClosed: !prev.centerClosed }))}>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.centerClosed}
+                                        readOnly
+                                        className="w-5 h-5 text-emerald-600 rounded-lg focus:ring-emerald-500 border-zinc-300 transition-all pointer-events-none"
+                                    />
+                                    <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
+                                        <span>Открытие + Закрытие</span>
+                                        <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">+500р.</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={handleBatchDelete}
+                                    className="px-6 py-3 border-2 border-red-50 rounded-xl text-red-500 bg-red-50/50 hover:bg-red-50 hover:border-red-100 transition-all font-bold text-sm"
+                                >
+                                    Удалить
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-200 font-bold text-sm"
+                                >
+                                    Применить
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -1046,6 +1316,7 @@ export default function SchedulePage() {
                     y={contextMenu.y}
                     onClose={() => setContextMenu(null)}
                     onAction={handleQuickAction}
+                    showBatchOption={contextMenu.showBatchOption}
                 />
             )}
         </div>
