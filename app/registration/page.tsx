@@ -66,6 +66,12 @@ export default function RegistrationPage() {
     async function handleSave(e: React.FormEvent) {
         e.preventDefault();
         const method = formData.id ? 'PUT' : 'POST';
+        const maxPoints = Number(formData.count) * 3;
+        if (Number(formData.totalScore) > maxPoints) {
+            alert(`Ошибка: Фактические баллы (${formData.totalScore}) не могут превышать максимальные (${maxPoints})`);
+            return;
+        }
+
         const res = await fetch('/api/registration', {
             method,
             headers: { 'Content-Type': 'application/json' },
@@ -103,7 +109,7 @@ export default function RegistrationPage() {
                             onClick={() => {
                                 setFormData({
                                     ...initialForm,
-                                    employeeId: activeEmployeeId !== 'all' ? activeEmployeeId : (employees[0]?.id || '')
+                                    employeeId: activeEmployeeId !== 'all' ? activeEmployeeId : (employees.find(e => e.role !== 'MANAGER')?.id || '')
                                 });
                                 setShowModal(true);
                             }}
@@ -259,7 +265,8 @@ export default function RegistrationPage() {
                                     <div className="relative group">
                                         <input
                                             type="number"
-                                            step="0.1"
+                                            step="1"
+                                            max={Number(formData.count) * 3}
                                             value={formData.totalScore}
                                             onChange={e => setFormData({ ...formData, totalScore: e.target.value })}
                                             className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl px-4 py-3 focus:border-blue-500 focus:bg-white outline-none font-bold text-sm transition-all"

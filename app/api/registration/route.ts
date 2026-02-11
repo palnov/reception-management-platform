@@ -59,12 +59,19 @@ export async function PUT(request: Request) {
         if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
         const registrationCount = Number(count) || 0;
+        const score = Number(totalScore) || 0;
+        const maxPoints = registrationCount * 3;
+
+        if (score > maxPoints) {
+            return NextResponse.json({ error: `Total score (${score}) exceeds max points (${maxPoints})` }, { status: 400 });
+        }
+
         const newData = {
             date,
             employeeId,
             count: registrationCount,
-            totalScore: Number(totalScore) || 0,
-            maxScore: registrationCount * 3,
+            totalScore: score,
+            maxScore: maxPoints,
             patientId: '', // Reset/Not used anymore
             criterion1: 0,
             criterion2: 0,
@@ -96,13 +103,20 @@ export async function POST(request: Request) {
         const { date, employeeId, count, totalScore } = body;
 
         const registrationCount = Number(count) || 0;
+        const score = Number(totalScore) || 0;
+        const maxPoints = registrationCount * 3;
+
+        if (score > maxPoints) {
+            return NextResponse.json({ error: `Total score (${score}) exceeds max points (${maxPoints})` }, { status: 400 });
+        }
+
         const record = await prisma.registrationKpi.create({
             data: {
                 date: date,
                 employeeId,
                 count: registrationCount,
-                totalScore: Number(totalScore) || 0,
-                maxScore: registrationCount * 3,
+                totalScore: score,
+                maxScore: maxPoints,
                 patientId: '',
                 criterion1: 0,
                 criterion2: 0,

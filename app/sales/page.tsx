@@ -158,7 +158,7 @@ export default function SalesPage() {
                         onClick={() => {
                             setFormData({
                                 ...initialForm,
-                                employeeId: activeEmployeeId !== 'all' ? activeEmployeeId : (employees[0]?.id || '')
+                                employeeId: activeEmployeeId !== 'all' ? activeEmployeeId : (employees.find(e => e.role !== 'MANAGER')?.id || '')
                             });
                             setShowModal(true);
                         }}
