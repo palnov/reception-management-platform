@@ -22,6 +22,7 @@ interface Shift {
     hours: number;
     type: string;
     cabinetClosed: boolean;
+    centerClosed: boolean;
     employeeId: string;
     coefficient: number;
     auditLogs?: any[];
@@ -194,6 +195,7 @@ export default function KpiPage() {
             let dayOffHours = 0;
             let dayOffPayTotal = 0;
             let cabinetBonuses = 0;
+            let centerBonuses = 0;
 
             empShifts.forEach(s => {
                 const coeff = s.coefficient || 1.0;
@@ -210,6 +212,7 @@ export default function KpiPage() {
                 }
 
                 if (s.cabinetClosed) cabinetBonuses += 250;
+                if (s.centerClosed) centerBonuses += 500;
             });
 
             // Combine legacy sales bonus with new promotional sales
@@ -233,7 +236,7 @@ export default function KpiPage() {
             if (avgQuality >= 95) qualityBonus = 5000;
             else if (avgQuality >= 90) qualityBonus = 2500;
 
-            const totalPay = basePay + dayOffPayTotal + cabinetBonuses + salesBonus + qualityBonus;
+            const totalPay = basePay + dayOffPayTotal + cabinetBonuses + centerBonuses + salesBonus + qualityBonus;
 
             // Aggregate all audit logs
             const allLogs = [
@@ -258,6 +261,7 @@ export default function KpiPage() {
                 dayOffHours,
                 dayOffPay: dayOffPayTotal,
                 cabinetBonuses,
+                centerBonuses,
                 salesBonus,
                 avgQuality,
                 qualityBonus,
@@ -286,7 +290,8 @@ export default function KpiPage() {
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Часы</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Оклад</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Работа в выходные</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Закрытие кабинетов</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Закрытие каб.</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-right text-emerald-600">Закрытие центра</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Продажи</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Качество</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Итого</th>
@@ -331,6 +336,7 @@ export default function KpiPage() {
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-right text-zinc-600">{calc.cabinetBonuses > 0 ? calc.cabinetBonuses : '-'}</td>
+                                        <td className="px-4 py-3 text-right text-zinc-600 font-medium text-emerald-600">{calc.centerBonuses > 0 ? calc.centerBonuses : '-'}</td>
                                         <td className="px-4 py-3 text-right text-zinc-600">{calc.salesBonus > 0 ? calc.salesBonus : '-'}</td>
                                         <td className="px-4 py-3 text-right text-zinc-600">
                                             {calc.qualityBonus > 0 && <span className="text-green-600 font-medium">+{calc.qualityBonus}</span>}

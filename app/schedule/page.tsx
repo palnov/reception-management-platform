@@ -40,6 +40,7 @@ interface Shift {
     type: string;
     hours: number;
     cabinetClosed: boolean;
+    centerClosed: boolean;
     coefficient: number;
     createdBy?: string;
     auditLogs?: any[];
@@ -177,12 +178,15 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                                     />
                                 )}
 
-                                {/* Door icon - top left corner */}
-                                {shift.cabinetClosed && (
-                                    <div className="absolute top-0.5 left-0.5">
+                                {/* Door icons */}
+                                <div className="absolute top-0.5 left-0.5 flex flex-col gap-0.5">
+                                    {shift.cabinetClosed && (
                                         <DoorOpen className="w-2.5 h-2.5 opacity-40 text-zinc-600" />
-                                    </div>
-                                )}
+                                    )}
+                                    {shift.centerClosed && (
+                                        <DoorOpen className="w-2.5 h-2.5 opacity-60 text-emerald-600" />
+                                    )}
+                                </div>
 
                                 {/* Hours number - centered */}
                                 <span className="font-bold text-sm">
@@ -237,6 +241,7 @@ export default function SchedulePage() {
         type: 'REGULAR',
         hours: '11',
         cabinetClosed: false,
+        centerClosed: false,
         coefficient: '1.0'
     });
 
@@ -368,7 +373,8 @@ export default function SchedulePage() {
             setFormData({
                 type: existingShift.type,
                 hours: existingShift.hours.toString(),
-                cabinetClosed: existingShift.cabinetClosed,
+                cabinetClosed: !!existingShift.cabinetClosed,
+                centerClosed: !!existingShift.centerClosed,
                 coefficient: (existingShift.coefficient || 1.0).toString()
             });
         } else {
@@ -376,6 +382,7 @@ export default function SchedulePage() {
                 type: 'REGULAR',
                 hours: '11',
                 cabinetClosed: false,
+                centerClosed: false,
                 coefficient: '1.0'
             });
         }
@@ -576,6 +583,7 @@ export default function SchedulePage() {
                     type: start.shift!.type,
                     hours: start.shift!.hours,
                     cabinetClosed: start.shift!.cabinetClosed,
+                    centerClosed: start.shift!.centerClosed,
                     coefficient: start.shift!.coefficient,
                     id: shiftsByEmployee[cell.empId]?.[cell.date]?.id
                 }));
@@ -877,18 +885,34 @@ export default function SchedulePage() {
                                         )}
                                     </div>
 
-                                    <div className="flex items-center p-4 bg-zinc-50 rounded-2xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData({ ...formData, cabinetClosed: !formData.cabinetClosed })}>
-                                        <input
-                                            type="checkbox"
-                                            id="cabinet"
-                                            checked={formData.cabinetClosed}
-                                            onChange={e => setFormData({ ...formData, cabinetClosed: e.target.checked })}
-                                            className="w-6 h-6 text-blue-600 rounded-lg focus:ring-blue-500 border-zinc-300 transition-all"
-                                        />
-                                        <label htmlFor="cabinet" className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center gap-2">
-                                            <DoorOpen className="w-4 h-4 text-zinc-400" />
-                                            Закрытие кабинетов (+250 ₽)
-                                        </label>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        <div className="flex items-center p-3 bg-zinc-50 rounded-2xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, cabinetClosed: !prev.cabinetClosed }))}>
+                                            <input
+                                                type="checkbox"
+                                                id="cabinet"
+                                                checked={formData.cabinetClosed}
+                                                readOnly
+                                                className="w-5 h-5 text-blue-600 rounded-lg focus:ring-blue-500 border-zinc-300 transition-all pointer-events-none"
+                                            />
+                                            <label htmlFor="cabinet" className="text-xs font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center gap-2">
+                                                <DoorOpen className="w-3.5 h-3.5 text-zinc-400" />
+                                                Закрытие кабинетов (+250 ₽)
+                                            </label>
+                                        </div>
+
+                                        <div className="flex items-center p-3 bg-zinc-50 rounded-2xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, centerClosed: !prev.centerClosed }))}>
+                                            <input
+                                                type="checkbox"
+                                                id="center"
+                                                checked={formData.centerClosed}
+                                                readOnly
+                                                className="w-5 h-5 text-emerald-600 rounded-lg focus:ring-emerald-500 border-zinc-300 transition-all pointer-events-none"
+                                            />
+                                            <label htmlFor="center" className="text-xs font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center gap-2">
+                                                <DoorOpen className="w-3.5 h-3.5 text-emerald-400" />
+                                                Закрытие центра (+500 ₽)
+                                            </label>
+                                        </div>
                                     </div>
                                 </>
                             )}
@@ -975,6 +999,33 @@ export default function SchedulePage() {
                                             />
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+                            {formData.type === 'REGULAR' && (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex items-center p-3 bg-zinc-50 rounded-2xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, cabinetClosed: !prev.cabinetClosed }))}>
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.cabinetClosed}
+                                            readOnly
+                                            className="w-5 h-5 text-blue-600 rounded-lg focus:ring-blue-500 border-zinc-300 transition-all pointer-events-none"
+                                        />
+                                        <label className="text-[10px] font-bold text-zinc-700 ml-2 cursor-pointer select-none">
+                                            Кабинеты (+250)
+                                        </label>
+                                    </div>
+                                    <div className="flex items-center p-3 bg-zinc-50 rounded-2xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, centerClosed: !prev.centerClosed }))}>
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.centerClosed}
+                                            readOnly
+                                            className="w-5 h-5 text-emerald-600 rounded-lg focus:ring-emerald-500 border-zinc-300 transition-all pointer-events-none"
+                                        />
+                                        <label className="text-[10px] font-bold text-zinc-700 ml-2 cursor-pointer select-none">
+                                            Центр (+500)
+                                        </label>
+                                    </div>
                                 </div>
                             )}
 

@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { id, date, employeeId, type, hours, cabinetClosed, coefficient } = body;
+    const { id, date, employeeId, type, hours, cabinetClosed, centerClosed, coefficient } = body;
 
     try {
         if (id) {
@@ -74,6 +74,7 @@ export async function POST(request: Request) {
                 type,
                 hours: parseFloat(hours),
                 cabinetClosed: cabinetClosed || false,
+                centerClosed: centerClosed || false,
                 coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5),
                 createdBy: existing.createdBy,
                 isDeleted: false // Restore if it was deleted
@@ -108,6 +109,7 @@ export async function POST(request: Request) {
                     type,
                     hours: parseFloat(hours),
                     cabinetClosed: cabinetClosed || false,
+                    centerClosed: centerClosed || false,
                     coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5),
                     isDeleted: false // Restore
                 };
@@ -135,6 +137,7 @@ export async function POST(request: Request) {
                     type,
                     hours: parseFloat(hours),
                     cabinetClosed: cabinetClosed || false,
+                    centerClosed: centerClosed || false,
                     coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5),
                     createdBy: session.employee.name,
                     isDeleted: false
@@ -143,7 +146,11 @@ export async function POST(request: Request) {
             // For create, maybe log the whole object or just key fields?
             // logging initial values
             await logAudit('SHIFT', shift.id, 'CREATE', {
-                type, hours: parseFloat(hours), coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5)
+                type,
+                hours: parseFloat(hours),
+                cabinetClosed: !!cabinetClosed,
+                centerClosed: !!centerClosed,
+                coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5)
             }, session);
             return NextResponse.json(shift);
         }

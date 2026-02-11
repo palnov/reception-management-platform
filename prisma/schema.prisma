@@ -30,6 +30,7 @@ model Shift {
   type          String   @default("REGULAR")
   hours         Float    @default(0)
   cabinetClosed Boolean  @default(false)
+  centerClosed  Boolean  @default(false)
   coefficient   Float    @default(1.0)
   comment       String?
   createdAt     String   @default("")

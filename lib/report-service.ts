@@ -124,7 +124,8 @@ export class ReportService {
                 const rows = useMultiRow ? [
                     sheet.getRow(rowIdx),
                     sheet.getRow(rowIdx + 1),
-                    sheet.getRow(rowIdx + 2)
+                    sheet.getRow(rowIdx + 2),
+                    sheet.getRow(rowIdx + 3)
                 ] : [sheet.getRow(rowIdx)];
 
                 const mainRow = rows[0];
@@ -139,6 +140,9 @@ export class ReportService {
                     rows[1].getCell(1).style = { ...cellStyle, font: { italic: true, size: 9, color: { argb: 'FF6B7280' } } };
                     rows[2].getCell(1).value = 'Кабинет';
                     rows[2].getCell(1).style = { ...cellStyle, font: { italic: true, size: 9, color: { argb: 'FF6B7280' } } };
+                    rows[3] = sheet.getRow(rowIdx + 3);
+                    rows[3].getCell(1).value = 'Центр';
+                    rows[3].getCell(1).style = { ...cellStyle, font: { italic: true, size: 9, color: { argb: 'FF059669' } } };
                 }
 
                 // Day columns
@@ -182,6 +186,10 @@ export class ReportService {
                             if (shift.cabinetClosed) {
                                 rows[2].getCell(col).value = 'Да';
                                 rows[2].getCell(col).font = { size: 9, bold: true, color: { argb: 'FF059669' } };
+                            }
+                            if (shift.centerClosed) {
+                                rows[3].getCell(col).value = 'Да';
+                                rows[3].getCell(col).font = { size: 9, bold: true, color: { argb: 'FF059669' } };
                             }
                         }
                     }
@@ -282,6 +290,7 @@ export class ReportService {
                 { header: 'Часы', key: 'hours', width: 12, style: { ...cellStyle, numFmt: '0.0' } },
                 { header: 'Смены (Руб)', key: 'shiftPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Кабинеты', key: 'cabinets', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'Центр', key: 'center', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Качество', key: 'quality', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
                 { header: 'KPI бонус', key: 'kpi', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
@@ -306,6 +315,7 @@ export class ReportService {
                 let hoursWorked = 0;
                 let shiftPay = 0;
                 let cabinetBonuses = 0;
+                let centerBonuses = 0;
                 const hourlyBase = emp.baseSalary / monthNorm;
 
                 empShifts.forEach(s => {
@@ -316,6 +326,7 @@ export class ReportService {
                         shiftPay += (3500 / 11) * s.hours;
                     }
                     if (s.cabinetClosed) cabinetBonuses += 250;
+                    if (s.centerClosed) centerBonuses += 500;
                 });
 
                 const salesBonus = empLegacyKpi.reduce((sum, k) => sum + k.salesBonus, 0) +
@@ -341,10 +352,11 @@ export class ReportService {
                     hours: hoursWorked,
                     shiftPay: Math.round(shiftPay),
                     cabinets: cabinetBonuses,
+                    center: centerBonuses,
                     sales: salesBonus,
                     quality: avgQuality,
                     kpi: kpiBonus,
-                    total: Math.round(shiftPay + cabinetBonuses + salesBonus + kpiBonus)
+                    total: Math.round(shiftPay + cabinetBonuses + centerBonuses + salesBonus + kpiBonus)
                 });
             }
 
