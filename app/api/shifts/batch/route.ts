@@ -63,7 +63,7 @@ export async function POST(request: Request) {
                             type: op.type,
                             hours: parseFloat(op.hours),
                             cabinetClosed: !!op.cabinetClosed,
-                            coefficient: parseFloat(op.coefficient || 1.0),
+                            coefficient: Math.min(parseFloat(op.coefficient || 1.0), 1.5),
                             createdBy: existing.createdBy,
                             isDeleted: false
                         };
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
                                 type: op.type,
                                 hours: parseFloat(op.hours),
                                 cabinetClosed: !!op.cabinetClosed,
-                                coefficient: parseFloat(op.coefficient || 1.0),
+                                coefficient: Math.min(parseFloat(op.coefficient || 1.0), 1.5),
                                 createdBy: session.employee.name,
                                 isDeleted: false
                             } as any

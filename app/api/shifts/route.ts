@@ -74,7 +74,7 @@ export async function POST(request: Request) {
                 type,
                 hours: parseFloat(hours),
                 cabinetClosed: cabinetClosed || false,
-                coefficient: parseFloat(coefficient || 1.0),
+                coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5),
                 createdBy: existing.createdBy,
                 isDeleted: false // Restore if it was deleted
             };
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
                     type,
                     hours: parseFloat(hours),
                     cabinetClosed: cabinetClosed || false,
-                    coefficient: parseFloat(coefficient || 1.0),
+                    coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5),
                     isDeleted: false // Restore
                 };
                 const diff = calculateDiff(existing, newData);
@@ -135,7 +135,7 @@ export async function POST(request: Request) {
                     type,
                     hours: parseFloat(hours),
                     cabinetClosed: cabinetClosed || false,
-                    coefficient: parseFloat(coefficient || 1.0),
+                    coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5),
                     createdBy: session.employee.name,
                     isDeleted: false
                 } as any
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
             // For create, maybe log the whole object or just key fields?
             // logging initial values
             await logAudit('SHIFT', shift.id, 'CREATE', {
-                type, hours: parseFloat(hours), coefficient: parseFloat(coefficient || 1.0)
+                type, hours: parseFloat(hours), coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5)
             }, session);
             return NextResponse.json(shift);
         }

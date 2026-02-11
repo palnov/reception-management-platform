@@ -53,34 +53,27 @@ export function InfoTooltip({ logs, className = "", onAuditClick, currentUser, c
         }
     }, [isVisible]);
 
-    // Visibility Logic
+    // Visibility Logic: "Superseded Editor" rule
     let shouldShow = false;
 
-    // If we don't have user info yet, decide safe default or hide? Hide to avoid flicker.
-    if (currentUser) {
-        const isManager = currentUser.role === 'MANAGER';
-        const isMe = (name: string) => name === currentUser.name;
-        const creatorName = createdBy || ''; // If undefined, assume NOT me (safe?) or handle 'system'?
+    if (currentUser && logs.length > 0) {
+        const myName = currentUser.name;
+        const latestEditor = logs[0].changedBy;
 
-        // Find if any log is by "Other"
-        const hasEditsByOther = logs.some(l => !isMe(l.changedBy));
-
-        if (isManager) {
-            // 1. Created by other
-            const createdByOther = !isMe(creatorName);
-            // 2. Created by Me but edited by other
-            if (createdByOther) shouldShow = true;
-            else if (hasEditsByOther) shouldShow = true;
+        // 1. If I am the latest editor, I see NO icon.
+        if (latestEditor === myName) {
+            shouldShow = false;
         } else {
-            // Employee
-            // 1. Created by Me AND edited by other
-            const createdByMe = isMe(creatorName);
-            if (createdByMe && hasEditsByOther) shouldShow = true;
+            // 2. I see the icon ONLY if I was the editor immediately before the current sequence of edits by others.
+            // Search for the first entry in logs that was NOT made by the current latestEditor.
+            const supersededLog = logs.find(l => l.changedBy !== latestEditor);
+
+            // 3. If that superseded editor was ME, then I should see the icon.
+            if (supersededLog && supersededLog.changedBy === myName) {
+                shouldShow = true;
+            }
         }
     } else {
-        // Fallback or loading state
-        // If critical to show 'i' before load, we might default to logic based on logs only?
-        // But the requirements are strict. Hide until loaded.
         return null;
     }
 

@@ -119,25 +119,43 @@ export class ReportService {
             let rowIdx = 5;
 
             for (const emp of reportEmployees) {
-                const row = sheet.getRow(rowIdx);
+                // If specific employee, we want 3 rows: Hours, Coefficient, Cabinet
+                const useMultiRow = !!employeeId;
+                const rows = useMultiRow ? [
+                    sheet.getRow(rowIdx),
+                    sheet.getRow(rowIdx + 1),
+                    sheet.getRow(rowIdx + 2)
+                ] : [sheet.getRow(rowIdx)];
 
-                // Column A: employee name
-                row.getCell(1).value = emp.name;
-                row.getCell(1).style = cellStyle;
-                row.getCell(1).font = { bold: true };
+                const mainRow = rows[0];
+
+                // Column A labels
+                mainRow.getCell(1).value = emp.name;
+                mainRow.getCell(1).style = cellStyle;
+                mainRow.getCell(1).font = { bold: true };
+
+                if (useMultiRow) {
+                    rows[1].getCell(1).value = 'Коэф.';
+                    rows[1].getCell(1).style = { ...cellStyle, font: { italic: true, size: 9, color: { argb: 'FF6B7280' } } };
+                    rows[2].getCell(1).value = 'Кабинет';
+                    rows[2].getCell(1).style = { ...cellStyle, font: { italic: true, size: 9, color: { argb: 'FF6B7280' } } };
+                }
 
                 // Day columns
                 for (let d = 1; d <= daysInMonth; d++) {
                     const col = d + 1;
                     const dayStr = `${monthStr}-${String(d).padStart(2, '0')}`; // Results in YYYY-MM-DD
                     const shift = shiftMap.get(`${emp.id}|${dayStr}`);
-                    const cell = row.getCell(col);
 
-                    // Base cell styling
-                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                    if (cellStyle.border) cell.border = cellStyle.border;
+                    // Initialize styling for all rows in this set
+                    rows.forEach(r => {
+                        const cell = r.getCell(col);
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                        if (cellStyle.border) cell.border = cellStyle.border;
+                    });
 
                     if (shift) {
+                        const cell = mainRow.getCell(col);
                         if (shift.type === 'REGULAR') {
                             cell.value = shift.hours;
                             cell.fill = fillRegular;
@@ -155,11 +173,24 @@ export class ReportService {
                             cell.fill = fillVacation;
                             cell.font = { bold: true, color: { argb: 'FF064E3B' } };
                         }
+
+                        // Fill additional rows if in multi-row mode
+                        if (useMultiRow) {
+                            rows[1].getCell(col).value = shift.coefficient;
+                            rows[1].getCell(col).font = { size: 9 };
+
+                            if (shift.cabinetClosed) {
+                                rows[2].getCell(col).value = 'Да';
+                                rows[2].getCell(col).font = { size: 9, bold: true, color: { argb: 'FF059669' } };
+                            }
+                        }
                     }
                 }
 
-                row.height = 22;
-                rowIdx++;
+                rows.forEach((r, idx) => {
+                    r.height = idx === 0 ? 22 : 18;
+                });
+                rowIdx += rows.length;
             }
         }
 

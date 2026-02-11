@@ -45,6 +45,7 @@ next-env.d.ts
 /prisma/*.db-journal
 /prisma/*.db-shm
 /prisma/*.db-wal
+/prisma/snapshots/
 
 # local test files
 test-backup.json

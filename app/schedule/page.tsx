@@ -144,14 +144,14 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                     else if (shift.type === 'VACATION') { bgClass = 'bg-green-100'; textClass = 'text-green-900'; }
                     else { bgClass = 'bg-blue-100'; textClass = 'text-blue-900'; }
                 } else if (isWeekend) {
-                    bgClass = 'bg-zinc-50/50';
+                    bgClass = 'bg-red-50/20'; // More distinct weekend background
                 }
 
                 return (
                     <td
                         key={dateKey}
                         className={`border-r border-zinc-200 text-center cursor-pointer transition-all relative h-12 w-11 p-0 select-none
-                            ${shift && !shift.isDeleted ? bgClass : (isWeekend ? 'bg-zinc-50/50' : '')}
+                            ${shift && !shift.isDeleted ? bgClass : (isWeekend ? 'bg-red-50/20' : '')}
                             ${shift && !shift.isDeleted ? textClass : ''}
                             ${!shift || shift.isDeleted ? 'hover:bg-blue-50' : 'hover:brightness-95'}
                             ${isSelected ? 'ring-2 ring-blue-500 ring-inset z-20 bg-blue-500/10' : ''}
@@ -398,6 +398,7 @@ export default function SchedulePage() {
                 date: format(selectedDate, 'yyyy-MM-dd'),
                 employeeId: selectedEmployeeId,
                 ...formData,
+                coefficient: Math.min(parseFloat(formData.coefficient || '1.0'), 1.5).toString()
             }),
         });
         setShowModal(false);
@@ -502,7 +503,12 @@ export default function SchedulePage() {
 
         const res = await fetch('/api/shifts/batch', {
             method: 'POST',
-            body: JSON.stringify({ operations })
+            body: JSON.stringify({
+                operations: operations.map(op => ({
+                    ...op,
+                    coefficient: Math.min(parseFloat(formData.coefficient || '1.0'), 1.5).toString()
+                }))
+            })
         });
 
         if (!res.ok) {
@@ -561,14 +567,9 @@ export default function SchedulePage() {
         } else {
             // Range selected
             const range = getSelectedRange(selection);
-            // Check if any cell in the range (EXCLUDING the start cell) has data
-            const otherCellsHaveData = range.some(cell =>
-                (cell.empId !== start.empId || cell.date !== start.date) &&
-                shiftsByEmployee[cell.empId]?.[cell.date]
-            );
 
-            if (start.shift && !otherCellsHaveData) {
-                // Drag-to-fill: Copy source shift to EMPTY range
+            if (start.shift) {
+                // Drag-to-fill: Copy source shift to any range (now includes OVERWRITING)
                 const operations = range.map(cell => ({
                     date: cell.date,
                     employeeId: cell.empId,
@@ -581,15 +582,21 @@ export default function SchedulePage() {
 
                 await fetch('/api/shifts/batch', {
                     method: 'POST',
-                    body: JSON.stringify({ operations })
+                    body: JSON.stringify({
+                        operations: operations.map(op => ({
+                            ...op,
+                            coefficient: Math.min(parseFloat(op.coefficient.toString() || '1.0'), 1.5).toString()
+                        }))
+                    })
                 });
                 setSelection(null);
                 fetchShifts();
-            } else if (!start.shift && !otherCellsHaveData) {
-                // Range is entirely empty
-                setShowBatchModal(true);
-            } else {
-                // Range has data or user is selecting existing data: JUST LEAVE SELECTED
+            } else if (!start.shift) {
+                // Check if any cell in the range has data. If yes, just select. If no, show batch modal.
+                const anyData = range.some(cell => shiftsByEmployee[cell.empId]?.[cell.date]);
+                if (!anyData) {
+                    setShowBatchModal(true);
+                }
             }
         }
 
@@ -660,7 +667,10 @@ export default function SchedulePage() {
 
         await fetch('/api/shifts', {
             method: 'POST',
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+                ...payload,
+                coefficient: Math.min(parseFloat(payload.coefficient.toString() || '1.0'), 1.5)
+            })
         });
         fetchShifts();
     }, [contextMenu, fetchShifts]);
@@ -712,7 +722,7 @@ export default function SchedulePage() {
                                     const isToday = isSameDay(day, new Date());
                                     const dateKey = format(day, 'yyyy-MM-dd');
                                     return (
-                                        <th key={dateKey} className={`border-b border-r border-zinc-200 p-2 text-center min-w-[44px] ${isWeekend ? 'bg-red-50/30 text-red-500' : 'bg-transparent text-zinc-700'} ${isToday ? 'bg-blue-50 text-blue-600' : ''}`}>
+                                        <th key={dateKey} className={`border-b border-r border-zinc-200 p-2 text-center min-w-[44px] ${isWeekend ? 'bg-red-50 text-red-600' : 'bg-transparent text-zinc-700'} ${isToday ? 'bg-blue-50 text-blue-600' : ''}`}>
                                             <div className="font-bold text-xs">{format(day, 'd')}</div>
                                             <div className="text-[9px] uppercase font-medium opacity-60">{format(day, 'EEEEEE', { locale: ru })}</div>
                                         </th>
@@ -857,6 +867,8 @@ export default function SchedulePage() {
                                                 <input
                                                     type="number"
                                                     step="0.1"
+                                                    min="1.0"
+                                                    max="1.5"
                                                     value={formData.coefficient}
                                                     onChange={e => setFormData({ ...formData, coefficient: e.target.value })}
                                                     className="w-full px-4 py-3 border-2 border-zinc-100 rounded-xl focus:border-blue-500 outline-none bg-zinc-50/50 font-medium transition-all"
@@ -955,6 +967,8 @@ export default function SchedulePage() {
                                             <input
                                                 type="number"
                                                 step="0.1"
+                                                min="1.0"
+                                                max="1.5"
                                                 value={formData.coefficient}
                                                 onChange={e => setFormData({ ...formData, coefficient: e.target.value })}
                                                 className="w-full px-4 py-3 border-2 border-zinc-100 rounded-xl focus:border-blue-500 outline-none bg-zinc-50/50 font-medium transition-all"
