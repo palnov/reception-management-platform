@@ -84,10 +84,10 @@ const SelectionOverlay = memo(function SelectionOverlay({
     const startRect = startCell.getBoundingClientRect();
     const endRect = endCell.getBoundingClientRect();
 
-    const top = Math.round(startRect.top - containerRect.top + container.scrollTop);
-    const left = Math.round(startRect.left - containerRect.left + container.scrollLeft);
-    const width = Math.round(endRect.right - startRect.left);
-    const height = Math.round(endRect.bottom - startRect.top);
+    const top = startRect.top - containerRect.top + container.scrollTop - 1;
+    const left = startRect.left - containerRect.left + container.scrollLeft - 1;
+    const width = endRect.right - startRect.left + 1;
+    const height = endRect.bottom - startRect.top + 1;
 
     return (
         <div
