@@ -135,7 +135,7 @@ export class ReportService {
 
                     // Base cell styling
                     cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                    cell.border = cellStyle.border;
+                    if (cellStyle.border) cell.border = cellStyle.border;
 
                     if (shift) {
                         if (shift.type === 'REGULAR') {
