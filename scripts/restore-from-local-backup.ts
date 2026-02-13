@@ -29,6 +29,7 @@ async function restore() {
             await tx.shift.deleteMany({});
             await tx.employee.deleteMany({});
             await tx.monthlyNorm.deleteMany({});
+            await tx.monthlyChecklist.deleteMany({});
 
             console.log('Cleared existing data.');
 
@@ -61,6 +62,7 @@ async function restore() {
                             type: s.type || 'REGULAR',
                             hours: Number(s.hours ?? 0),
                             cabinetClosed: Boolean(s.cabinetClosed),
+                            centerClosed: Boolean(s.centerClosed),
                             coefficient: Number(s.coefficient ?? 1.0),
                             comment: s.comment,
                             createdAt: s.createdAt || '',
@@ -83,7 +85,7 @@ async function restore() {
                             qualityScore: Number(k.qualityScore ?? 0),
                             errorsCount: Number(k.errorsCount ?? 0),
                             salesBonus: Number(k.salesBonus ?? 0),
-                            checkList: Boolean(k.checkList),
+                            checkList: Number(k.checkList ?? 0),
                             createdAt: k.createdAt || '',
                             createdBy: k.createdBy
                         }
@@ -148,6 +150,34 @@ async function restore() {
                     });
                 }
                 console.log('Restored Monthly Norms.');
+            }
+
+            // 8. Restore MonthlyChecklist
+            if (data.monthlyChecklists) {
+                for (const m of data.monthlyChecklists) {
+                    await tx.monthlyChecklist.upsert({
+                        where: {
+                            month_employeeId: {
+                                month: m.month,
+                                employeeId: m.employeeId
+                            }
+                        },
+                        update: {
+                            percentage: Number(m.percentage ?? 0),
+                            updatedAt: m.updatedAt || '',
+                            updatedBy: m.updatedBy
+                        },
+                        create: {
+                            month: m.month,
+                            employeeId: m.employeeId,
+                            percentage: Number(m.percentage ?? 0),
+                            createdAt: m.createdAt || '',
+                            updatedAt: m.updatedAt || '',
+                            updatedBy: m.updatedBy
+                        }
+                    });
+                }
+                console.log('Restored Monthly Checklists.');
             }
         });
 
