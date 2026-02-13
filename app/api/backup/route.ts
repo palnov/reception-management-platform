@@ -188,6 +188,7 @@ export async function POST(request: Request) {
                             criterion3: Number(r.criterion3 ?? 0),
                             totalScore: Number(r.totalScore ?? 0),
                             maxScore: Number(r.maxScore ?? 0),
+                            count: Number(r.count ?? 0),
                             createdAt: r.createdAt || '',
                             createdBy: r.createdBy
                         }
