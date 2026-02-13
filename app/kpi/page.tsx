@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, isSameDay, subMonths, addMonths, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, CheckCircle, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, X, Pencil, ClipboardCheck } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
 
 interface Employee {
@@ -25,6 +25,7 @@ interface Shift {
     centerClosed: boolean;
     employeeId: string;
     coefficient: number;
+    isDeleted?: boolean;
     auditLogs?: any[];
 }
 
@@ -34,7 +35,7 @@ interface KpiRecord {
     qualityScore: number;
     errorsCount: number;
     salesBonus: number;
-    checkList: boolean;
+    checkList: number;
     employeeId: string;
     auditLogs?: any[];
 }
@@ -65,18 +66,24 @@ export default function KpiPage() {
     const [kpiRecords, setKpiRecords] = useState<KpiRecord[]>([]);
     const [promotionSales, setPromotionSales] = useState<PromotionSale[]>([]);
     const [registrationKpis, setRegistrationKpis] = useState<RegistrationKpi[]>([]);
+    const [monthlyChecklists, setMonthlyChecklists] = useState<any[]>([]);
     const [monthNorm, setMonthNorm] = useState<number>(176);
 
     // Entry Form State
     const [showModal, setShowModal] = useState(false);
     const [selectedKpiDate, setSelectedKpiDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+    const [editingKpiId, setEditingKpiId] = useState<string | null>(null);
+
+    // Inline Editing State for Checklist
+    const [editingChecklistEmpId, setEditingChecklistEmpId] = useState<string | null>(null);
+    const [tempChecklistValue, setTempChecklistValue] = useState<string>('');
 
     const initialForm = {
         qualityScore: '100',
         errorsCount: '0',
         salesBonus: '0',
-        checkList: true,
+        checkList: '0',
     };
     const [formData, setFormData] = useState(initialForm);
 
@@ -115,22 +122,25 @@ export default function KpiPage() {
             const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
             const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
 
-            const [shiftsRes, kpiRes, salesRes, regRes] = await Promise.all([
+            const [shiftsRes, kpiRes, salesRes, regRes, checklistRes] = await Promise.all([
                 fetch(`/api/shifts?start=${start}&end=${end}`),
                 fetch(`/api/kpi?start=${start}&end=${end}`),
                 fetch(`/api/sales?start=${start}&end=${end}`),
-                fetch(`/api/registration?start=${start}&end=${end}`)
+                fetch(`/api/registration?start=${start}&end=${end}`),
+                fetch(`/api/checklist?month=${currentMonth.toISOString().substring(0, 7)}`)
             ]);
 
             const shiftsData = await shiftsRes.json();
             const kpiData = await kpiRes.json();
             const salesData = await salesRes.json();
             const regData = await regRes.json();
+            const checklistData = await checklistRes.json();
 
             setShifts(Array.isArray(shiftsData) ? shiftsData : []);
             setKpiRecords(Array.isArray(kpiData) ? kpiData : []);
             setPromotionSales(Array.isArray(salesData) ? salesData : []);
             setRegistrationKpis(Array.isArray(regData) ? regData : []);
+            setMonthlyChecklists(Array.isArray(checklistData) ? checklistData : []);
         } catch (e) {
             console.error('KPI_FETCH_DATA_ERROR:', e);
         }
@@ -154,20 +164,29 @@ export default function KpiPage() {
         setShowModal(true);
     }
 
-    async function handleSaveKpi(e: React.FormEvent) {
-        e.preventDefault();
-        if (!selectedEmployeeId) return;
 
-        await fetch('/api/kpi', {
-            method: 'POST',
-            body: JSON.stringify({
-                date: selectedKpiDate,
-                employeeId: selectedEmployeeId,
-                ...formData,
-            }),
-        });
-        fetchData();
-        setShowModal(false);
+
+    async function handleSaveChecklist(empId: string, value: string) {
+        try {
+            const newValue = parseFloat(value);
+            const month = currentMonth.toISOString().substring(0, 7); // Format: "2026-02"
+
+            await fetch('/api/checklist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    month,
+                    employeeId: empId,
+                    percentage: newValue,
+                    updatedBy: currentUser?.name || null
+                }),
+            });
+
+            fetchData();
+            setEditingChecklistEmpId(null);
+        } catch (e) {
+            console.error('Failed to save checklist:', e);
+        }
     }
 
     const payrollData = useMemo(() => {
@@ -185,7 +204,7 @@ export default function KpiPage() {
                 ? { ...emp, baseSalary: currentUser.baseSalary }
                 : emp;
 
-            const empShifts = shifts.filter(s => s.employeeId === enrichedEmp.id);
+            const empShifts = shifts.filter(s => s.employeeId === enrichedEmp.id && !s.isDeleted);
             const empKpis = kpiRecords.filter(k => k.employeeId === enrichedEmp.id);
             const empSales = promotionSales.filter(s => s.employeeId === enrichedEmp.id);
             const empRegs = registrationKpis.filter(r => r.employeeId === enrichedEmp.id);
@@ -194,9 +213,7 @@ export default function KpiPage() {
             let basePay = 0;
             let dayOffHours = 0;
             let dayOffPayTotal = 0;
-            let cabinetBonuses = 0;
-            let centerBonuses = 0;
-
+            let closingBonuses = 0;
             empShifts.forEach(s => {
                 const coeff = s.coefficient || 1.0;
                 const hourlyBase = enrichedEmp.baseSalary / monthNorm;
@@ -211,8 +228,8 @@ export default function KpiPage() {
                     basePay += shiftPay;
                 }
 
-                if (s.cabinetClosed) cabinetBonuses += 250;
-                if (s.centerClosed) centerBonuses += 500;
+                if (s.cabinetClosed) closingBonuses += 250;
+                if (s.centerClosed) closingBonuses += 500;
             });
 
             // Combine legacy sales bonus with new promotional sales
@@ -232,11 +249,20 @@ export default function KpiPage() {
 
             const avgQuality = regCount > 0 ? regQuality : legacyQuality;
 
+            // Get checklist from monthly checklist table (single value per month)
+            const monthStr = currentMonth.toISOString().substring(0, 7);
+            const empChecklist = monthlyChecklists.find(c => c.employeeId === enrichedEmp.id && c.month === monthStr);
+            const calcChecklist = empChecklist ? empChecklist.percentage : 0;
+
             let qualityBonus = 0;
             if (avgQuality >= 95) qualityBonus = 5000;
-            else if (avgQuality >= 90) qualityBonus = 2500;
+            else if (avgQuality >= 85) qualityBonus = 2500;
 
-            const totalPay = basePay + dayOffPayTotal + cabinetBonuses + centerBonuses + salesBonus + qualityBonus;
+            let checklistBonus = 0;
+            if (calcChecklist >= 90) checklistBonus = 5000;
+            else if (calcChecklist >= 76) checklistBonus = 2500;
+
+            const totalPay = basePay + dayOffPayTotal + closingBonuses + salesBonus + qualityBonus + checklistBonus;
 
             // Aggregate all audit logs
             const allLogs = [
@@ -260,16 +286,17 @@ export default function KpiPage() {
                 basePay,
                 dayOffHours,
                 dayOffPay: dayOffPayTotal,
-                cabinetBonuses,
-                centerBonuses,
+                closingBonuses,
                 salesBonus,
                 avgQuality,
                 qualityBonus,
+                calcChecklist,
+                checklistBonus,
                 totalPay,
                 auditLogs: uniqueLogs
             };
         });
-    }, [employees, shifts, kpiRecords, promotionSales, registrationKpis, monthNorm, currentUser, isUserLoading]);
+    }, [employees, shifts, kpiRecords, promotionSales, registrationKpis, monthlyChecklists, monthNorm, currentUser, isUserLoading, currentMonth]);
 
     return (
         <div>
@@ -290,9 +317,9 @@ export default function KpiPage() {
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Часы</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Оклад</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Работа в выходные</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Закрытие каб.</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right text-emerald-600">Закрытие центра</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Открытие/Закрытие</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Продажи</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Чеклист</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Качество</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Итого</th>
                         </tr>
@@ -300,11 +327,11 @@ export default function KpiPage() {
                     <tbody className="divide-y divide-zinc-100">
                         {isUserLoading ? (
                             <tr>
-                                <td colSpan={8} className="px-4 py-12 text-center text-zinc-500">Загрузка данных...</td>
+                                <td colSpan={9} className="px-4 py-12 text-center text-zinc-500">Загрузка данных...</td>
                             </tr>
                         ) : payrollData.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="px-4 py-12 text-center text-zinc-500">Нет данных для отображения.</td>
+                                <td colSpan={9} className="px-4 py-12 text-center text-zinc-500">Нет данных для отображения.</td>
                             </tr>
                         ) : (
                             payrollData.map(calc => {
@@ -313,11 +340,7 @@ export default function KpiPage() {
                                 return (
                                     <tr
                                         key={calc.empId}
-                                        className="hover:bg-zinc-50 cursor-pointer"
-                                        onClick={(e) => {
-                                            if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
-                                            handleRowClick(calc.empId);
-                                        }}
+                                        className="hover:bg-zinc-50"
                                     >
                                         <td className="px-4 py-3 font-medium text-zinc-900">
                                             <div className="flex items-center gap-2">
@@ -335,9 +358,39 @@ export default function KpiPage() {
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-right text-zinc-600">{calc.cabinetBonuses > 0 ? calc.cabinetBonuses : '-'}</td>
-                                        <td className="px-4 py-3 text-right text-zinc-600 font-medium text-emerald-600">{calc.centerBonuses > 0 ? calc.centerBonuses : '-'}</td>
+                                        <td className="px-4 py-3 text-right text-zinc-600 font-medium text-emerald-600">{calc.closingBonuses > 0 ? calc.closingBonuses : '-'}</td>
                                         <td className="px-4 py-3 text-right text-zinc-600">{calc.salesBonus > 0 ? calc.salesBonus : '-'}</td>
+                                        <td className="px-4 py-3 text-right text-zinc-600">
+                                            {editingChecklistEmpId === calc.empId ? (
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <input
+                                                        autoFocus
+                                                        type="number"
+                                                        className="w-16 px-1 py-0.5 border rounded text-right text-sm"
+                                                        value={tempChecklistValue}
+                                                        onChange={(e) => setTempChecklistValue(e.target.value)}
+                                                        onBlur={() => handleSaveChecklist(calc.empId, tempChecklistValue)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') handleSaveChecklist(calc.empId, tempChecklistValue);
+                                                            if (e.key === 'Escape') setEditingChecklistEmpId(null);
+                                                        }}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    {calc.checklistBonus > 0 && <span className="text-green-600 font-medium">+{calc.checklistBonus}</span>}
+                                                    <div
+                                                        className="text-[10px] text-zinc-400 cursor-pointer hover:text-blue-600 transition-colors"
+                                                        onClick={() => {
+                                                            setEditingChecklistEmpId(calc.empId);
+                                                            setTempChecklistValue(calc.calcChecklist.toFixed(0));
+                                                        }}
+                                                    >
+                                                        {calc.calcChecklist.toFixed(0)}%
+                                                    </div>
+                                                </>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-3 text-right text-zinc-600">
                                             {calc.qualityBonus > 0 && <span className="text-green-600 font-medium">+{calc.qualityBonus}</span>}
                                             <div className="text-[10px] text-zinc-400">{calc.avgQuality.toFixed(1)}%</div>
@@ -370,7 +423,7 @@ export default function KpiPage() {
                             Сотрудник: <span className="font-medium text-zinc-900">{employees.find(e => e.id === selectedEmployeeId)?.name}</span>
                         </p>
 
-                        <form onSubmit={handleSaveKpi} className="space-y-6">
+                        <form className="space-y-6">
                             <div>
                                 <label className="block text-sm font-medium mb-1">Дата</label>
                                 <input
@@ -413,14 +466,22 @@ export default function KpiPage() {
                                 />
                             </div>
 
-                            <div className="flex items-center p-3 bg-zinc-50 rounded-lg border border-zinc-200 cursor-pointer" onClick={() => setFormData({ ...formData, checkList: !formData.checkList })}>
-                                <input
-                                    type="checkbox"
-                                    checked={formData.checkList}
-                                    onChange={e => setFormData({ ...formData, checkList: e.target.checked })}
-                                    className="w-4 h-4 text-blue-600 rounded cursor-pointer"
-                                />
-                                <label className="ml-2 text-sm text-zinc-700 cursor-pointer select-none">Чек-лист заполнен</label>
+                            <div className="p-3 bg-zinc-50 rounded-lg border border-zinc-200">
+                                <label className="block text-sm font-medium mb-1">Чек-лист (%)</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="number"
+                                        value={formData.checkList}
+                                        onChange={e => setFormData({ ...formData, checkList: e.target.value })}
+                                        className="w-full px-3 py-2 border rounded-lg"
+                                        max="100" min="0"
+                                    />
+                                    <div className="text-xs font-bold whitespace-nowrap">
+                                        {parseFloat(formData.checkList) >= 90 ? <span className="text-green-600">+5000р</span> :
+                                            parseFloat(formData.checkList) >= 76 ? <span className="text-blue-600">+2500р</span> :
+                                                <span className="text-zinc-400">0р</span>}
+                                    </div>
+                                </div>
                             </div>
 
                             <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium">

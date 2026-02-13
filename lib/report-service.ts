@@ -289,9 +289,10 @@ export class ReportService {
                 { header: 'Оклад', key: 'base', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Часы', key: 'hours', width: 12, style: { ...cellStyle, numFmt: '0.0' } },
                 { header: 'Смены (Руб)', key: 'shiftPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                { header: 'Кабинеты', key: 'cabinets', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                { header: 'Центр', key: 'center', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'Откр/Закр', key: 'closing', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'Чеклист %', key: 'checklist_pct', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
+                { header: 'Чеклист Руб', key: 'checklist_rub', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Качество', key: 'quality', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
                 { header: 'KPI бонус', key: 'kpi', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'ИТОГО', key: 'total', width: 15, style: { ...cellStyle, font: { bold: true }, numFmt: '#,##0' } },
@@ -304,6 +305,11 @@ export class ReportService {
             const allKpi = await prisma.kpiRecord.findMany({ where: { date: dateFilter, employeeId: employeeId || undefined } });
             const allRegs = await prisma.registrationKpi.findMany({ where: { date: dateFilter, employeeId: employeeId || undefined } });
 
+            // Fetch monthly checklists
+            const allChecklists = await prisma.monthlyChecklist.findMany({
+                where: { month: monthStr, ...(employeeId ? { employeeId } : {}) }
+            });
+
             for (const emp of employees) {
                 if (emp.role === 'MANAGER') continue;
 
@@ -314,8 +320,7 @@ export class ReportService {
 
                 let hoursWorked = 0;
                 let shiftPay = 0;
-                let cabinetBonuses = 0;
-                let centerBonuses = 0;
+                let closingBonuses = 0;
                 const hourlyBase = emp.baseSalary / monthNorm;
 
                 empShifts.forEach(s => {
@@ -325,8 +330,8 @@ export class ReportService {
                     } else if (s.type === 'DAY_OFF_WORK') {
                         shiftPay += (3500 / 11) * s.hours;
                     }
-                    if (s.cabinetClosed) cabinetBonuses += 250;
-                    if (s.centerClosed) centerBonuses += 500;
+                    if (s.cabinetClosed) closingBonuses += 250;
+                    if (s.centerClosed) closingBonuses += 500;
                 });
 
                 const salesBonus = empLegacyKpi.reduce((sum, k) => sum + k.salesBonus, 0) +
@@ -342,21 +347,30 @@ export class ReportService {
                     avgQuality = 1; // Default 100%
                 }
 
+                // Get checklist from monthly checklist table (single value per month)
+                const empChecklist = allChecklists.find(c => c.employeeId === emp.id);
+                const calcChecklist = empChecklist ? empChecklist.percentage / 100 : 0;
+
                 let kpiBonus = 0;
                 if (avgQuality >= 0.95) kpiBonus = 5000;
-                else if (avgQuality >= 0.90) kpiBonus = 2500;
+                else if (avgQuality >= 0.85) kpiBonus = 2500;
+
+                let checklistBonus = 0;
+                if (calcChecklist >= 0.90) checklistBonus = 5000;
+                else if (calcChecklist >= 0.76) checklistBonus = 2500;
 
                 sheet.addRow({
                     name: emp.name,
                     base: emp.baseSalary,
                     hours: hoursWorked,
                     shiftPay: Math.round(shiftPay),
-                    cabinets: cabinetBonuses,
-                    center: centerBonuses,
+                    closing: closingBonuses,
                     sales: salesBonus,
+                    checklist_pct: calcChecklist,
+                    checklist_rub: checklistBonus,
                     quality: avgQuality,
                     kpi: kpiBonus,
-                    total: Math.round(shiftPay + cabinetBonuses + centerBonuses + salesBonus + kpiBonus)
+                    total: Math.round(shiftPay + closingBonuses + salesBonus + kpiBonus + checklistBonus)
                 });
             }
 

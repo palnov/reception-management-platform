@@ -66,7 +66,7 @@ export async function POST(request: Request) {
                 qualityScore: parseFloat(json.qualityScore || 0),
                 errorsCount: parseInt(json.errorsCount || 0),
                 salesBonus: parseFloat(json.salesBonus || 0),
-                checkList: json.checkList || false,
+                checkList: parseFloat(json.checkList || 0),
             };
             const diff = calculateDiff(existing, newData);
 
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
                     qualityScore: parseFloat(json.qualityScore || 0),
                     errorsCount: parseInt(json.errorsCount || 0),
                     salesBonus: parseFloat(json.salesBonus || 0),
-                    checkList: json.checkList || false,
+                    checkList: parseFloat(json.checkList || 0),
                     createdBy: session.employee.name
                 } as any,
             });

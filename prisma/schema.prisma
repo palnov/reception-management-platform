@@ -8,19 +8,20 @@ datasource db {
 }
 
 model Employee {
-  id               String            @id @default(uuid())
-  name             String
-  role             String            @default("ADMIN")
-  password         String            @default("1234")
-  baseSalary       Float             @default(0)
-  hourlyRate       Float             @default(0)
-  branch           String?
-  sortOrder        Int               @default(0)
-  createdAt        String            @default("")
-  kpiRecords       KpiRecord[]
-  promotionSales   PromotionSale[]
-  registrationKpis RegistrationKpi[]
-  shifts           Shift[]
+  id                String             @id @default(uuid())
+  name              String
+  role              String             @default("ADMIN")
+  password          String             @default("1234")
+  baseSalary        Float              @default(0)
+  hourlyRate        Float              @default(0)
+  branch            String?
+  sortOrder         Int                @default(0)
+  createdAt         String             @default("")
+  kpiRecords        KpiRecord[]
+  promotionSales    PromotionSale[]
+  registrationKpis  RegistrationKpi[]
+  shifts            Shift[]
+  monthlyChecklists MonthlyChecklist[]
 }
 
 model Shift {
@@ -46,7 +47,7 @@ model KpiRecord {
   qualityScore Float    @default(0)
   errorsCount  Int      @default(0)
   salesBonus   Float    @default(0)
-  checkList    Boolean  @default(false)
+  checkList    Float    @default(0)
   createdAt    String   @default("")
   createdBy    String?
   employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -56,6 +57,19 @@ model MonthlyNorm {
   month     String @id
   hours     Float  @default(176)
   createdAt String @default("")
+}
+
+model MonthlyChecklist {
+  id         String   @id @default(uuid())
+  month      String   // Format: "2026-02"
+  employeeId String
+  percentage Float    @default(0)
+  createdAt  String   @default("")
+  updatedAt  String   @default("")
+  updatedBy  String?
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([month, employeeId])
 }
 
 model PromotionSale {
