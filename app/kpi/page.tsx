@@ -52,6 +52,7 @@ interface RegistrationKpi {
     id: string;
     date: string;
     employeeId: string;
+    count: number;
     totalScore: number;
     maxScore: number;
     auditLogs?: any[];
@@ -237,10 +238,14 @@ export default function KpiPage() {
                 empSales.reduce((sum, s) => sum + s.bonus, 0));
 
             // Combine registration quality audits
+            // Combine registration quality audits
             const regCount = empRegs.length;
-            const regQuality = regCount > 0
-                ? (empRegs.reduce((sum, r) => sum + (r.totalScore / r.maxScore), 0) / regCount) * 100
-                : 100; // Default to 100 if no audits
+            let regQuality = 100;
+            if (regCount > 0) {
+                const totalObtained = empRegs.reduce((sum, r) => sum + r.totalScore, 0);
+                const totalMax = empRegs.reduce((sum, r) => sum + (r.maxScore || (r.count * 3) || 1), 0);
+                regQuality = totalMax > 0 ? (totalObtained / totalMax) * 100 : 100;
+            }
 
             // Legacy quality score for backward compatibility if needed, but prioritize new audit
             const legacyQuality = empKpis.length > 0

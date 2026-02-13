@@ -242,15 +242,13 @@ export class ReportService {
         // 3. REGISTRATIONS SHEET
         // =============================================
         if (type === 'FULL' || type === 'REGISTRATION') {
-            const sheet = workbook.addWorksheet('Первички');
+            const sheet = workbook.addWorksheet('Качество оформления');
             sheet.columns = [
                 { header: 'Дата', key: 'date', width: 12, style: { ...cellStyle, numFmt: 'dd.mm.yy' } },
-                { header: 'Пациент', key: 'patient', width: 25, style: cellStyle },
                 { header: 'Сотрудник', key: 'employee', width: 25, style: cellStyle },
-                { header: 'Критерий 1', key: 'c1', width: 10, style: centerStyle },
-                { header: 'Критерий 2', key: 'c2', width: 10, style: centerStyle },
-                { header: 'Критерий 3', key: 'c3', width: 10, style: centerStyle },
-                { header: 'Итог', key: 'total', width: 10, style: centerStyle },
+                { header: 'Кол-во оформлений', key: 'count', width: 15, style: centerStyle },
+                { header: 'Факт', key: 'fact', width: 10, style: centerStyle },
+                { header: 'Макс', key: 'max', width: 10, style: centerStyle },
                 { header: '%', key: 'percent', width: 10, style: { ...centerStyle, numFmt: '0.0%' } },
             ];
 
@@ -264,15 +262,14 @@ export class ReportService {
             });
 
             regs.forEach(r => {
-                const percent = r.maxScore > 0 ? r.totalScore / r.maxScore : 0;
+                const maxScore = r.count * 3;
+                const percent = maxScore > 0 ? r.totalScore / maxScore : 0;
                 sheet.addRow({
                     date: parseISO(r.date),
-                    patient: r.patientId || '-',
                     employee: r.employee.name,
-                    c1: r.criterion1,
-                    c2: r.criterion2,
-                    c3: r.criterion3,
-                    total: r.totalScore,
+                    count: r.count,
+                    fact: r.totalScore,
+                    max: maxScore,
                     percent: percent
                 });
             });

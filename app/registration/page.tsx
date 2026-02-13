@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, Trash2, FileCheck, Star, BadgeCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, FileCheck, Star, BadgeCheck, ArrowUp, ArrowDown } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
 
 interface Employee {
@@ -31,6 +31,7 @@ export default function RegistrationPage() {
     const [records, setRecords] = useState<RegistrationKpi[]>([]);
     const [activeEmployeeId, setActiveEmployeeId] = useState<string | 'all'>('all');
     const [showModal, setShowModal] = useState(false);
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
     const initialForm = {
         id: '',
@@ -95,9 +96,16 @@ export default function RegistrationPage() {
     }
 
     const filteredRecords = useMemo(() => {
-        if (activeEmployeeId === 'all') return records;
-        return records.filter(r => r.employeeId === activeEmployeeId);
-    }, [records, activeEmployeeId]);
+        let text = records;
+        if (activeEmployeeId !== 'all') {
+            text = records.filter(r => r.employeeId === activeEmployeeId);
+        }
+        return text.sort((a, b) => {
+            const dateA = new Date(a.date).getTime();
+            const dateB = new Date(b.date).getTime();
+            return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+        });
+    }, [records, activeEmployeeId, sortOrder]);
 
     return (
         <div className="space-y-6">
@@ -156,7 +164,13 @@ export default function RegistrationPage() {
                 <table className="w-full text-left text-sm">
                     <thead className="bg-zinc-50 border-b border-zinc-200">
                         <tr>
-                            <th className="px-6 py-4 font-bold text-zinc-500 uppercase tracking-wider text-[10px]">Дата</th>
+                            <th className="px-6 py-4 font-bold text-zinc-500 uppercase tracking-wider text-[10px] cursor-pointer hover:bg-zinc-100 transition-colors"
+                                onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}>
+                                <div className="flex items-center gap-1">
+                                    Дата
+                                    {sortOrder === 'desc' ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />}
+                                </div>
+                            </th>
                             <th className="px-6 py-4 font-bold text-zinc-500 uppercase tracking-wider text-[10px]">Сотрудник</th>
                             <th className="px-6 py-4 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-center">Кол-во оформлений</th>
                             <th className="px-6 py-4 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-center">Баллы</th>
@@ -193,7 +207,7 @@ export default function RegistrationPage() {
                                 <td className="px-6 py-4 text-center text-zinc-500 font-bold">{(r.totalScore ?? 0)} / {(r.maxScore ?? 0)}</td>
                                 <td className="px-6 py-4 text-center">
                                     <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${(((r.totalScore ?? 0) / (r.maxScore || 1)) * 100) >= 90 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                                        {(((r.totalScore ?? 0) / (r.maxScore || 1)) * 100).toFixed(0)} %
+                                        {(((r.totalScore ?? 0) / (r.maxScore || 1)) * 100).toFixed(1)} %
                                     </span>
                                 </td>
 
@@ -211,6 +225,30 @@ export default function RegistrationPage() {
                             </tr>
                         ))}
                     </tbody>
+                    {activeEmployeeId !== 'all' && (
+                        <tfoot className="bg-zinc-100 border-t-2 border-zinc-200">
+                            <tr className="font-bold text-zinc-900">
+                                <td colSpan={2} className="px-6 py-4 text-right uppercase tracking-wider text-[10px]">Итого по выборке:</td>
+                                <td className="px-6 py-4 text-center">{filteredRecords.reduce((sum, r) => sum + (r.count ?? 0), 0)}</td>
+                                <td className="px-6 py-4 text-center text-zinc-500">
+                                    {filteredRecords.reduce((sum, r) => sum + (r.totalScore ?? 0), 0)} / {filteredRecords.reduce((sum, r) => sum + (r.maxScore ?? 0), 0)}
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                    {(() => {
+                                        const totalScore = filteredRecords.reduce((sum, r) => sum + (r.totalScore ?? 0), 0);
+                                        const totalMax = filteredRecords.reduce((sum, r) => sum + (r.maxScore ?? 0), 0);
+                                        const percent = totalMax > 0 ? (totalScore / totalMax) * 100 : 100;
+                                        return (
+                                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${percent >= 90 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                {percent.toFixed(1)} %
+                                            </span>
+                                        );
+                                    })()}
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    )}
                 </table>
             </div>
 

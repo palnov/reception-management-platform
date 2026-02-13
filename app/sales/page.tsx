@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, Trash2, ShoppingCart } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, ShoppingCart, ArrowUp, ArrowDown } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
 
 interface Employee {
@@ -30,6 +30,7 @@ export default function SalesPage() {
     const [sales, setSales] = useState<Sale[]>([]);
     const [activeEmployeeId, setActiveEmployeeId] = useState<string | 'all'>('all');
     const [showModal, setShowModal] = useState(false);
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
     const initialForm = {
         id: '',
@@ -81,9 +82,16 @@ export default function SalesPage() {
     }
 
     const filteredSales = useMemo(() => {
-        if (activeEmployeeId === 'all') return sales;
-        return sales.filter(s => s.employeeId === activeEmployeeId);
-    }, [sales, activeEmployeeId]);
+        let text = sales;
+        if (activeEmployeeId !== 'all') {
+            text = sales.filter(s => s.employeeId === activeEmployeeId);
+        }
+        return text.sort((a, b) => {
+            const dateA = new Date(a.date).getTime();
+            const dateB = new Date(b.date).getTime();
+            return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+        });
+    }, [sales, activeEmployeeId, sortOrder]);
 
     const summary = useMemo(() => {
         const totalCost = filteredSales.reduce((sum, s) => sum + s.price, 0);
@@ -173,7 +181,13 @@ export default function SalesPage() {
                 <table className="w-full text-left text-sm">
                     <thead className="bg-zinc-50 border-b border-zinc-200">
                         <tr>
-                            <th className="px-6 py-4 font-bold text-zinc-500 uppercase tracking-wider text-[10px]">Дата</th>
+                            <th className="px-6 py-4 font-bold text-zinc-500 uppercase tracking-wider text-[10px] cursor-pointer hover:bg-zinc-100 transition-colors"
+                                onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}>
+                                <div className="flex items-center gap-1">
+                                    Дата
+                                    {sortOrder === 'desc' ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />}
+                                </div>
+                            </th>
                             <th className="px-6 py-4 font-bold text-zinc-500 uppercase tracking-wider text-[10px]">ID Пациента</th>
                             <th className="px-6 py-4 font-bold text-zinc-500 uppercase tracking-wider text-[10px]">Сотрудник</th>
                             <th className="px-6 py-4 font-bold text-zinc-500 uppercase tracking-wider text-[10px]">Продукт</th>
