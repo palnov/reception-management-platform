@@ -20,6 +20,7 @@ export async function GET() {
             monthlyNorms: await prisma.monthlyNorm.findMany(),
             promotionSales: await prisma.promotionSale.findMany(),
             registrationKpis: await prisma.registrationKpi.findMany(),
+            monthlyChecklists: await prisma.monthlyChecklist.findMany(),
             auditLogs: await prisma.auditLog.findMany()
         };
 
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
             await tx.registrationKpi.deleteMany();
             await tx.promotionSale.deleteMany();
             await tx.kpiRecord.deleteMany();
+            await tx.monthlyChecklist.deleteMany();
             await tx.shift.deleteMany();
             await tx.monthlyNorm.deleteMany();
             await tx.employee.deleteMany();
@@ -123,6 +125,7 @@ export async function POST(request: Request) {
                             type: s.type || 'REGULAR',
                             hours: Number(s.hours ?? 0),
                             cabinetClosed: Boolean(s.cabinetClosed),
+                            centerClosed: Boolean(s.centerClosed),
                             coefficient: Number(s.coefficient ?? 1.0),
                             comment: s.comment,
                             createdAt: s.createdAt || '',
@@ -144,7 +147,7 @@ export async function POST(request: Request) {
                             qualityScore: Number(k.qualityScore ?? 0),
                             errorsCount: Number(k.errorsCount ?? 0),
                             salesBonus: Number(k.salesBonus ?? 0),
-                            checkList: Boolean(k.checkList),
+                            checkList: Number(k.checkList ?? 0),
                             createdAt: k.createdAt || '',
                             createdBy: k.createdBy
                         }
@@ -192,7 +195,24 @@ export async function POST(request: Request) {
                 }
             }
 
-            // 8. Restore AuditLogs
+            // 8. Restore MonthlyChecklists
+            if (backup.monthlyChecklists && backup.monthlyChecklists.length > 0) {
+                for (const m of backup.monthlyChecklists) {
+                    await tx.monthlyChecklist.create({
+                        data: {
+                            id: m.id,
+                            month: m.month,
+                            employeeId: m.employeeId,
+                            percentage: Number(m.percentage ?? 0),
+                            createdAt: m.createdAt || '',
+                            updatedAt: m.updatedAt || '',
+                            updatedBy: m.updatedBy
+                        }
+                    });
+                }
+            }
+
+            // 9. Restore AuditLogs
             if (backup.auditLogs && backup.auditLogs.length > 0) {
                 for (const l of backup.auditLogs) {
                     await tx.auditLog.create({
