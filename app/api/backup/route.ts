@@ -94,6 +94,7 @@ export async function POST(request: Request) {
                             baseSalary: Number(emp.baseSalary ?? 0),
                             hourlyRate: Number(emp.hourlyRate ?? 0),
                             branch: emp.branch,
+                            hireDate: emp.hireDate || '',
                             sortOrder: Number(emp.sortOrder ?? 0),
                             createdAt: emp.createdAt || ''
                         }

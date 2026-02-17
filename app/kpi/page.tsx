@@ -14,6 +14,7 @@ interface Employee {
     hourlyRate: number;
     role: string;
     branch?: string;
+    hireDate?: string;
 }
 
 interface Shift {
@@ -267,7 +268,18 @@ export default function KpiPage() {
             if (calcChecklist >= 90) checklistBonus = 5000;
             else if (calcChecklist >= 76) checklistBonus = 2500;
 
-            const totalPay = basePay + dayOffPayTotal + closingBonuses + salesBonus + qualityBonus + checklistBonus;
+            // Seniority (Выслуга)
+            const hireDateParsed = enrichedEmp.hireDate ? new Date(enrichedEmp.hireDate) : null;
+            const seniorityYears = hireDateParsed
+                ? (Date.now() - hireDateParsed.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+                : 0;
+
+            let seniorityBonus = 0;
+            if (seniorityYears >= 3) seniorityBonus = 3000;
+            else if (seniorityYears >= 2) seniorityBonus = 2000;
+            else if (seniorityYears >= 1) seniorityBonus = 1000;
+
+            const totalPay = basePay + dayOffPayTotal + closingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus;
 
             // Aggregate all audit logs
             const allLogs = [
@@ -297,6 +309,8 @@ export default function KpiPage() {
                 qualityBonus,
                 calcChecklist,
                 checklistBonus,
+                seniorityYears,
+                seniorityBonus,
                 totalPay,
                 auditLogs: uniqueLogs
             };
@@ -325,6 +339,7 @@ export default function KpiPage() {
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Открытие/Закрытие</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Продажи</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Чеклист</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Выслуга</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Качество</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Итого</th>
                         </tr>
@@ -340,7 +355,7 @@ export default function KpiPage() {
                             </tr>
                         ) : (
                             payrollData.map(calc => {
-                                if (calc.rawHours === 0 && calc.dayOffHours === 0 && calc.totalPay === 0) return null;
+                                if (calc.rawHours === 0 && calc.dayOffHours === 0 && calc.totalPay === 0 && !calc.seniorityBonus) return null;
 
                                 return (
                                     <tr
@@ -395,6 +410,10 @@ export default function KpiPage() {
                                                     </div>
                                                 </>
                                             )}
+                                        </td>
+                                        <td className="px-4 py-3 text-right text-zinc-600">
+                                            {calc.seniorityBonus > 0 && <span className="text-green-600 font-medium">+{calc.seniorityBonus}</span>}
+                                            <div className="text-[10px] text-zinc-400">{calc.seniorityYears > 0 ? calc.seniorityYears.toFixed(1) + ' г.' : ''}</div>
                                         </td>
                                         <td className="px-4 py-3 text-right text-zinc-600">
                                             {calc.qualityBonus > 0 && <span className="text-green-600 font-medium">+{calc.qualityBonus}</span>}

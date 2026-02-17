@@ -44,6 +44,7 @@ async function restore() {
                         baseSalary: emp.baseSalary,
                         hourlyRate: emp.hourlyRate,
                         branch: emp.branch,
+                        hireDate: emp.hireDate || '',
                         sortOrder: emp.sortOrder,
                         createdAt: emp.createdAt || new Date().toISOString()
                     }

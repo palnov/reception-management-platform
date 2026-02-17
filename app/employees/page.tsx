@@ -12,6 +12,7 @@ interface Employee {
     baseSalary: number;
     hourlyRate: number;
     branch?: string;
+    hireDate?: string;
 }
 
 export default function EmployeesPage() {
@@ -23,9 +24,10 @@ export default function EmployeesPage() {
     const initialForm = {
         name: '',
         role: 'ADMIN',
-        password: '', // New field
+        password: '',
         baseSalary: '',
-        branch: 'Дзержинского 26' // Default
+        branch: 'Дзержинского 26',
+        hireDate: ''
     };
 
     const [formData, setFormData] = useState(initialForm);
@@ -57,9 +59,10 @@ export default function EmployeesPage() {
         setFormData({
             name: emp.name,
             role: emp.role,
-            password: emp.password || '', // Include password
+            password: emp.password || '',
             baseSalary: emp.baseSalary.toString(),
-            branch: emp.branch || 'Дзержинского 26'
+            branch: emp.branch || 'Дзержинского 26',
+            hireDate: emp.hireDate || ''
         });
         setShowForm(true);
     }
@@ -186,41 +189,52 @@ export default function EmployeesPage() {
                                 )}
                             </div>
 
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => { setShowForm(false); setEditId(null); }}
-                                    className="flex-1 px-4 py-2 border border-zinc-300 rounded-lg text-zinc-700 hover:bg-zinc-50 transition-colors"
-                                >
-                                    Отмена
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                                >
-                                    Сохранить
-                                </button>
+                            <div>
+                                <label className="block text-sm font-medium text-zinc-700 mb-1">Дата приёма</label>
+                                <input
+                                    type="date"
+                                    value={formData.hireDate}
+                                    onChange={e => setFormData({ ...formData, hireDate: e.target.value })}
+                                    className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                />
                             </div>
-                            {editId && (
-                                <button
-                                    type="button"
-                                    onClick={async () => {
-                                        if (confirm('Вы уверены, что хотите удалить этого сотрудника? Все связанные с ним данные (смены, KPI) также будут удалены.')) {
-                                            const res = await fetch(`/api/employees?id=${editId}`, { method: 'DELETE' });
-                                            if (res.ok) {
-                                                setShowForm(false);
-                                                setEditId(null);
-                                                fetchEmployees();
-                                                router.refresh();
-                                            }
-                                        }
-                                    }}
-                                    className="w-full mt-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
-                                >
-                                    <Trash2 className="w-4 h-4" /> Удалить сотрудника
-                                </button>
-                            )}
+
                         </div>
+
+                        <div className="flex gap-3 pt-4">
+                            <button
+                                type="button"
+                                onClick={() => { setShowForm(false); setEditId(null); }}
+                                className="flex-1 px-4 py-2 border border-zinc-300 rounded-lg text-zinc-700 hover:bg-zinc-50 transition-colors"
+                            >
+                                Отмена
+                            </button>
+                            <button
+                                type="submit"
+                                className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                            >
+                                Сохранить
+                            </button>
+                        </div>
+                        {editId && (
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    if (confirm('Вы уверены, что хотите удалить этого сотрудника? Все связанные с ним данные (смены, KPI) также будут удалены.')) {
+                                        const res = await fetch(`/api/employees?id=${editId}`, { method: 'DELETE' });
+                                        if (res.ok) {
+                                            setShowForm(false);
+                                            setEditId(null);
+                                            fetchEmployees();
+                                            router.refresh();
+                                        }
+                                    }
+                                }}
+                                className="w-full mt-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                            >
+                                <Trash2 className="w-4 h-4" /> Удалить сотрудника
+                            </button>
+                        )}
                     </form>
                 </div>
             )}
@@ -232,6 +246,7 @@ export default function EmployeesPage() {
                             <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Сотрудник</th>
                             <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Должность</th>
                             <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Филиал</th>
+                            <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Дата приёма</th>
                             <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500 text-right">Оклад</th>
                         </tr>
                     </thead>
@@ -283,6 +298,9 @@ export default function EmployeesPage() {
                                         </div>
                                     ) : null}
                                 </td>
+                                <td className="px-6 py-4 text-zinc-600 text-sm">
+                                    {emp.hireDate ? new Date(emp.hireDate).toLocaleDateString('ru-RU') : <span className="text-zinc-400">—</span>}
+                                </td>
                                 <td className="px-6 py-4 text-zinc-900 text-sm font-medium text-right">
                                     {emp.role === 'MANAGER' ? '-' : `${emp.baseSalary.toLocaleString()} ₽`}
                                 </td>
@@ -290,12 +308,12 @@ export default function EmployeesPage() {
                         ))}
                         {employees.length === 0 && !isLoading && (
                             <tr>
-                                <td colSpan={4} className="px-6 py-12 text-center text-zinc-500">Нет сотрудников.</td>
+                                <td colSpan={5} className="px-6 py-12 text-center text-zinc-500">Нет сотрудников.</td>
                             </tr>
                         )}
                         {isLoading && (
                             <tr>
-                                <td colSpan={3} className="px-6 py-12 text-center text-zinc-500">Загрузка...</td>
+                                <td colSpan={5} className="px-6 py-12 text-center text-zinc-500">Загрузка...</td>
                             </tr>
                         )}
                     </tbody>

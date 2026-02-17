@@ -52,7 +52,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
     }
     const body = await request.json();
-    const { name, role, baseSalary, hourlyRate, branch, password } = body;
+    const { name, role, baseSalary, hourlyRate, branch, password, hireDate } = body;
 
     const lastEmployee = await prisma.employee.findFirst({
         orderBy: { sortOrder: 'desc' },
@@ -68,6 +68,7 @@ export async function POST(request: Request) {
             baseSalary: parseFloat(baseSalary || 0),
             hourlyRate: parseFloat(hourlyRate || 0),
             branch,
+            hireDate: hireDate || '',
             sortOrder: nextOrder
         }
     });
@@ -79,7 +80,7 @@ export async function PUT(request: Request) {
         return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
     }
     const body = await request.json();
-    const { id, name, role, baseSalary, hourlyRate, branch, sortOrder, password } = body;
+    const { id, name, role, baseSalary, hourlyRate, branch, sortOrder, password, hireDate } = body;
 
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
 
@@ -88,7 +89,8 @@ export async function PUT(request: Request) {
         role,
         baseSalary: parseFloat(baseSalary || 0),
         hourlyRate: parseFloat(hourlyRate || 0),
-        branch
+        branch,
+        hireDate: hireDate || ''
     };
 
     if (password !== undefined) {

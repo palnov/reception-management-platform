@@ -292,6 +292,7 @@ export class ReportService {
                 { header: 'Чеклист Руб', key: 'checklist_rub', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Качество', key: 'quality', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
                 { header: 'KPI бонус', key: 'kpi', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'Выслуга', key: 'seniority', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'ИТОГО', key: 'total', width: 15, style: { ...cellStyle, font: { bold: true }, numFmt: '#,##0' } },
             ];
 
@@ -356,6 +357,17 @@ export class ReportService {
                 if (calcChecklist >= 0.90) checklistBonus = 5000;
                 else if (calcChecklist >= 0.76) checklistBonus = 2500;
 
+                // Seniority (Выслуга)
+                const hireDateParsed = (emp as any).hireDate ? new Date((emp as any).hireDate) : null;
+                const seniorityYears = hireDateParsed
+                    ? (Date.now() - hireDateParsed.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+                    : 0;
+
+                let seniorityBonus = 0;
+                if (seniorityYears >= 3) seniorityBonus = 3000;
+                else if (seniorityYears >= 2) seniorityBonus = 2000;
+                else if (seniorityYears >= 1) seniorityBonus = 1000;
+
                 sheet.addRow({
                     name: emp.name,
                     base: emp.baseSalary,
@@ -367,7 +379,8 @@ export class ReportService {
                     checklist_rub: checklistBonus,
                     quality: avgQuality,
                     kpi: kpiBonus,
-                    total: Math.round(shiftPay + closingBonuses + salesBonus + kpiBonus + checklistBonus)
+                    seniority: seniorityBonus,
+                    total: Math.round(shiftPay + closingBonuses + salesBonus + kpiBonus + checklistBonus + seniorityBonus)
                 });
             }
 
