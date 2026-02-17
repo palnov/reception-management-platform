@@ -50,12 +50,16 @@ export async function POST(request: Request) {
         }
 
         // --- SAFETY SNAPSHOT BEFORE RESTORE ---
-        const DB_PATH = path.join(process.cwd(), 'prisma', 'dev.db');
-        const SNAPSHOTS_DIR = path.join(process.cwd(), 'prisma', 'snapshots');
-        if (fs.existsSync(DB_PATH)) {
-            if (!fs.existsSync(SNAPSHOTS_DIR)) fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true });
-            const safetyName = `auto_before_json_restore_${new Date().toISOString().replace(/[:.]/g, '-')}.db`;
-            fs.copyFileSync(DB_PATH, path.join(SNAPSHOTS_DIR, safetyName));
+        try {
+            const DB_PATH = path.join(process.cwd(), 'prisma', 'dev.db');
+            const SNAPSHOTS_DIR = path.join(process.cwd(), 'prisma', 'snapshots');
+            if (fs.existsSync(DB_PATH)) {
+                if (!fs.existsSync(SNAPSHOTS_DIR)) fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true });
+                const safetyName = `auto_before_json_restore_${new Date().toISOString().replace(/[:.]/g, '-')}.db`;
+                fs.copyFileSync(DB_PATH, path.join(SNAPSHOTS_DIR, safetyName));
+            }
+        } catch (snapshotError) {
+            console.error('Snapshot failed (continuing anyway):', snapshotError);
         }
         // --------------------------------------
 

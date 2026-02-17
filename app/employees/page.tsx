@@ -40,8 +40,8 @@ export default function EmployeesPage() {
     async function fetchEmployees() {
         try {
             const res = await fetch('/api/employees');
-            if (res.status === 403) {
-                router.push('/schedule');
+            if (res.status === 401 || res.status === 403) {
+                window.location.href = '/login';
                 return;
             }
             if (!res.ok) throw new Error('Unauthorized or error');
@@ -302,7 +302,7 @@ export default function EmployeesPage() {
                                     {emp.hireDate ? new Date(emp.hireDate).toLocaleDateString('ru-RU') : <span className="text-zinc-400">—</span>}
                                 </td>
                                 <td className="px-6 py-4 text-zinc-900 text-sm font-medium text-right">
-                                    {emp.role === 'MANAGER' ? '-' : `${emp.baseSalary.toLocaleString()} ₽`}
+                                    {emp.role === 'MANAGER' ? '-' : `${(emp.baseSalary ?? 0).toLocaleString()} ₽`}
                                 </td>
                             </tr>
                         ))}

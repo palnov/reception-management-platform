@@ -270,8 +270,9 @@ export default function KpiPage() {
 
             // Seniority (Выслуга)
             const hireDateParsed = enrichedEmp.hireDate ? new Date(enrichedEmp.hireDate) : null;
-            const seniorityYears = hireDateParsed
-                ? (Date.now() - hireDateParsed.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+            const isHireDateValid = hireDateParsed && !isNaN(hireDateParsed.getTime());
+            const seniorityYears = isHireDateValid
+                ? (Date.now() - hireDateParsed!.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
                 : 0;
 
             let seniorityBonus = 0;

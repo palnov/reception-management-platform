@@ -36,7 +36,10 @@ export async function GET() {
             select: isManager ? undefined : {
                 id: true,
                 name: true,
-                role: true, // Needed for some UI logic
+                role: true,
+                baseSalary: true, // Needed to prevent UI crash
+                hireDate: true,   // Needed for consistency
+                branch: true,     // Optional but safe
             }
         });
 

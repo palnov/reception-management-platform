@@ -359,9 +359,14 @@ export default function SchedulePage() {
     useEffect(() => {
         fetchEmployees();
         fetch('/api/auth/me')
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) throw new Error('Unauthorized');
+                return res.json();
+            })
             .then(data => setCurrentUser(data))
-            .catch(console.error);
+            .catch(() => {
+                window.location.href = '/login';
+            });
     }, []);
 
     useEffect(() => {
@@ -372,6 +377,10 @@ export default function SchedulePage() {
     async function fetchEmployees() {
         try {
             const res = await fetch('/api/employees');
+            if (res.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
             const data = await res.json();
             const list = Array.isArray(data) ? data : [];
             setEmployees(list.filter(e => e.role !== 'MANAGER'));

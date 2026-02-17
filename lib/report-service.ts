@@ -358,9 +358,11 @@ export class ReportService {
                 else if (calcChecklist >= 0.76) checklistBonus = 2500;
 
                 // Seniority (Выслуга)
-                const hireDateParsed = (emp as any).hireDate ? new Date((emp as any).hireDate) : null;
-                const seniorityYears = hireDateParsed
-                    ? (Date.now() - hireDateParsed.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+                const hireDateStr = (emp as any).hireDate;
+                const hireDateParsed = hireDateStr ? new Date(hireDateStr) : null;
+                const isHireDateValid = hireDateParsed && !isNaN(hireDateParsed.getTime());
+                const seniorityYears = isHireDateValid
+                    ? (Date.now() - hireDateParsed!.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
                     : 0;
 
                 let seniorityBonus = 0;
