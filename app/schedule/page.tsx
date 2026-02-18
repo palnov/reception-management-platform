@@ -361,8 +361,6 @@ export default function SchedulePage() {
         })
     );
 
-    const [currentUser, setCurrentUser] = useState<any>(null);
-
     useEffect(() => {
         fetchEmployees();
         fetch('/api/auth/me')
