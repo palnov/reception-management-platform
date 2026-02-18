@@ -7,6 +7,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const start = searchParams.get('start');
     const end = searchParams.get('end');
+    const includeDetails = searchParams.get('includeDetails') === 'true';
 
     try {
         const sales = await prisma.promotionSale.findMany({
@@ -31,12 +32,27 @@ export async function GET(request: Request) {
                 entityType: 'SALE',
                 entityId: { in: saleIds }
             },
-            orderBy: { timestamp: 'desc' }
+            orderBy: { timestamp: 'desc' },
+            select: includeDetails ? undefined : {
+                id: true,
+                entityId: true,
+                entityType: true,
+                action: true,
+                changedBy: true,
+                changedByRole: true,
+                timestamp: true,
+            }
+        });
+
+        const logsBySaleId = new Map<string, any[]>();
+        logs.forEach(log => {
+            if (!logsBySaleId.has(log.entityId)) logsBySaleId.set(log.entityId, []);
+            logsBySaleId.get(log.entityId)!.push(log);
         });
 
         const salesWithLogs = sales.map(s => ({
             ...s,
-            auditLogs: logs.filter((l: any) => l.entityId === s.id)
+            auditLogs: logsBySaleId.get(s.id) || []
         }));
 
         return NextResponse.json(salesWithLogs);

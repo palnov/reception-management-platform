@@ -12,6 +12,7 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const start = searchParams.get('start');
         const end = searchParams.get('end');
+        const includeDetails = searchParams.get('includeDetails') === 'true';
 
         if (!start || !end) {
             return NextResponse.json({ error: 'Start and end dates required' }, { status: 400 });
@@ -23,7 +24,6 @@ export async function GET(request: Request) {
                     gte: start,
                     lte: end,
                 },
-                // Include deleted shifts so we can show audit trail
             },
             include: {
                 employee: true
@@ -37,13 +37,30 @@ export async function GET(request: Request) {
                 entityType: 'SHIFT',
                 entityId: { in: shiftIds }
             },
-            orderBy: { timestamp: 'desc' }
+            orderBy: { timestamp: 'desc' },
+            select: includeDetails ? undefined : {
+                id: true,
+                entityId: true,
+                entityType: true,
+                action: true,
+                changedBy: true,
+                changedByRole: true,
+                timestamp: true,
+            }
         });
 
-        // Attach logs to shifts
+        // Attach logs to shifts using a Map for O(N + L) performance
+        const logsByShiftId = new Map<string, any[]>();
+        logs.forEach(log => {
+            if (!logsByShiftId.has(log.entityId)) {
+                logsByShiftId.set(log.entityId, []);
+            }
+            logsByShiftId.get(log.entityId)!.push(log);
+        });
+
         const shiftsWithLogs = shifts.map(s => ({
             ...s,
-            auditLogs: logs.filter((l: any) => l.entityId === s.id)
+            auditLogs: logsByShiftId.get(s.id) || []
         }));
 
         return NextResponse.json(shiftsWithLogs);

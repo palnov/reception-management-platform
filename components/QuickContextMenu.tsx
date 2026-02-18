@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Stethoscope, Palmtree, Trash2, Layers } from 'lucide-react';
 
@@ -15,6 +15,9 @@ interface QuickContextMenuProps {
 
 export function QuickContextMenu({ x, y, onClose, onAction, showBatchOption }: QuickContextMenuProps) {
     const [mounted, setMounted] = useState(false);
+    const [pos, setPos] = useState({ x, y });
+    const [isVisible, setIsVisible] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         setMounted(true);
@@ -31,15 +34,42 @@ export function QuickContextMenu({ x, y, onClose, onAction, showBatchOption }: Q
         };
     }, [onClose]);
 
+    useLayoutEffect(() => {
+        if (mounted && menuRef.current) {
+            const rect = menuRef.current.getBoundingClientRect();
+            const padding = 8;
+            let nextX = x;
+            let nextY = y;
+
+            // Check right overflow
+            if (nextX + rect.width > window.innerWidth - padding) {
+                nextX = window.innerWidth - rect.width - padding;
+            }
+            // Check bottom overflow
+            if (nextY + rect.height > window.innerHeight - padding) {
+                nextY = window.innerHeight - rect.height - padding;
+            }
+            // Check top/left (unlikely but good for robustness)
+            if (nextX < padding) nextX = padding;
+            if (nextY < padding) nextY = padding;
+
+            setPos({ x: nextX, y: nextY });
+            setIsVisible(true);
+        }
+    }, [mounted, x, y, showBatchOption]);
+
     if (!mounted) return null;
 
     return createPortal(
         <div
+            ref={menuRef}
             className="fixed z-[999999] bg-zinc-900 text-white rounded-xl shadow-2xl border border-zinc-700 py-1.5 w-48 animate-in fade-in zoom-in-95 duration-100"
             style={{
-                left: x,
-                top: y,
-                filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.3))'
+                left: pos.x,
+                top: pos.y,
+                filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.3))',
+                opacity: isVisible ? 1 : 0,
+                pointerEvents: isVisible ? 'auto' : 'none'
             }}
             onClick={(e) => e.stopPropagation()}
         >

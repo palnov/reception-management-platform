@@ -125,10 +125,10 @@ export default function KpiPage() {
             const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
 
             const [shiftsRes, kpiRes, salesRes, regRes, checklistRes] = await Promise.all([
-                fetch(`/api/shifts?start=${start}&end=${end}`),
-                fetch(`/api/kpi?start=${start}&end=${end}`),
-                fetch(`/api/sales?start=${start}&end=${end}`),
-                fetch(`/api/registration?start=${start}&end=${end}`),
+                fetch(`/api/shifts?start=${start}&end=${end}&includeDetails=true`),
+                fetch(`/api/kpi?start=${start}&end=${end}&includeDetails=true`),
+                fetch(`/api/sales?start=${start}&end=${end}&includeDetails=true`),
+                fetch(`/api/registration?start=${start}&end=${end}&includeDetails=true`),
                 fetch(`/api/checklist?month=${currentMonth.toISOString().substring(0, 7)}`)
             ]);
 

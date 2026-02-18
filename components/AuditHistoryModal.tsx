@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { X, ArrowRight, User, Calendar, Trash2, Plus, Edit2, ChevronDown, ChevronUp, History } from 'lucide-react';
@@ -13,6 +13,8 @@ interface AuditLog {
     changedByRole: string;
     timestamp: string;
     details: string | null;
+    entityId?: string;
+    entityType?: string;
 }
 
 interface AuditHistoryModalProps {
@@ -24,6 +26,34 @@ const IGNORED_FIELDS = ['id', 'employeeId', 'date', 'createdAt', 'createdBy', 'i
 
 export function AuditHistoryModal({ logs, onClose }: AuditHistoryModalProps) {
     const [expandedLogs, setExpandedLogs] = useState<Record<string, boolean>>({});
+    const [localLogs, setLocalLogs] = useState<AuditLog[]>(logs);
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        // If the first log is missing details, we likely need to fetch all details for this entity
+        const needsFetch = logs.some(l => l.details === null || l.details === undefined);
+        if (needsFetch && logs.length > 0) {
+            setIsLoading(true);
+            // We assume all logs in this modal belong to the same entity
+            // The first log in the list should have entityId/entityType from the optimized API
+            const entityId = logs[0].entityId;
+            const entityType = logs[0].entityType || 'SHIFT';
+
+            if (entityId) {
+                fetch(`/api/audit-logs?entityId=${entityId}&entityType=${entityType}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (Array.isArray(data)) {
+                            setLocalLogs(data);
+                        }
+                    })
+                    .catch(err => console.error('Failed to fetch audit details:', err))
+                    .finally(() => setIsLoading(false));
+            }
+        } else {
+            setLocalLogs(logs);
+        }
+    }, [logs]);
 
     if (!logs || logs.length === 0) return null;
 
@@ -110,8 +140,16 @@ export function AuditHistoryModal({ logs, onClose }: AuditHistoryModalProps) {
                     </button>
                 </div>
 
-                <div className="overflow-y-auto p-4 space-y-3">
-                    {logs.map((log) => {
+                <div className="overflow-y-auto p-4 space-y-3 relative min-h-[200px]">
+                    {isLoading && (
+                        <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-10 transition-all">
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                <span className="text-sm font-medium text-zinc-500">Загрузка истории...</span>
+                            </div>
+                        </div>
+                    )}
+                    {localLogs.map((log) => {
                         let details: any = null;
                         try {
                             if (log.details) details = JSON.parse(log.details);

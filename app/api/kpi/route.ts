@@ -7,6 +7,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const start = searchParams.get('start');
     const end = searchParams.get('end');
+    const includeDetails = searchParams.get('includeDetails') === 'true';
 
     if (!start || !end) {
         return NextResponse.json({ error: 'Start and end dates required' }, { status: 400 });
@@ -32,12 +33,27 @@ export async function GET(request: Request) {
                 entityType: 'KPI',
                 entityId: { in: recordIds }
             },
-            orderBy: { timestamp: 'desc' }
+            orderBy: { timestamp: 'desc' },
+            select: includeDetails ? undefined : {
+                id: true,
+                entityId: true,
+                entityType: true,
+                action: true,
+                changedBy: true,
+                changedByRole: true,
+                timestamp: true,
+            }
+        });
+
+        const logsByRecordId = new Map<string, any[]>();
+        logs.forEach(log => {
+            if (!logsByRecordId.has(log.entityId)) logsByRecordId.set(log.entityId, []);
+            logsByRecordId.get(log.entityId)!.push(log);
         });
 
         const recordsWithLogs = records.map(r => ({
             ...r,
-            auditLogs: logs.filter((l: any) => l.entityId === r.id)
+            auditLogs: logsByRecordId.get(r.id) || []
         }));
 
         return NextResponse.json(recordsWithLogs);
