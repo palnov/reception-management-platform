@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, parseISO, subDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, X, DoorOpen, MapPin, GripVertical, User, Crown, BadgeCheck, Clock, Briefcase, CheckSquare, Activity, LayoutList, Timer, Percent, Layers } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
@@ -337,11 +337,18 @@ export default function SchedulePage() {
         showBatchOption?: boolean;
     } | null>(null);
 
+    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [prevMonthShifts, setPrevMonthShifts] = useState<Shift[]>([]);
+    const [isAutoFilling, setIsAutoFilling] = useState(false);
+
     // Track whether audit icon was clicked to prevent modal
     const auditIconClickedRef = useRef(false);
     const tableBodyRef = useRef<HTMLTableSectionElement>(null);
     const gridContainerRef = useRef<HTMLDivElement>(null);
     const blockModalRef = useRef(false);
+
+    const isMonthEmpty = useMemo(() => shifts.filter(s => !s.isDeleted).length === 0, [shifts]);
+    const prevMonthHasShifts = useMemo(() => prevMonthShifts.filter(s => !s.isDeleted).length > 0, [prevMonthShifts]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -397,7 +404,22 @@ export default function SchedulePage() {
                 return;
             }
             const data = await res.json();
-            setShifts(Array.isArray(data) ? data : []);
+            const currentShifts = Array.isArray(data) ? data : [];
+            setShifts(currentShifts);
+
+            // If current month is empty, fetch previous month to check for auto-fill
+            if (currentShifts.filter((s: any) => !s.isDeleted).length === 0) {
+                const prevMonth = subMonths(currentMonth, 1);
+                const pStart = format(startOfMonth(prevMonth), 'yyyy-MM-dd');
+                const pEnd = format(endOfMonth(prevMonth), 'yyyy-MM-dd');
+                const pRes = await fetch(`/api/shifts?start=${pStart}&end=${pEnd}`);
+                if (pRes.ok) {
+                    const pData = await pRes.json();
+                    setPrevMonthShifts(Array.isArray(pData) ? pData : []);
+                }
+            } else {
+                setPrevMonthShifts([]);
+            }
         } catch (e) { console.error('SCHEDULE_FETCH_SHIFTS_ERROR:', e); }
     }
 
@@ -433,6 +455,127 @@ export default function SchedulePage() {
             }
         } catch (e) { console.error(e); }
     }
+
+    const handleAutoFill = async () => {
+        if (!prevMonthHasShifts || !isMonthEmpty || isAutoFilling) return;
+        setIsAutoFilling(true);
+
+        try {
+            const operations: any[] = [];
+            const prevShiftsByEmp: Record<string, Record<string, Shift>> = {};
+            prevMonthShifts.forEach(s => {
+                if (!prevShiftsByEmp[s.employeeId]) prevShiftsByEmp[s.employeeId] = {};
+                prevShiftsByEmp[s.employeeId][s.date] = s;
+            });
+
+            const currentMonthStart = startOfMonth(currentMonth);
+            const currentMonthEnd = endOfMonth(currentMonth);
+            const currentDays = eachDayOfInterval({ start: currentMonthStart, end: currentMonthEnd });
+
+            for (const emp of employees) {
+                const empPrevShifts = Object.values(prevShiftsByEmp[emp.id] || {}).filter(s => !s.isDeleted);
+                if (empPrevShifts.length === 0) continue;
+
+                // Sort by date descending to find the last regular shifts
+                const sortedPrev = empPrevShifts
+                    .filter(s => s.type === 'REGULAR' || s.type === 'SICK' || s.type === 'VACATION')
+                    .sort((a, b) => b.date.localeCompare(a.date));
+
+                if (sortedPrev.length === 0) continue;
+
+                // Determine pattern: 5/2 or 2/2
+                // We'll look at the last few REGULAR shifts to decide. 
+                // Mostly 8h -> 5/2, mostly 11h -> 2/2.
+                const regularShifts = sortedPrev.filter(s => s.type === 'REGULAR');
+                if (regularShifts.length === 0) continue;
+
+                const avgHours = regularShifts.reduce((acc, s) => acc + s.hours, 0) / regularShifts.length;
+                const is52 = avgHours < 10; // Simple heuristic: 8h vs 11h
+
+                if (is52) {
+                    // Pattern 5/2: weekdays 8h, weekeds empty
+                    currentDays.forEach(day => {
+                        const dayOfWeek = day.getDay();
+                        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                            operations.push({
+                                date: format(day, 'yyyy-MM-dd'),
+                                employeeId: emp.id,
+                                type: 'REGULAR',
+                                hours: 8,
+                                cabinetClosed: false,
+                                centerClosed: false,
+                                coefficient: 1.0
+                            });
+                        }
+                    });
+                } else {
+                    // Pattern 2/2: Find the last regular shift and project
+                    // To be more robust, we look for the last regular shift cycle.
+                    // But wait, the user said: "if there was sick/vacation, look what was before".
+                    // So we need to project from some "anchor" point.
+
+                    // Let's find the last known REGULAR shift and its date.
+                    const lastRegular = regularShifts[0];
+                    const anchorDate = parseISO(lastRegular.date);
+
+                    // We need to know if this was day 1 or day 2 of the 11h block.
+                    // Check the day before anchorDate.
+                    const prevDayKey = format(subDays(anchorDate, 1), 'yyyy-MM-dd');
+                    const wasDayBeforeRegular = prevShiftsByEmp[emp.id]?.[prevDayKey]?.type === 'REGULAR';
+
+                    // Cycle position: 0 (day1 of 11h), 1 (day2 of 11h), 2 (day1 empty), 3 (day2 empty)
+                    let anchorCyclePos = wasDayBeforeRegular ? 1 : 0;
+
+                    // Now project from anchorDate to start of currentMonth
+                    // Days between anchorDate and start of currentMonth
+                    const daysToProject = eachDayOfInterval({
+                        start: anchorDate,
+                        end: currentMonthEnd
+                    });
+
+                    // We start from anchorDate (cyclePos = anchorCyclePos)
+                    let currentCyclePos = anchorCyclePos;
+                    daysToProject.forEach((day, idx) => {
+                        if (idx === 0) return; // Skip anchor date itself as it's in the past
+
+                        currentCyclePos = (anchorCyclePos + idx) % 4;
+
+                        // If day is in current month, add to operations
+                        if (day >= currentMonthStart) {
+                            if (currentCyclePos === 0 || currentCyclePos === 1) {
+                                operations.push({
+                                    date: format(day, 'yyyy-MM-dd'),
+                                    employeeId: emp.id,
+                                    type: 'REGULAR',
+                                    hours: 11,
+                                    cabinetClosed: false,
+                                    centerClosed: false,
+                                    coefficient: 1.0
+                                });
+                            }
+                        }
+                    });
+                }
+            }
+
+            if (operations.length > 0) {
+                const res = await fetch('/api/shifts/batch', {
+                    method: 'POST',
+                    body: JSON.stringify({ operations })
+                });
+                if (res.ok) {
+                    fetchShifts();
+                } else {
+                    const err = await res.json();
+                    alert('Ошибка при заполнении: ' + (err.error || 'Unknown error'));
+                }
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsAutoFilling(false);
+        }
+    };
 
     const handleDragEnd = useCallback((event: DragEndEvent) => {
         const { active, over } = event;
@@ -943,7 +1086,16 @@ export default function SchedulePage() {
                         <div className="px-1.5 py-0.5 rounded bg-zinc-100 text-[10px] font-bold uppercase tracking-wider">Изм.</div>
                     </div>
                 </div>
-                <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm border-zinc-200/60">
+                <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm border-zinc-200/60 transition-all">
+                    {isMonthEmpty && prevMonthHasShifts && (
+                        <button
+                            onClick={handleAutoFill}
+                            disabled={isAutoFilling}
+                            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-all shadow-sm font-bold text-sm disabled:opacity-50 animate-in fade-in slide-in-from-right-4"
+                        >
+                            {isAutoFilling ? 'Заполнение...' : 'Заполнить'}
+                        </button>
+                    )}
                     <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 text-zinc-600" /></button>
                     <span className="text-lg font-semibold w-40 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
                     <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
