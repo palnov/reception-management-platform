@@ -2,13 +2,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { logAudit } from '@/lib/audit';
 
 async function checkManager() {
     const session = await getSession();
     return session?.employee?.role === 'MANAGER';
 }
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
         // 1. Setup/Ensure at least one Manager exists
         const managerCount = await prisma.employee.count({
@@ -30,18 +31,40 @@ export async function GET() {
 
         // 2. Determine what data to return based on role
         const isManager = await checkManager();
+        const { searchParams } = new URL(request.url);
+        const activeOnly = searchParams.get('activeOnly') === 'true';
+        const activeInDate = searchParams.get('activeInDate'); // ISO date (e.g., "2026-03-01")
+
+        const where: any = {};
+        if (activeOnly) {
+            const today = new Date().toISOString().split('T')[0];
+            where.OR = [
+                { dismissalDate: "" },
+                { dismissalDate: { gt: today } }
+            ];
+        } else if (activeInDate) {
+            // Include employees who:
+            // 1. Have no dismissal date
+            // 2. Were dismissed ON or AFTER the activeInDate
+            where.OR = [
+                { dismissalDate: "" },
+                { dismissalDate: { gte: activeInDate } }
+            ];
+        }
 
         const employees = await prisma.employee.findMany({
+            where,
             orderBy: { sortOrder: 'asc' },
             select: isManager ? undefined : {
                 id: true,
                 name: true,
                 role: true,
                 baseSalary: true, // Needed to prevent UI crash
-                hireDate: true,   // Needed for consistency
-                branch: true,     // Optional but safe
+                hireDate: true,
+                branch: true,
+                dismissalDate: true
             }
-        });
+        } as any);
 
         return NextResponse.json(employees);
     } catch (error: any) {
@@ -55,7 +78,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
     }
     const body = await request.json();
-    const { name, role, baseSalary, hourlyRate, branch, password, hireDate } = body;
+    const { name, role, baseSalary, hourlyRate, branch, password, hireDate, dismissalDate } = body;
 
     const lastEmployee = await prisma.employee.findFirst({
         orderBy: { sortOrder: 'desc' },
@@ -72,10 +95,47 @@ export async function POST(request: Request) {
             hourlyRate: parseFloat(hourlyRate || 0),
             branch,
             hireDate: hireDate || '',
+            dismissalDate: dismissalDate || '',
             sortOrder: nextOrder
+        } as any
+    });
+
+    // Automatic Shift Clearing on POST (if dismissed immediately)
+    if (dismissalDate) {
+        await clearFutureShifts(employee.id, dismissalDate);
+    }
+    return NextResponse.json(employee);
+}
+
+async function clearFutureShifts(empId: string, dismissalDate: string) {
+    const session = await getSession();
+    const shiftsToClear = await prisma.shift.findMany({
+        where: {
+            employeeId: empId,
+            date: { gte: dismissalDate },
+            isDeleted: false
         }
     });
-    return NextResponse.json(employee);
+
+    if (shiftsToClear.length > 0) {
+        await prisma.$transaction([
+            prisma.shift.updateMany({
+                where: { id: { in: shiftsToClear.map(s => s.id) } },
+                data: { isDeleted: true }
+            }),
+            ...shiftsToClear.map(s => prisma.auditLog.create({
+                data: {
+                    entityType: 'SHIFT',
+                    entityId: s.id,
+                    action: 'DELETE',
+                    changedBy: session?.employee?.name || 'SYSTEM',
+                    changedByRole: session?.employee?.role || 'SYSTEM',
+                    timestamp: new Date().toISOString(),
+                    details: JSON.stringify({ ...s, autoCleared: true, reason: `Employee dismissed on ${dismissalDate}` })
+                }
+            }))
+        ]);
+    }
 }
 
 export async function PUT(request: Request) {
@@ -83,7 +143,7 @@ export async function PUT(request: Request) {
         return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
     }
     const body = await request.json();
-    const { id, name, role, baseSalary, hourlyRate, branch, sortOrder, password, hireDate } = body;
+    const { id, name, role, baseSalary, hourlyRate, branch, sortOrder, password, hireDate, dismissalDate } = body;
 
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
 
@@ -93,7 +153,8 @@ export async function PUT(request: Request) {
         baseSalary: parseFloat(baseSalary || 0),
         hourlyRate: parseFloat(hourlyRate || 0),
         branch,
-        hireDate: hireDate || ''
+        hireDate: hireDate || '',
+        dismissalDate: dismissalDate || ''
     };
 
     if (password !== undefined) {
@@ -108,6 +169,12 @@ export async function PUT(request: Request) {
         where: { id },
         data
     });
+
+    // Automatic Shift Clearing on PUT
+    if (dismissalDate) {
+        await clearFutureShifts(id, dismissalDate);
+    }
+
     return NextResponse.json(employee);
 }
 

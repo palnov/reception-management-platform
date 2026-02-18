@@ -18,6 +18,7 @@ model Employee {
   branch            String?
   sortOrder         Int                @default(0)
   createdAt         String             @default("")
+  dismissalDate     String             @default("")
   kpiRecords        KpiRecord[]
   promotionSales    PromotionSale[]
   registrationKpis  RegistrationKpi[]

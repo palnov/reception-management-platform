@@ -44,14 +44,15 @@ export default function SalesPage() {
 
     useEffect(() => {
         fetchEmployees();
-    }, []);
+    }, [currentMonth]);
 
     useEffect(() => {
         fetchSales();
     }, [currentMonth]);
 
     async function fetchEmployees() {
-        const res = await fetch('/api/employees');
+        const monthStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+        const res = await fetch(`/api/employees?activeInDate=${monthStr}`);
         const data = await res.json();
         setEmployees(Array.isArray(data) ? data : []);
     }

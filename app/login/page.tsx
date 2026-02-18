@@ -18,7 +18,7 @@ export default function LoginPage() {
     const router = useRouter();
 
     useEffect(() => {
-        fetch('/api/employees')
+        fetch('/api/employees?activeOnly=true')
             .then(res => res.json())
             .then(data => {
                 setEmployees(Array.isArray(data) ? data : []);

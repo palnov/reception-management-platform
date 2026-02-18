@@ -15,6 +15,7 @@ interface Employee {
     role: string;
     branch?: string;
     hireDate?: string;
+    dismissalDate?: string;
 }
 
 interface Shift {
@@ -95,6 +96,7 @@ export default function KpiPage() {
     }, []);
 
     useEffect(() => {
+        fetchEmployees();
         fetchData();
         fetchNorm();
     }, [currentMonth]);
@@ -114,9 +116,19 @@ export default function KpiPage() {
     }
 
     async function fetchEmployees() {
-        const res = await fetch('/api/employees');
-        const data = await res.json();
-        setEmployees(Array.isArray(data) ? data : []);
+        try {
+            const monthStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+            const res = await fetch(`/api/employees?activeInDate=${monthStr}`);
+            if (res.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+            const data = await res.json();
+            const list = Array.isArray(data) ? data : [];
+            setEmployees(list.filter(e => e.role !== 'MANAGER'));
+        } catch (e) {
+            console.error('FETCH_EMPLOYEES_ERROR:', e);
+        }
     }
 
     async function fetchData() {
@@ -211,12 +223,17 @@ export default function KpiPage() {
             const empSales = promotionSales.filter(s => s.employeeId === enrichedEmp.id);
             const empRegs = registrationKpis.filter(r => r.employeeId === enrichedEmp.id);
 
+            const dismissalDate = enrichedEmp.dismissalDate;
+
             let rawHours = 0;
             let basePay = 0;
             let dayOffHours = 0;
             let dayOffPayTotal = 0;
             let closingBonuses = 0;
             empShifts.forEach(s => {
+                // Safety check: skip shifts on or after dismissal date
+                if (dismissalDate && s.date >= dismissalDate) return;
+
                 const coeff = s.coefficient || 1.0;
                 const hourlyBase = enrichedEmp.baseSalary / monthNorm;
                 const shiftPay = hourlyBase * s.hours * coeff;
@@ -276,9 +293,16 @@ export default function KpiPage() {
 
             // Seniority (Выслуга)
             const hireDateParsed = enrichedEmp.hireDate ? new Date(enrichedEmp.hireDate) : null;
+            const dismissalDateParsed = enrichedEmp.dismissalDate ? new Date(enrichedEmp.dismissalDate) : null;
             const isHireDateValid = hireDateParsed && !isNaN(hireDateParsed.getTime());
+
+            // For seniority, we calculate time from hire to either NOW or DISMISSAL
+            const endDate = (dismissalDateParsed && !isNaN(dismissalDateParsed.getTime()))
+                ? dismissalDateParsed.getTime()
+                : Date.now();
+
             const seniorityYears = isHireDateValid
-                ? (Date.now() - hireDateParsed!.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+                ? (endDate - hireDateParsed!.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
                 : 0;
 
             let seniorityBonus = 0;

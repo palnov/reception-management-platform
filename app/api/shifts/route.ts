@@ -24,6 +24,7 @@ export async function GET(request: Request) {
                     gte: start,
                     lte: end,
                 },
+                isDeleted: false
             },
             include: {
                 employee: true
@@ -80,6 +81,11 @@ export async function POST(request: Request) {
     const { id, date, employeeId, type, hours, cabinetClosed, centerClosed, coefficient } = body;
 
     try {
+        const emp = await prisma.employee.findUnique({ where: { id: employeeId } }) as any;
+        if (emp?.dismissalDate && date >= emp.dismissalDate) {
+            return NextResponse.json({ error: `Employee dismissed on ${emp.dismissalDate}. Cannot create shift on ${date}.` }, { status: 400 });
+        }
+
         if (id) {
             // Update existing (by ID)
             const existing = await prisma.shift.findUnique({ where: { id } });
@@ -131,6 +137,12 @@ export async function POST(request: Request) {
                     isDeleted: false // Restore
                 };
                 const diff = calculateDiff(existing, newData);
+
+                const involvedEmps = await prisma.employee.findMany({
+                    where: { id: { in: [employeeId] } }, // Assuming employeeId is the only involved employee for this shift update
+                    select: { id: true, dismissalDate: true } as any
+                }) as any[];
+                const dismissalMap = new Map(involvedEmps.map((e: any) => [e.id, e.dismissalDate]));
 
                 const shift = await prisma.shift.update({
                     where: { id: existing.id },

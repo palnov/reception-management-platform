@@ -28,7 +28,11 @@ interface Employee {
     id: string;
     name: string;
     role: string;
+    baseSalary: number;
+    hourlyRate: number;
     branch?: string;
+    hireDate?: string;
+    dismissalDate?: string;
     sortOrder: number;
 }
 
@@ -158,6 +162,14 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
         zIndex: isDragging ? 100 : 'auto',
     };
 
+    const isDismissed = useMemo(() => {
+        const dDate = emp.dismissalDate;
+        if (!dDate) return (date: string) => false;
+        return (date: string) => {
+            return dDate !== "" && date >= dDate;
+        };
+    }, [emp.dismissalDate]);
+
     return (
         <tr ref={setNodeRef} style={style} className="hover:bg-zinc-50 group border-b border-zinc-200">
             <td className="sticky left-0 bg-white group-hover:bg-zinc-50 z-10 border-r border-zinc-200 p-3 font-medium text-zinc-900 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] transition-colors">
@@ -186,9 +198,18 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                             </div>
                             <span className="truncate">{emp.name}</span>
                         </div>
-                        {emp.branch && (
-                            <div className="text-[10px] text-zinc-400 pl-7">
-                                {BRANCH_CODES[emp.branch] || emp.branch}
+                        {(emp.branch || emp.dismissalDate) && (
+                            <div className="flex items-center gap-2 pl-7 leading-tight">
+                                {emp.branch && (
+                                    <span className="text-[10px] text-zinc-400">
+                                        {BRANCH_CODES[emp.branch] || emp.branch}
+                                    </span>
+                                )}
+                                {emp.dismissalDate && emp.dismissalDate <= new Date().toISOString().split('T')[0] && (
+                                    <span className="text-[10px] text-red-500 font-bold whitespace-nowrap">
+                                        УВОЛЕНА: {format(parseISO(emp.dismissalDate), 'dd.MM.yy')}
+                                    </span>
+                                )}
                             </div>
                         )}
                     </div>
@@ -198,11 +219,15 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                 const dateKey = format(day, 'yyyy-MM-dd');
                 const shift = empShifts[dateKey];
                 const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                const dismissed = isDismissed(dateKey);
 
                 let bgClass = '';
                 let textClass = '';
 
-                if (shift) {
+                if (dismissed) {
+                    bgClass = 'bg-zinc-100/50';
+                    textClass = 'text-zinc-300';
+                } else if (shift) {
                     if (shift.type === 'SICK') { bgClass = 'bg-red-100'; textClass = 'text-red-900'; }
                     else if (shift.type === 'DAY_OFF_WORK') { bgClass = 'bg-amber-100'; textClass = 'text-amber-900'; }
                     else if (shift.type === 'VACATION') { bgClass = 'bg-green-100'; textClass = 'text-green-900'; }
@@ -215,31 +240,42 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                     <td
                         key={dateKey}
                         className={`border-r border-zinc-200 text-center cursor-pointer relative h-12 w-11 p-0 select-none transition-all
-                            ${shift && !shift.isDeleted ? bgClass : (isWeekend ? 'bg-red-50/30' : '')}
-                            ${shift && !shift.isDeleted ? textClass : ''}
-                            ${!shift || shift.isDeleted ? 'hover:bg-blue-50/50' : 'hover:brightness-95'}
+                            ${shift && !shift.isDeleted ? bgClass : (isWeekend || dismissed ? bgClass : '')}
+                            ${shift && !shift.isDeleted ? textClass : (dismissed ? textClass : '')}
+                            ${!shift || shift.isDeleted ? (dismissed ? '' : 'hover:bg-blue-50/50') : 'hover:brightness-95'}
                             ${day.getDay() === 6 ? 'border-l-2 border-zinc-400' : ''}
                             ${day.getDay() === 0 ? 'border-r-2 border-zinc-400' : ''}
-                            ${(handleCell?.empId === emp.id && handleCell?.dateKey === dateKey) ||
-                                (selection && isInSelection(emp.id, dateKey)) ? 'z-30' : ''}
+                            ${((handleCell?.empId === emp.id && handleCell?.dateKey === dateKey) ||
+                                (selection && isInSelection(emp.id, dateKey))) && !dismissed ? 'z-30' : ''}
                         `}
                         onMouseDown={(e) => {
+                            if (dismissed) return;
                             if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
                             if (e.button === 0) onMouseDown(e, emp.id, dateKey);
                         }}
-                        onMouseEnter={() => onMouseEnter(emp.id, dateKey)}
+                        onMouseEnter={() => !dismissed && onMouseEnter(emp.id, dateKey)}
                         onContextMenu={(e) => {
+                            if (dismissed) return;
                             if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
                             onContextMenu(e, emp.id, dateKey, shift);
                         }}
                     >
                         {/* Hover handle trigger (bottom-right corner) - Exactly matches visual handle position */}
-                        <div
-                            className="absolute -bottom-[5px] -right-[5px] w-2.5 h-2.5 z-40 cursor-crosshair"
-                            onMouseEnter={() => onHandleHover(emp.id, dateKey)}
-                            onMouseLeave={() => onHandleHover(null, null)}
-                            onMouseDown={onHandleMouseDown}
-                        />
+                        {!dismissed && (
+                            <div
+                                className="absolute -bottom-[5px] -right-[5px] w-2.5 h-2.5 z-40 cursor-crosshair"
+                                onMouseEnter={() => onHandleHover(emp.id, dateKey)}
+                                onMouseLeave={() => onHandleHover(null, null)}
+                                onMouseDown={onHandleMouseDown}
+                            />
+                        )}
+
+                        {dismissed && (
+                            <div className="absolute inset-0 flex items-center justify-center opacity-40 pointer-events-none">
+                                <span className="text-[7px] font-black uppercase tracking-tighter rotate-[-15deg] border border-current px-0.5 rounded leading-tight">Уволен</span>
+                            </div>
+                        )}
+
                         {/* If shift exists and NOT deleted, render normal content */}
                         {shift && !shift.isDeleted && (
                             <div className="relative h-full w-full flex items-center justify-center leading-none">
@@ -375,22 +411,28 @@ export default function SchedulePage() {
     }, []);
 
     useEffect(() => {
+        fetchEmployees();
         fetchShifts();
         fetchNorm();
     }, [currentMonth]);
 
-    async function fetchEmployees() {
+    const fetchEmployees = async () => {
         try {
-            const res = await fetch('/api/employees');
+            const monthStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+            const res = await fetch(`/api/employees?activeInDate=${monthStr}`);
             if (res.status === 401) {
                 window.location.href = '/login';
                 return;
             }
             const data = await res.json();
-            const list = Array.isArray(data) ? data : [];
-            setEmployees(list.filter(e => e.role !== 'MANAGER'));
-        } catch (e) { console.error(e); }
-    }
+            // Server now handles filtering by date via activeInDate.
+            // We just need to exclude MANAGERs if needed, but usually Schedule page hides them already or shows if they have shifts.
+            // Let's keep it simple and just set the data.
+            setEmployees(Array.isArray(data) ? data.filter((e: any) => e.role !== 'MANAGER') : []);
+        } catch (e) {
+            console.error(e);
+        }
+    };
 
     async function fetchShifts() {
         try {
@@ -491,9 +533,14 @@ export default function SchedulePage() {
                 if (is52) {
                     currentDays.forEach(day => {
                         const dayOfWeek = day.getDay();
+                        const dateStr = format(day, 'yyyy-MM-dd');
+
+                        // Respect dismissal date
+                        if (emp.dismissalDate && dateStr > emp.dismissalDate) return;
+
                         if (dayOfWeek !== 0 && dayOfWeek !== 6) {
                             operations.push({
-                                date: format(day, 'yyyy-MM-dd'),
+                                date: dateStr,
                                 employeeId: emp.id,
                                 type: 'REGULAR',
                                 hours: 8,
@@ -537,11 +584,14 @@ export default function SchedulePage() {
 
                         const currentCyclePos = (anchorCyclePos + idx) % 4;
                         const isWorkDay = (currentCyclePos === 0 || currentCyclePos === 1);
+                        const dateStr = format(day, 'yyyy-MM-dd');
 
-                        // Only add shifts that fall into the target month
+                        // Only add shifts that fall into the target month and respect dismissal date
                         if (day >= currentMonthStart && isWorkDay) {
+                            if (emp.dismissalDate && dateStr > emp.dismissalDate) return;
+
                             operations.push({
-                                date: format(day, 'yyyy-MM-dd'),
+                                date: dateStr,
                                 employeeId: emp.id,
                                 type: 'REGULAR',
                                 hours: 11,
@@ -600,6 +650,11 @@ export default function SchedulePage() {
     }, []);
 
     const openModal = useCallback((date: Date, empId: string, existingShift?: Shift) => {
+        const emp = employees.find(e => e.id === empId);
+        if (emp?.dismissalDate && format(date, 'yyyy-MM-dd') > emp.dismissalDate) {
+            return; // Don't open modal for dismissed days
+        }
+
         setSelectedDate(date);
         setSelectedEmployeeId(empId);
         if (existingShift) {
@@ -620,7 +675,7 @@ export default function SchedulePage() {
             });
         }
         setShowModal(true);
-    }, []);
+    }, [employees]);
 
     const handleSaveShift = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -739,12 +794,17 @@ export default function SchedulePage() {
         if (!selection) return;
 
         const range = getSelectedRange(selection);
-        const operations = range.map(cell => ({
-            date: cell.date,
-            employeeId: cell.empId,
-            ...formData,
-            id: shiftsByEmployee[cell.empId]?.[cell.date]?.id
-        }));
+        const operations = range.map(cell => {
+            const emp = employees.find(e => e.id === cell.empId);
+            if (emp?.dismissalDate && cell.date > emp.dismissalDate) return null;
+
+            return {
+                date: cell.date,
+                employeeId: cell.empId,
+                ...formData,
+                id: shiftsByEmployee[cell.empId]?.[cell.date]?.id
+            };
+        }).filter(Boolean);
 
         const res = await fetch('/api/shifts/batch', {
             method: 'POST',
@@ -873,6 +933,10 @@ export default function SchedulePage() {
                 const sourceEmpId = employees[finalEmpIdx].id;
                 const sourceDate = format(days[finalDateIdx], 'yyyy-MM-dd');
                 const sourceShift = shiftsByEmployee[sourceEmpId]?.[sourceDate];
+
+                // Respect dismissal date
+                const targetEmp = employees[cellEmpIdx];
+                if (targetEmp?.dismissalDate && cell.date > targetEmp.dismissalDate) return null;
 
                 if (!sourceShift) {
                     const existingShiftId = shiftsByEmployee[cell.empId]?.[cell.date]?.id;

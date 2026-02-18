@@ -18,6 +18,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Неверный ID или пароль' }, { status: 401 });
         }
 
+        // Block login if dismissed
+        const empRecord = employee as any;
+        if (empRecord.dismissalDate && empRecord.dismissalDate <= new Date().toISOString().split('T')[0]) {
+            return NextResponse.json({ error: 'Доступ заблокирован (сотрудник уволен)' }, { status: 403 });
+        }
+
         await login({
             id: employee.id,
             name: employee.name,

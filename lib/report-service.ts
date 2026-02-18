@@ -19,7 +19,13 @@ export class ReportService {
         };
         const monthStr = format(startDate, 'yyyy-MM'); // e.g. "2026-02"
 
-        const empFilter: any = employeeId ? { id: employeeId } : { role: { not: 'MANAGER' } };
+        const empFilter: any = employeeId ? { id: employeeId } : {
+            role: { not: 'MANAGER' },
+            OR: [
+                { dismissalDate: "" },
+                { dismissalDate: { gte: format(startDate, 'yyyy-MM-dd') } }
+            ]
+        };
         const employees = await prisma.employee.findMany({
             where: empFilter,
             orderBy: { sortOrder: 'asc' }
@@ -369,9 +375,18 @@ export class ReportService {
                 // Seniority (Выслуга)
                 const hireDateStr = (emp as any).hireDate;
                 const hireDateParsed = hireDateStr ? new Date(hireDateStr) : null;
+                const dismissalDateStr = (emp as any).dismissalDate;
+                const dismissalDateParsed = dismissalDateStr ? new Date(dismissalDateStr) : null;
+
                 const isHireDateValid = hireDateParsed && !isNaN(hireDateParsed.getTime());
+
+                // Use dismissal date as end point if it exists
+                const calculationEndDate = (dismissalDateParsed && dismissalDateParsed < new Date())
+                    ? dismissalDateParsed.getTime()
+                    : Date.now();
+
                 const seniorityYears = isHireDateValid
-                    ? (Date.now() - hireDateParsed!.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+                    ? (calculationEndDate - hireDateParsed!.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
                     : 0;
 
                 let seniorityBonus = 0;

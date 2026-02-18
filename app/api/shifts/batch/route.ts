@@ -58,8 +58,27 @@ export async function POST(request: Request) {
             const existingMap = new Map();
             existingShifts.forEach(s => existingMap.set(`${s.employeeId}_${s.date}`, s));
 
+            // Fetch dismissal dates for all involved employees
+            const involvedEmpIds = [...new Set(operations.map(op => op.employeeId))];
+            const involvedEmps = await prisma.employee.findMany({
+                where: { id: { in: involvedEmpIds } },
+                select: { id: true, dismissalDate: true } as any
+            }) as any[];
+            const dismissalMap = new Map(involvedEmps.map((e: any) => [e.id, e.dismissalDate]));
+
+            const validOperations = operations.filter(op => {
+                const dDate = dismissalMap.get(op.employeeId);
+                return !dDate || op.date < dDate;
+            });
+
+            if (validOperations.length === 0 && operations.length > 0) {
+                // All requested operations were invalid (e.g. all past dismissal)
+                // We can either return error or just skip. Let's return error if all were rejected.
+                // But wait, some might be valid. Let's just process the valid ones.
+            }
+
             results.upserted = await prisma.$transaction(
-                operations.map(op => {
+                validOperations.map(op => {
                     const existing = op.id ? existingShifts.find(s => s.id === op.id) : existingMap.get(`${op.employeeId}_${op.date}`);
 
                     const data = {

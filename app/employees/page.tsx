@@ -13,6 +13,7 @@ interface Employee {
     hourlyRate: number;
     branch?: string;
     hireDate?: string;
+    dismissalDate?: string;
 }
 
 export default function EmployeesPage() {
@@ -27,7 +28,8 @@ export default function EmployeesPage() {
         password: '',
         baseSalary: '',
         branch: 'Дзержинского 26',
-        hireDate: ''
+        hireDate: '',
+        dismissalDate: ''
     };
 
     const [formData, setFormData] = useState(initialForm);
@@ -62,7 +64,8 @@ export default function EmployeesPage() {
             password: emp.password || '',
             baseSalary: emp.baseSalary.toString(),
             branch: emp.branch || 'Дзержинского 26',
-            hireDate: emp.hireDate || ''
+            hireDate: emp.hireDate || '',
+            dismissalDate: emp.dismissalDate || ''
         });
         setShowForm(true);
     }
@@ -189,14 +192,25 @@ export default function EmployeesPage() {
                                 )}
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-zinc-700 mb-1">Дата приёма</label>
-                                <input
-                                    type="date"
-                                    value={formData.hireDate}
-                                    onChange={e => setFormData({ ...formData, hireDate: e.target.value })}
-                                    className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-zinc-700 mb-1">Дата приёма</label>
+                                    <input
+                                        type="date"
+                                        value={formData.hireDate}
+                                        onChange={e => setFormData({ ...formData, hireDate: e.target.value })}
+                                        className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-zinc-700 mb-1">Дата увольнения</label>
+                                    <input
+                                        type="date"
+                                        value={formData.dismissalDate}
+                                        onChange={e => setFormData({ ...formData, dismissalDate: e.target.value })}
+                                        className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                    />
+                                </div>
                             </div>
 
                         </div>
@@ -239,86 +253,101 @@ export default function EmployeesPage() {
                 </div>
             )}
 
-            <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                <table className="w-full text-left">
-                    <thead className="bg-zinc-50 border-b border-zinc-200">
-                        <tr>
-                            <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Сотрудник</th>
-                            <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Должность</th>
-                            <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Филиал</th>
-                            <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Дата приёма</th>
-                            <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500 text-right">Оклад</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100">
-                        {employees.map(emp => (
-                            <tr
-                                key={emp.id}
-                                className="hover:bg-zinc-50 transition-colors group cursor-pointer"
-                                onClick={() => handleEdit(emp)}
-                            >
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${emp.role === 'MANAGER'
-                                            ? 'bg-purple-100 text-purple-600'
-                                            : emp.role === 'SENIOR'
-                                                ? 'bg-amber-100 text-amber-600'
-                                                : 'bg-zinc-100 text-zinc-500'
-                                            }`}>
-                                            {emp.role === 'MANAGER' ? (
-                                                <Crown className="w-5 h-5" />
-                                            ) : emp.role === 'SENIOR' ? (
-                                                <BadgeCheck className="w-5 h-5" />
-                                            ) : (
-                                                <User className="w-4 h-4" />
-                                            )}
-                                        </div>
-                                        <div>
-                                            <span className="font-medium text-zinc-900 block">{emp.name}</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-zinc-600 text-sm">
-                                    <span className={`inline-flex items-center w-fit px-2 py-0.5 rounded text-xs font-medium ${emp.role === 'MANAGER'
-                                        ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                                        : emp.role === 'SENIOR'
-                                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                            : 'bg-blue-50 text-blue-700 border border-blue-200'
-                                        }`}>
-                                        {emp.role === 'MANAGER' ? 'Руководитель' : emp.role === 'SENIOR' ? 'Старший смены' : 'Администратор'}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 text-zinc-600 text-sm">
-                                    {emp.role === 'MANAGER' ? (
-                                        <span className="text-zinc-400">-</span>
-                                    ) : emp.branch ? (
-                                        <div className="flex items-center text-zinc-600">
-                                            <MapPin className="w-3.5 h-3.5 mr-1.5 text-zinc-400" />
-                                            {emp.branch}
-                                        </div>
-                                    ) : null}
-                                </td>
-                                <td className="px-6 py-4 text-zinc-600 text-sm">
-                                    {emp.hireDate ? new Date(emp.hireDate).toLocaleDateString('ru-RU') : <span className="text-zinc-400">—</span>}
-                                </td>
-                                <td className="px-6 py-4 text-zinc-900 text-sm font-medium text-right">
-                                    {emp.role === 'MANAGER' ? '-' : `${(emp.baseSalary ?? 0).toLocaleString()} ₽`}
-                                </td>
-                            </tr>
-                        ))}
-                        {employees.length === 0 && !isLoading && (
-                            <tr>
-                                <td colSpan={5} className="px-6 py-12 text-center text-zinc-500">Нет сотрудников.</td>
-                            </tr>
-                        )}
-                        {isLoading && (
-                            <tr>
-                                <td colSpan={5} className="px-6 py-12 text-center text-zinc-500">Загрузка...</td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            {(() => {
+                const todayStr = new Date().toISOString().split('T')[0];
+                const activeEmployees = employees.filter(emp => !emp.dismissalDate || emp.dismissalDate > todayStr);
+                const dismissedEmployees = employees.filter(emp => emp.dismissalDate && emp.dismissalDate <= todayStr);
+
+                const renderTable = (list: Employee[], title: string) => (
+                    <div className="mb-12">
+                        <h2 className="text-xl font-bold text-zinc-800 mb-4 px-2">{title}</h2>
+                        <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
+                            <table className="w-full text-left">
+                                <thead className="bg-zinc-50 border-b border-zinc-200">
+                                    <tr>
+                                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Сотрудник</th>
+                                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Должность</th>
+                                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Филиал</th>
+                                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Дата приёма</th>
+                                        <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500 text-right">Оклад</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-100">
+                                    {list.map(emp => (
+                                        <tr
+                                            key={emp.id}
+                                            className="hover:bg-zinc-50 transition-colors group cursor-pointer"
+                                            onClick={() => handleEdit(emp)}
+                                        >
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${emp.role === 'MANAGER'
+                                                        ? 'bg-purple-100 text-purple-600'
+                                                        : emp.role === 'SENIOR'
+                                                            ? 'bg-amber-100 text-amber-600'
+                                                            : 'bg-zinc-100 text-zinc-500'
+                                                        }`}>
+                                                        {emp.role === 'MANAGER' ? (
+                                                            <Crown className="w-5 h-5" />
+                                                        ) : emp.role === 'SENIOR' ? (
+                                                            <BadgeCheck className="w-5 h-5" />
+                                                        ) : (
+                                                            <User className="w-4 h-4" />
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-medium text-zinc-900 block">{emp.name}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-zinc-600 text-sm">
+                                                <span className={`inline-flex items-center w-fit px-2 py-0.5 rounded text-xs font-medium ${emp.role === 'MANAGER'
+                                                    ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                                    : emp.role === 'SENIOR'
+                                                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                        : 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                    }`}>
+                                                    {emp.role === 'MANAGER' ? 'Руководитель' : emp.role === 'SENIOR' ? 'Старший смены' : 'Администратор'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-zinc-600 text-sm">
+                                                {emp.role === 'MANAGER' ? (
+                                                    <span className="text-zinc-400">-</span>
+                                                ) : emp.branch ? (
+                                                    <div className="flex items-center text-zinc-600">
+                                                        <MapPin className="w-3.5 h-3.5 mr-1.5 text-zinc-400" />
+                                                        {emp.branch}
+                                                    </div>
+                                                ) : null}
+                                            </td>
+                                            <td className="px-6 py-4 text-zinc-600 text-sm">
+                                                {emp.hireDate ? new Date(emp.hireDate).toLocaleDateString('ru-RU') : <span className="text-zinc-400">—</span>}
+                                            </td>
+                                            <td className="px-6 py-4 text-zinc-900 text-sm font-medium text-right">
+                                                {emp.role === 'MANAGER' ? '-' : `${(emp.baseSalary ?? 0).toLocaleString()} ₽`}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {list.length === 0 && !isLoading && (
+                                        <tr>
+                                            <td colSpan={5} className="px-6 py-12 text-center text-zinc-500">Нет сотрудников в этом списке.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                );
+
+                if (isLoading) return <div className="text-center py-12 text-zinc-500 font-medium">Загрузка данных...</div>;
+
+                return (
+                    <>
+                        {renderTable(activeEmployees, "Действующие сотрудники")}
+                        {dismissedEmployees.length > 0 && renderTable(dismissedEmployees, "Уволенные сотрудники")}
+                    </>
+                );
+            })()}
         </div>
     );
 }
