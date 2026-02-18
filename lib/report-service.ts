@@ -288,14 +288,14 @@ export class ReportService {
                 { header: 'Смены (Руб)', key: 'shiftPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Откр/Закр', key: 'closing', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                { header: 'Чеклист %', key: 'checklist_pct', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
-                { header: 'Чеклист Руб', key: 'checklist_rub', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Открытие Б/Л', key: 'sick_leave_open', width: 15, style: centerStyle },
                 { header: 'Закрытие/продление Б/Л', key: 'sick_leave_close', width: 25, style: centerStyle },
                 { header: 'Карточки', key: 'cards', width: 15, style: centerStyle },
+                { header: 'Выслуга', key: 'seniority', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'Чеклист %', key: 'checklist_pct', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
+                { header: 'Чеклист Руб', key: 'checklist_rub', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Качество', key: 'quality', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
                 { header: 'KPI бонус', key: 'kpi', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                { header: 'Выслуга', key: 'seniority', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'ИТОГО', key: 'total', width: 15, style: { ...cellStyle, font: { bold: true }, numFmt: '#,##0' } },
             ];
 
@@ -388,14 +388,14 @@ export class ReportService {
                     shiftPay: Math.round(shiftPay),
                     closing: closingBonuses,
                     sales: salesBonus,
-                    checklist_pct: calcChecklist,
-                    checklist_rub: checklistBonus,
                     sick_leave_open: sickLeaveOpening,
                     sick_leave_close: sickLeaveClosing,
                     cards: cardCreation,
+                    seniority: seniorityBonus,
+                    checklist_pct: calcChecklist,
+                    checklist_rub: checklistBonus,
                     quality: avgQuality,
                     kpi: kpiBonus,
-                    seniority: seniorityBonus,
                     total: total
                 });
             }

@@ -312,15 +312,15 @@ export default function KpiPage() {
                 dayOffPay: dayOffPayTotal,
                 closingBonuses,
                 salesBonus,
-                avgQuality,
-                qualityBonus,
-                calcChecklist,
-                checklistBonus,
                 sickLeaveOpening,
                 sickLeaveClosing,
                 sickLeaveBonus,
                 cardCreation,
                 cardBonus,
+                calcChecklist,
+                checklistBonus,
+                avgQuality,
+                qualityBonus,
                 seniorityYears,
                 seniorityBonus,
                 totalPay,
@@ -350,11 +350,11 @@ export default function KpiPage() {
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Работа в выходные</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Открытие/Закрытие</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Продажи</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Чеклист</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-center">Открытие Б/Л</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-center">Закр/Продл Б/Л</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-center">Карточки</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Выслуга</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Чеклист</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Качество</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Итого</th>
                         </tr>
@@ -395,37 +395,6 @@ export default function KpiPage() {
                                         </td>
                                         <td className="px-4 py-3 text-right text-zinc-600 font-medium text-emerald-600">{calc.closingBonuses > 0 ? calc.closingBonuses : '-'}</td>
                                         <td className="px-4 py-3 text-right text-zinc-600">{calc.salesBonus > 0 ? calc.salesBonus : '-'}</td>
-                                        <td className="px-4 py-3 text-right text-zinc-600">
-                                            {editingCell?.empId === calc.empId && editingCell?.field === 'percentage' ? (
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <input
-                                                        autoFocus
-                                                        type="number"
-                                                        className="w-16 px-1 py-0.5 border rounded text-right text-sm"
-                                                        value={tempValue}
-                                                        onChange={(e) => setTempValue(e.target.value)}
-                                                        onBlur={() => handleSaveChecklist(calc.empId, 'percentage', tempValue)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') handleSaveChecklist(calc.empId, 'percentage', tempValue);
-                                                            if (e.key === 'Escape') setEditingCell(null);
-                                                        }}
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    {calc.checklistBonus > 0 && <span className="text-green-600 font-medium">+{calc.checklistBonus}</span>}
-                                                    <div
-                                                        className="text-[10px] text-zinc-400 cursor-pointer hover:text-blue-600 transition-colors"
-                                                        onClick={() => {
-                                                            setEditingCell({ empId: calc.empId, field: 'percentage' });
-                                                            setTempValue(calc.calcChecklist.toFixed(0));
-                                                        }}
-                                                    >
-                                                        {calc.calcChecklist.toFixed(0)}%
-                                                    </div>
-                                                </>
-                                            )}
-                                        </td>
                                         <td className="px-4 py-3 text-center text-zinc-600">
                                             {editingCell?.empId === calc.empId && editingCell?.field === 'sickLeaveOpening' ? (
                                                 <input
@@ -512,6 +481,37 @@ export default function KpiPage() {
                                             <div className="text-[10px] text-zinc-400">{calc.seniorityYears > 0 ? calc.seniorityYears.toFixed(1) + ' г.' : ''}</div>
                                         </td>
                                         <td className="px-4 py-3 text-right text-zinc-600">
+                                            {editingCell?.empId === calc.empId && editingCell?.field === 'percentage' ? (
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <input
+                                                        autoFocus
+                                                        type="number"
+                                                        className="w-16 px-1 py-0.5 border rounded text-right text-sm"
+                                                        value={tempValue}
+                                                        onChange={(e) => setTempValue(e.target.value)}
+                                                        onBlur={() => handleSaveChecklist(calc.empId, 'percentage', tempValue)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') handleSaveChecklist(calc.empId, 'percentage', tempValue);
+                                                            if (e.key === 'Escape') setEditingCell(null);
+                                                        }}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    {calc.checklistBonus > 0 && <span className="text-green-600 font-medium">+{calc.checklistBonus}</span>}
+                                                    <div
+                                                        className="text-[10px] text-zinc-400 cursor-pointer hover:text-blue-600 transition-colors"
+                                                        onClick={() => {
+                                                            setEditingCell({ empId: calc.empId, field: 'percentage' });
+                                                            setTempValue(calc.calcChecklist.toFixed(0));
+                                                        }}
+                                                    >
+                                                        {calc.calcChecklist.toFixed(0)}%
+                                                    </div>
+                                                </>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-right text-zinc-600">
                                             {calc.qualityBonus > 0 && <span className="text-green-600 font-medium">+{calc.qualityBonus}</span>}
                                             <div className="text-[10px] text-zinc-400">{calc.avgQuality.toFixed(1)}%</div>
                                         </td>
@@ -526,91 +526,93 @@ export default function KpiPage() {
                 </table>
             </div>
 
-            {showModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in">
-                    <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold flex items-center gap-2">
-                                <CheckCircle className="w-5 h-5 text-green-600" />
-                                Ввод KPI
-                            </h2>
-                            <button onClick={() => setShowModal(false)} className="p-2 hover:bg-zinc-100 rounded-full">
-                                <X className="w-5 h-5 text-zinc-500" />
-                            </button>
-                        </div>
-
-                        <p className="text-sm text-zinc-500 mb-4">
-                            Сотрудник: <span className="font-medium text-zinc-900">{employees.find(e => e.id === selectedEmployeeId)?.name}</span>
-                        </p>
-
-                        <form className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Дата</label>
-                                <input
-                                    type="date"
-                                    value={selectedKpiDate}
-                                    onChange={e => setSelectedKpiDate(e.target.value)}
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                />
+            {
+                showModal && (
+                    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in">
+                        <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-bold flex items-center gap-2">
+                                    <CheckCircle className="w-5 h-5 text-green-600" />
+                                    Ввод KPI
+                                </h2>
+                                <button onClick={() => setShowModal(false)} className="p-2 hover:bg-zinc-100 rounded-full">
+                                    <X className="w-5 h-5 text-zinc-500" />
+                                </button>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <p className="text-sm text-zinc-500 mb-4">
+                                Сотрудник: <span className="font-medium text-zinc-900">{employees.find(e => e.id === selectedEmployeeId)?.name}</span>
+                            </p>
+
+                            <form className="space-y-6">
                                 <div>
-                                    <label className="block text-sm font-medium mb-1">Качество (%)</label>
+                                    <label className="block text-sm font-medium mb-1">Дата</label>
                                     <input
-                                        type="number"
-                                        value={formData.qualityScore}
-                                        onChange={e => setFormData({ ...formData, qualityScore: e.target.value })}
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        max="100" min="0"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Ошибки</label>
-                                    <input
-                                        type="number"
-                                        value={formData.errorsCount}
-                                        onChange={e => setFormData({ ...formData, errorsCount: e.target.value })}
+                                        type="date"
+                                        value={selectedKpiDate}
+                                        onChange={e => setSelectedKpiDate(e.target.value)}
                                         className="w-full px-3 py-2 border rounded-lg"
                                     />
                                 </div>
-                            </div>
 
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Бонус за продажи (₽)</label>
-                                <input
-                                    type="number"
-                                    value={formData.salesBonus}
-                                    onChange={e => setFormData({ ...formData, salesBonus: e.target.value })}
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                />
-                            </div>
-
-                            <div className="p-3 bg-zinc-50 rounded-lg border border-zinc-200">
-                                <label className="block text-sm font-medium mb-1">Чек-лист (%)</label>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="number"
-                                        value={formData.checkList}
-                                        onChange={e => setFormData({ ...formData, checkList: e.target.value })}
-                                        className="w-full px-3 py-2 border rounded-lg"
-                                        max="100" min="0"
-                                    />
-                                    <div className="text-xs font-bold whitespace-nowrap">
-                                        {parseFloat(formData.checkList) >= 90 ? <span className="text-green-600">+5000р</span> :
-                                            parseFloat(formData.checkList) >= 76 ? <span className="text-blue-600">+2500р</span> :
-                                                <span className="text-zinc-400">0р</span>}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Качество (%)</label>
+                                        <input
+                                            type="number"
+                                            value={formData.qualityScore}
+                                            onChange={e => setFormData({ ...formData, qualityScore: e.target.value })}
+                                            className="w-full px-3 py-2 border rounded-lg"
+                                            max="100" min="0"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Ошибки</label>
+                                        <input
+                                            type="number"
+                                            value={formData.errorsCount}
+                                            onChange={e => setFormData({ ...formData, errorsCount: e.target.value })}
+                                            className="w-full px-3 py-2 border rounded-lg"
+                                        />
                                     </div>
                                 </div>
-                            </div>
 
-                            <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium">
-                                Сохранить
-                            </button>
-                        </form>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Бонус за продажи (₽)</label>
+                                    <input
+                                        type="number"
+                                        value={formData.salesBonus}
+                                        onChange={e => setFormData({ ...formData, salesBonus: e.target.value })}
+                                        className="w-full px-3 py-2 border rounded-lg"
+                                    />
+                                </div>
+
+                                <div className="p-3 bg-zinc-50 rounded-lg border border-zinc-200">
+                                    <label className="block text-sm font-medium mb-1">Чек-лист (%)</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="number"
+                                            value={formData.checkList}
+                                            onChange={e => setFormData({ ...formData, checkList: e.target.value })}
+                                            className="w-full px-3 py-2 border rounded-lg"
+                                            max="100" min="0"
+                                        />
+                                        <div className="text-xs font-bold whitespace-nowrap">
+                                            {parseFloat(formData.checkList) >= 90 ? <span className="text-green-600">+5000р</span> :
+                                                parseFloat(formData.checkList) >= 76 ? <span className="text-blue-600">+2500р</span> :
+                                                    <span className="text-zinc-400">0р</span>}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium">
+                                    Сохранить
+                                </button>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }
