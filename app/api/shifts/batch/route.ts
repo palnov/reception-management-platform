@@ -19,98 +19,75 @@ export async function POST(request: Request) {
                 where: { id: { in: deleteIds } }
             });
 
-            // Process one by one to log audit
-            const deletePromises = shiftsToDelete.map(async (shift) => {
-                await logAudit('SHIFT', shift.id, 'DELETE', shift, session);
-                return prisma.shift.update({
-                    where: { id: shift.id },
-                    data: { isDeleted: true }
-                });
-            });
-
-            await Promise.all(deletePromises);
+            if (shiftsToDelete.length > 0) {
+                await prisma.$transaction([
+                    ...shiftsToDelete.map(shift =>
+                        prisma.auditLog.create({
+                            data: {
+                                entityType: 'SHIFT',
+                                entityId: shift.id,
+                                action: 'DELETE',
+                                changedBy: session.employee.name,
+                                changedByRole: session.employee.role,
+                                timestamp: new Date().toISOString(),
+                                details: JSON.stringify(shift)
+                            }
+                        })
+                    ),
+                    prisma.shift.updateMany({
+                        where: { id: { in: shiftsToDelete.map(s => s.id) } },
+                        data: { isDeleted: true }
+                    })
+                ]);
+            }
             results.deleted = { count: deleteIds.length };
         }
 
         // 2. Handle Upserts (Operations)
         if (Array.isArray(operations) && operations.length > 0) {
-            // We need to handle audit logs for batch updates too if possible, but for performance maybe skip?
-            // "Batch Save" usually means Drag-n-Fill. It updates many items.
-            // Ideally we should log. But let's stick to core requirement: isDeleted handling.
+            // Optimization: fetch all existing shifts for the given employee+date combinations
+            const existingShifts = await prisma.shift.findMany({
+                where: {
+                    OR: operations.map(op => ({
+                        employeeId: op.employeeId,
+                        date: op.date
+                    }))
+                }
+            });
 
-            // Note: upsert requires unique input. using ID is best.
-            // But if id is missing (new shift), we might need composite check.
-            // The frontend sends `id` if it exists.
+            const existingMap = new Map();
+            existingShifts.forEach(s => existingMap.set(`${s.employeeId}_${s.date}`, s));
 
-            results.upserted = await Promise.all(operations.map(async (op) => {
-                // We need to check if existing one is deleted to restore it
-                // Upsert handles this if we include isDeleted: false in update.
+            results.upserted = await prisma.$transaction(
+                operations.map(op => {
+                    const existing = op.id ? existingShifts.find(s => s.id === op.id) : existingMap.get(`${op.employeeId}_${op.date}`);
 
-                // If we want Audit Logs for Batch, we'd need to fetch existing to diff.
-                // For now, let's just make sure isDeleted is correct.
+                    const data = {
+                        type: op.type,
+                        hours: parseFloat(op.hours),
+                        cabinetClosed: !!op.cabinetClosed,
+                        centerClosed: !!op.centerClosed,
+                        coefficient: Math.min(parseFloat(op.coefficient || 1.0), 1.5),
+                        isDeleted: false
+                    };
 
-                // Problem: upsert returns the record.
-                // We can't easy log changes inside `$transaction` with raw queries or without middleware.
-                // Let's iterate.
-
-                let resultShift;
-
-                if (op.id) {
-                    // Update
-                    const existing = await prisma.shift.findUnique({ where: { id: op.id } });
                     if (existing) {
-                        const newData = {
-                            type: op.type,
-                            hours: parseFloat(op.hours),
-                            cabinetClosed: !!op.cabinetClosed,
-                            centerClosed: !!op.centerClosed,
-                            coefficient: Math.min(parseFloat(op.coefficient || 1.0), 1.5),
-                            createdBy: existing.createdBy,
-                            isDeleted: false
-                        };
-                        const diff = calculateDiff(existing, newData);
-
-                        resultShift = await prisma.shift.update({
-                            where: { id: op.id },
-                            data: newData as any
+                        return prisma.shift.update({
+                            where: { id: existing.id },
+                            data: { ...data, createdBy: existing.createdBy }
                         });
-
-                        if (diff) {
-                            await logAudit('SHIFT', resultShift.id, 'UPDATE', diff, session);
-                        }
-                    }
-                } else {
-                    // Create or Find by unique (Employee+Date) logic if ID missing?
-                    // Prisma `upsert` needs `where` unique.
-                    // The frontend creates IDs? No.
-                    // The frontend sends `id` if known from `shiftsByEmployee`.
-                    // If purely new, `op.id` is undefined.
-                    // But `batch` mainly used for Drag Fill which might overwrite existing.
-                    // If overwriting existing, we need ID.
-                    // Current frontend logic:
-                    // `range.map(cell => ({ ... id: shiftsByEmployee[cell.empId]?.[cell.date]?.id }))`
-                    // So we HAVE ID if it exists.
-
-                    if (!op.id) {
-                        // Create New
-                        resultShift = await prisma.shift.create({
+                    } else {
+                        return prisma.shift.create({
                             data: {
+                                ...data,
                                 date: op.date,
                                 employeeId: op.employeeId,
-                                type: op.type,
-                                hours: parseFloat(op.hours),
-                                cabinetClosed: !!op.cabinetClosed,
-                                centerClosed: !!op.centerClosed,
-                                coefficient: Math.min(parseFloat(op.coefficient || 1.0), 1.5),
-                                createdBy: session.employee.name,
-                                isDeleted: false
-                            } as any
+                                createdBy: session.employee.name
+                            }
                         });
-                        await logAudit('SHIFT', resultShift.id, 'CREATE', { type: op.type }, session);
                     }
-                }
-                return resultShift;
-            }));
+                })
+            );
         }
 
         return NextResponse.json({ success: true, results });

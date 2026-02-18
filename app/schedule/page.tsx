@@ -337,7 +337,7 @@ export default function SchedulePage() {
         showBatchOption?: boolean;
     } | null>(null);
 
-    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [userData, setUserData] = useState<any>(null);
     const [prevMonthShifts, setPrevMonthShifts] = useState<Shift[]>([]);
     const [isAutoFilling, setIsAutoFilling] = useState(false);
 
@@ -368,7 +368,7 @@ export default function SchedulePage() {
                 if (!res.ok) throw new Error('Unauthorized');
                 return res.json();
             })
-            .then(data => setCurrentUser(data))
+            .then(data => setUserData(data))
             .catch(() => {
                 window.location.href = '/login';
             });
@@ -405,11 +405,11 @@ export default function SchedulePage() {
             const currentShifts = Array.isArray(data) ? data : [];
             setShifts(currentShifts);
 
-            // If current month is empty, fetch previous month to check for auto-fill
+            // If current month is empty, fetch historical shifts to check for auto-fill (up to 3 months back)
             if (currentShifts.filter((s: any) => !s.isDeleted).length === 0) {
-                const prevMonth = subMonths(currentMonth, 1);
-                const pStart = format(startOfMonth(prevMonth), 'yyyy-MM-dd');
-                const pEnd = format(endOfMonth(prevMonth), 'yyyy-MM-dd');
+                const threeMonthsAgo = subMonths(currentMonth, 3);
+                const pStart = format(startOfMonth(threeMonthsAgo), 'yyyy-MM-dd');
+                const pEnd = format(endOfMonth(subMonths(currentMonth, 1)), 'yyyy-MM-dd');
                 const pRes = await fetch(`/api/shifts?start=${pStart}&end=${pEnd}`);
                 if (pRes.ok) {
                     const pData = await pRes.json();
@@ -460,10 +460,12 @@ export default function SchedulePage() {
 
         try {
             const operations: any[] = [];
-            const prevShiftsByEmp: Record<string, Record<string, Shift>> = {};
+
+            // Group historical shifts by employee
+            const histShiftsByEmp: Record<string, Shift[]> = {};
             prevMonthShifts.forEach(s => {
-                if (!prevShiftsByEmp[s.employeeId]) prevShiftsByEmp[s.employeeId] = {};
-                prevShiftsByEmp[s.employeeId][s.date] = s;
+                if (!histShiftsByEmp[s.employeeId]) histShiftsByEmp[s.employeeId] = [];
+                histShiftsByEmp[s.employeeId].push(s);
             });
 
             const currentMonthStart = startOfMonth(currentMonth);
@@ -471,27 +473,22 @@ export default function SchedulePage() {
             const currentDays = eachDayOfInterval({ start: currentMonthStart, end: currentMonthEnd });
 
             for (const emp of employees) {
-                const empPrevShifts = Object.values(prevShiftsByEmp[emp.id] || {}).filter(s => !s.isDeleted);
-                if (empPrevShifts.length === 0) continue;
+                const empHist = (histShiftsByEmp[emp.id] || []).filter(s => !s.isDeleted);
+                if (empHist.length === 0) continue;
 
-                // Sort by date descending to find the last regular shifts
-                const sortedPrev = empPrevShifts
-                    .filter(s => s.type === 'REGULAR' || s.type === 'SICK' || s.type === 'VACATION')
+                // 1. Find the most recent regular shifts to determine the pattern (5/2 or 2/2)
+                const regularHist = empHist
+                    .filter(s => s.type === 'REGULAR')
                     .sort((a, b) => b.date.localeCompare(a.date));
 
-                if (sortedPrev.length === 0) continue;
+                if (regularHist.length === 0) continue;
 
-                // Determine pattern: 5/2 or 2/2
-                // We'll look at the last few REGULAR shifts to decide. 
-                // Mostly 8h -> 5/2, mostly 11h -> 2/2.
-                const regularShifts = sortedPrev.filter(s => s.type === 'REGULAR');
-                if (regularShifts.length === 0) continue;
-
-                const avgHours = regularShifts.reduce((acc, s) => acc + s.hours, 0) / regularShifts.length;
-                const is52 = avgHours < 10; // Simple heuristic: 8h vs 11h
+                // Simple heuristic: if recent shifts are mostly 8h -> 5/2, else 2/2 (11h)
+                const recentShifts = regularHist.slice(0, 5); // Look at last 5 shifts
+                const avgHours = recentShifts.reduce((acc, s) => acc + s.hours, 0) / recentShifts.length;
+                const is52 = avgHours < 10;
 
                 if (is52) {
-                    // Pattern 5/2: weekdays 8h, weekeds empty
                     currentDays.forEach(day => {
                         const dayOfWeek = day.getDay();
                         if (dayOfWeek !== 0 && dayOfWeek !== 6) {
@@ -513,16 +510,16 @@ export default function SchedulePage() {
                     // So we need to project from some "anchor" point.
 
                     // Let's find the last known REGULAR shift and its date.
-                    const lastRegular = regularShifts[0];
-                    const anchorDate = parseISO(lastRegular.date);
+                    const lastReg = regularHist[0];
+                    const anchorDate = parseISO(lastReg.date);
 
                     // We need to know if this was day 1 or day 2 of the 11h block.
                     // Check the day before anchorDate.
                     const prevDayKey = format(subDays(anchorDate, 1), 'yyyy-MM-dd');
-                    const wasDayBeforeRegular = prevShiftsByEmp[emp.id]?.[prevDayKey]?.type === 'REGULAR';
+                    const wasDayBeforeReg = empHist.some(s => s.date === prevDayKey && s.type === 'REGULAR');
 
                     // Cycle position: 0 (day1 of 11h), 1 (day2 of 11h), 2 (day1 empty), 3 (day2 empty)
-                    let anchorCyclePos = wasDayBeforeRegular ? 1 : 0;
+                    let anchorCyclePos = wasDayBeforeReg ? 1 : 0;
 
                     // Now project from anchorDate to start of currentMonth
                     // Days between anchorDate and start of currentMonth
@@ -532,25 +529,23 @@ export default function SchedulePage() {
                     });
 
                     // We start from anchorDate (cyclePos = anchorCyclePos)
-                    let currentCyclePos = anchorCyclePos;
-                    daysToProject.forEach((day, idx) => {
-                        if (idx === 0) return; // Skip anchor date itself as it's in the past
+                    daysToProject.forEach((day: Date, idx: number) => {
+                        if (idx === 0) return;
 
-                        currentCyclePos = (anchorCyclePos + idx) % 4;
+                        const currentCyclePos = (anchorCyclePos + idx) % 4;
+                        const isWorkDay = (currentCyclePos === 0 || currentCyclePos === 1);
 
-                        // If day is in current month, add to operations
-                        if (day >= currentMonthStart) {
-                            if (currentCyclePos === 0 || currentCyclePos === 1) {
-                                operations.push({
-                                    date: format(day, 'yyyy-MM-dd'),
-                                    employeeId: emp.id,
-                                    type: 'REGULAR',
-                                    hours: 11,
-                                    cabinetClosed: false,
-                                    centerClosed: false,
-                                    coefficient: 1.0
-                                });
-                            }
+                        // Only add shifts that fall into the target month
+                        if (day >= currentMonthStart && isWorkDay) {
+                            operations.push({
+                                date: format(day, 'yyyy-MM-dd'),
+                                employeeId: emp.id,
+                                type: 'REGULAR',
+                                hours: 11,
+                                cabinetClosed: false,
+                                centerClosed: false,
+                                coefficient: 1.0
+                            });
                         }
                     });
                 }
@@ -559,6 +554,7 @@ export default function SchedulePage() {
             if (operations.length > 0) {
                 const res = await fetch('/api/shifts/batch', {
                     method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ operations })
                 });
                 if (res.ok) {
@@ -569,7 +565,7 @@ export default function SchedulePage() {
                 }
             }
         } catch (e) {
-            console.error(e);
+            console.error('AUTO_FILL_ERROR:', e);
         } finally {
             setIsAutoFilling(false);
         }
@@ -749,6 +745,7 @@ export default function SchedulePage() {
 
         const res = await fetch('/api/shifts/batch', {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 operations: operations.map(op => ({
                     ...op,
@@ -776,13 +773,20 @@ export default function SchedulePage() {
             .filter(Boolean) as string[];
 
         if (deleteIds.length > 0) {
-            const res = await fetch('/api/shifts/batch', {
-                method: 'POST',
-                body: JSON.stringify({ deleteIds })
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                console.error('Batch delete failed:', err);
+            try {
+                const res = await fetch('/api/shifts/batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ deleteIds })
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    console.error('Batch delete failed:', err);
+                    alert('Ошибка при удалении: ' + (err.error || 'Server error'));
+                }
+            } catch (err) {
+                console.error('Network error during batch delete:', err);
+                alert('Ошибка сети при удалении');
             }
         }
         setShowBatchModal(false);
@@ -925,22 +929,36 @@ export default function SchedulePage() {
     const handleKeyDown = useCallback(async (e: KeyboardEvent) => {
         if (!selection || isDragging) return;
 
+        // Ignore if user is typing in an input or textarea
+        const activeElement = document.activeElement;
+        if (activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA' || (activeElement as HTMLElement)?.isContentEditable) {
+            return;
+        }
+
         if (e.key === 'Delete' || e.key === 'Backspace') {
+            e.preventDefault();
             const range = getSelectedRange(selection);
             const deleteIds = range
                 .map(cell => shiftsByEmployee[cell.empId]?.[cell.date]?.id)
                 .filter(Boolean) as string[];
 
             if (deleteIds.length > 0) {
-                const res = await fetch('/api/shifts/batch', {
-                    method: 'POST',
-                    body: JSON.stringify({ deleteIds })
-                });
-                if (!res.ok) {
-                    const err = await res.json();
-                    console.error('Batch delete failed:', err);
+                try {
+                    const res = await fetch('/api/shifts/batch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ deleteIds })
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        console.error('Batch delete failed:', err);
+                        alert('Ошибка при удалении: ' + (err.error || 'Server error'));
+                    }
+                    fetchShifts();
+                } catch (err) {
+                    console.error('Network error during batch delete:', err);
+                    alert('Ошибка сети при удалении');
                 }
-                fetchShifts();
             }
             setSelection(null);
         } else if (e.key === 'Escape') {
@@ -982,10 +1000,21 @@ export default function SchedulePage() {
                     .filter(Boolean) as string[];
 
                 if (deleteIds.length > 0) {
-                    await fetch('/api/shifts/batch', {
-                        method: 'POST',
-                        body: JSON.stringify({ deleteIds })
-                    });
+                    try {
+                        const res = await fetch('/api/shifts/batch', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ deleteIds })
+                        });
+                        if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            console.error('Batch delete failed:', err);
+                            alert('Ошибка при массовом удалении: ' + (err.error || 'Server error'));
+                        }
+                    } catch (err) {
+                        console.error('Network error during batch delete:', err);
+                        alert('Ошибка сети при массовом удалении');
+                    }
                 }
             } else {
                 const operations = range.map(cell => ({
@@ -995,10 +1024,21 @@ export default function SchedulePage() {
                     hours: action === 'VACATION' ? 0 : 8,
                     id: shiftsByEmployee[cell.empId]?.[cell.date]?.id
                 }));
-                await fetch('/api/shifts/batch', {
-                    method: 'POST',
-                    body: JSON.stringify({ operations })
-                });
+                try {
+                    const res = await fetch('/api/shifts/batch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ operations })
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        console.error('Batch update failed:', err);
+                        alert('Ошибка при массовом обновлении: ' + (err.error || 'Server error'));
+                    }
+                } catch (err) {
+                    console.error('Network error during batch update:', err);
+                    alert('Ошибка сети при массовом обновлении');
+                }
             }
             setSelection(null);
             fetchShifts();
@@ -1150,7 +1190,7 @@ export default function SchedulePage() {
                                         openModal={openModal}
                                         onMouseDown={handleMouseDown}
                                         onMouseEnter={handleMouseEnter}
-                                        currentUser={currentUser}
+                                        currentUser={userData}
                                         onContextMenu={handleContextMenu}
                                         onHandleHover={handleHandleHover}
                                         onHandleMouseDown={handleHandleMouseDown}
