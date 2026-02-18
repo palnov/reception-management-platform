@@ -293,6 +293,7 @@ export class ReportService {
                 { header: 'Часы', key: 'hours', width: 12, style: { ...cellStyle, numFmt: '0.0' } },
                 { header: 'Смены (Руб)', key: 'shiftPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Откр/Закр', key: 'closing', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'ИО', key: 'actingLead', width: 12, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Открытие Б/Л', key: 'sick_leave_open', width: 15, style: centerStyle },
                 { header: 'Закрытие/продление Б/Л', key: 'sick_leave_close', width: 25, style: centerStyle },
@@ -328,6 +329,7 @@ export class ReportService {
                 let hoursWorked = 0;
                 let shiftPay = 0;
                 let closingBonuses = 0;
+                let actingLeadBonus = 0;
                 const hourlyBase = emp.baseSalary / monthNorm;
 
                 empShifts.forEach(s => {
@@ -339,6 +341,7 @@ export class ReportService {
                     }
                     if (s.cabinetClosed) closingBonuses += 250;
                     if (s.centerClosed) closingBonuses += 500;
+                    if ((s as any).isActingLead) actingLeadBonus += 250;
                 });
 
                 const salesBonus = empLegacyKpi.reduce((sum, k) => sum + k.salesBonus, 0) +
@@ -394,7 +397,7 @@ export class ReportService {
                 else if (seniorityYears >= 2) seniorityBonus = 2000;
                 else if (seniorityYears >= 1) seniorityBonus = 1000;
 
-                const total = Math.round(shiftPay + closingBonuses + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus);
+                const total = Math.round(shiftPay + closingBonuses + actingLeadBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus);
 
                 sheet.addRow({
                     name: emp.name,
@@ -402,6 +405,7 @@ export class ReportService {
                     hours: hoursWorked,
                     shiftPay: Math.round(shiftPay),
                     closing: closingBonuses,
+                    actingLead: actingLeadBonus,
                     sales: salesBonus,
                     sick_leave_open: sickLeaveOpening,
                     sick_leave_close: sickLeaveClosing,

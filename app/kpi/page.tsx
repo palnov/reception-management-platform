@@ -6,6 +6,7 @@ import { format, startOfMonth, endOfMonth, isSameDay, subMonths, addMonths, pars
 import { ru } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, CheckCircle, X, Pencil, ClipboardCheck } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
+import { Tooltip } from '@/components/Tooltip';
 
 interface Employee {
     id: string;
@@ -27,6 +28,7 @@ interface Shift {
     centerClosed: boolean;
     employeeId: string;
     coefficient: number;
+    isActingLead: boolean;
     isDeleted?: boolean;
     auditLogs?: any[];
 }
@@ -230,6 +232,7 @@ export default function KpiPage() {
             let dayOffHours = 0;
             let dayOffPayTotal = 0;
             let closingBonuses = 0;
+            let actingLeadBonus = 0;
             empShifts.forEach(s => {
                 // Safety check: skip shifts on or after dismissal date
                 if (dismissalDate && s.date >= dismissalDate) return;
@@ -249,6 +252,7 @@ export default function KpiPage() {
 
                 if (s.cabinetClosed) closingBonuses += 250;
                 if (s.centerClosed) closingBonuses += 500;
+                if (s.isActingLead) actingLeadBonus += 250;
             });
 
             // Combine legacy sales bonus with new promotional sales
@@ -310,7 +314,7 @@ export default function KpiPage() {
             else if (seniorityYears >= 2) seniorityBonus = 2000;
             else if (seniorityYears >= 1) seniorityBonus = 1000;
 
-            const totalPay = basePay + dayOffPayTotal + closingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus;
+            const totalPay = basePay + dayOffPayTotal + closingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + actingLeadBonus;
 
             // Aggregate all audit logs
             const allLogs = [
@@ -335,6 +339,7 @@ export default function KpiPage() {
                 dayOffHours,
                 dayOffPay: dayOffPayTotal,
                 closingBonuses,
+                actingLeadBonus,
                 salesBonus,
                 sickLeaveOpening,
                 sickLeaveClosing,
@@ -371,26 +376,39 @@ export default function KpiPage() {
                             <th className="px-4 py-3 font-medium text-zinc-500">Сотрудник</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Часы</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Оклад</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Работа в выходные</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Открытие/Закрытие</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Работа в вых.</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">
+                                <Tooltip content="Доплата за открытие, закрытие центра и за закрытие кабинетов">Откр/Закр.</Tooltip>
+                            </th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">
+                                <Tooltip content="Доплата за исполнение обязанностей старшей смены">ИО</Tooltip>
+                            </th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Продажи</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-center">Открытие Б/Л</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-center">Закр/Продл Б/Л</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-center">Карточки</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-center">
+                                <Tooltip content="Доплата за открытие больничных листов">Откр. Б/Л</Tooltip>
+                            </th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-center">
+                                <Tooltip content="Доплата за продление и закрытие больничных листов">Закр/Продл Б/Л</Tooltip>
+                            </th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-center">
+                                <Tooltip content="Доплата за создание карточек пациентов">Карточки</Tooltip>
+                            </th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Выслуга</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Чеклист</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Качество</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">
+                                <Tooltip content="Качество заполнения карточек первичных пациентов">Качество</Tooltip>
+                            </th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Итого</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
                         {isUserLoading ? (
                             <tr>
-                                <td colSpan={9} className="px-4 py-12 text-center text-zinc-500">Загрузка данных...</td>
+                                <td colSpan={14} className="px-4 py-12 text-center text-zinc-500">Загрузка данных...</td>
                             </tr>
                         ) : payrollData.length === 0 ? (
                             <tr>
-                                <td colSpan={9} className="px-4 py-12 text-center text-zinc-500">Нет данных для отображения.</td>
+                                <td colSpan={14} className="px-4 py-12 text-center text-zinc-500">Нет данных для отображения.</td>
                             </tr>
                         ) : (
                             payrollData.map(calc => {
@@ -410,14 +428,15 @@ export default function KpiPage() {
                                         <td className="px-4 py-3 text-right text-zinc-600 font-semibold">{calc.rawHours.toFixed(1)}</td>
                                         <td className="px-4 py-3 text-right text-zinc-600">{calc.basePay.toFixed(0)}</td>
                                         <td className="px-4 py-3 text-right text-zinc-600">
-                                            {calc.dayOffPay > 0 && (
+                                            {calc.dayOffPay > 0 ? (
                                                 <div>
                                                     <div>{calc.dayOffPay.toFixed(0)}</div>
-                                                    <div className="text-[10px] text-zinc-400">({calc.dayOffHours}ч)</div>
+                                                    <div className="text-[10px] text-zinc-400">{calc.dayOffHours}ч</div>
                                                 </div>
-                                            )}
+                                            ) : '-'}
                                         </td>
                                         <td className="px-4 py-3 text-right text-zinc-600 font-medium text-emerald-600">{calc.closingBonuses > 0 ? calc.closingBonuses : '-'}</td>
+                                        <td className="px-4 py-3 text-right text-zinc-600 font-medium text-indigo-600">{calc.actingLeadBonus > 0 ? calc.actingLeadBonus : '-'}</td>
                                         <td className="px-4 py-3 text-right text-zinc-600">{calc.salesBonus > 0 ? calc.salesBonus : '-'}</td>
                                         <td className="px-4 py-3 text-center text-zinc-600">
                                             {editingCell?.empId === calc.empId && editingCell?.field === 'sickLeaveOpening' ? (

@@ -131,6 +131,7 @@ export async function POST(request: Request) {
                             hours: Number(s.hours ?? 0),
                             cabinetClosed: Boolean(s.cabinetClosed),
                             centerClosed: Boolean(s.centerClosed),
+                            isActingLead: Boolean(s.isActingLead),
                             coefficient: Number(s.coefficient ?? 1.0),
                             comment: s.comment,
                             createdAt: s.createdAt || '',

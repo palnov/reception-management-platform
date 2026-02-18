@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { id, date, employeeId, type, hours, cabinetClosed, centerClosed, coefficient } = body;
+    const { id, date, employeeId, type, hours, cabinetClosed, centerClosed, isActingLead, coefficient } = body;
 
     try {
         const emp = await prisma.employee.findUnique({ where: { id: employeeId } }) as any;
@@ -98,6 +98,7 @@ export async function POST(request: Request) {
                 hours: parseFloat(hours),
                 cabinetClosed: cabinetClosed || false,
                 centerClosed: centerClosed || false,
+                isActingLead: isActingLead || false,
                 coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5),
                 createdBy: existing.createdBy,
                 isDeleted: false // Restore if it was deleted
@@ -133,6 +134,7 @@ export async function POST(request: Request) {
                     hours: parseFloat(hours),
                     cabinetClosed: cabinetClosed || false,
                     centerClosed: centerClosed || false,
+                    isActingLead: isActingLead || false,
                     coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5),
                     isDeleted: false // Restore
                 };
@@ -167,6 +169,7 @@ export async function POST(request: Request) {
                     hours: parseFloat(hours),
                     cabinetClosed: cabinetClosed || false,
                     centerClosed: centerClosed || false,
+                    isActingLead: isActingLead || false,
                     coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5),
                     createdBy: session.employee.name,
                     isDeleted: false
@@ -179,6 +182,7 @@ export async function POST(request: Request) {
                 hours: parseFloat(hours),
                 cabinetClosed: !!cabinetClosed,
                 centerClosed: !!centerClosed,
+                isActingLead: !!isActingLead,
                 coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5)
             }, session);
             return NextResponse.json(shift);

@@ -86,6 +86,7 @@ export async function POST(request: Request) {
                         hours: parseFloat(op.hours),
                         cabinetClosed: !!op.cabinetClosed,
                         centerClosed: !!op.centerClosed,
+                        isActingLead: !!op.isActingLead,
                         coefficient: Math.min(parseFloat(op.coefficient || 1.0), 1.5),
                         isDeleted: false
                     };

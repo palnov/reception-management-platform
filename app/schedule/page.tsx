@@ -45,6 +45,7 @@ interface Shift {
     cabinetClosed: boolean;
     centerClosed: boolean;
     coefficient: number;
+    isActingLead: boolean;
     createdBy?: string;
     auditLogs?: any[];
     isDeleted?: boolean;
@@ -279,21 +280,28 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                         {/* If shift exists and NOT deleted, render normal content */}
                         {shift && !shift.isDeleted && (
                             <div className="relative h-full w-full flex items-center justify-center leading-none">
-                                {shift.auditLogs && shift.auditLogs.length > 0 && (
-                                    <InfoTooltip
-                                        logs={shift.auditLogs}
-                                        currentUser={currentUser}
-                                        createdBy={shift.createdBy}
-                                    />
-                                )}
-
-                                {/* Door icons */}
+                                {/* Left icons (Doors) */}
                                 <div className="absolute top-0.5 left-0.5 flex flex-col gap-0.5">
                                     {shift.cabinetClosed && (
                                         <DoorOpen className="w-2.5 h-2.5 opacity-40 text-zinc-600" />
                                     )}
                                     {shift.centerClosed && (
                                         <DoorOpen className="w-2.5 h-2.5 opacity-60 text-emerald-600" />
+                                    )}
+                                </div>
+
+                                {/* Right icons (Lead indicator and Info) */}
+                                <div className="absolute top-0.5 right-0.5 flex flex-col gap-0.5 items-end">
+                                    {shift.isActingLead && (
+                                        <Crown className="w-2.5 h-2.5 text-amber-500" />
+                                    )}
+                                    {shift.auditLogs && shift.auditLogs.length > 0 && (
+                                        <InfoTooltip
+                                            logs={shift.auditLogs}
+                                            currentUser={currentUser}
+                                            createdBy={shift.createdBy}
+                                            className="!static"
+                                        />
                                     )}
                                 </div>
 
@@ -324,10 +332,10 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                                 </div>
                             </div>
                         )}
-                    </td>
+                    </td >
                 )
             })}
-        </tr>
+        </tr >
     );
 });
 
@@ -351,6 +359,7 @@ export default function SchedulePage() {
         hours: '11',
         cabinetClosed: false,
         centerClosed: false,
+        isActingLead: false,
         coefficient: '1.0'
     });
 
@@ -663,6 +672,7 @@ export default function SchedulePage() {
                 hours: existingShift.hours.toString(),
                 cabinetClosed: !!existingShift.cabinetClosed,
                 centerClosed: !!existingShift.centerClosed,
+                isActingLead: !!existingShift.isActingLead,
                 coefficient: (existingShift.coefficient || 1.0).toString()
             });
         } else {
@@ -671,6 +681,7 @@ export default function SchedulePage() {
                 hours: '11',
                 cabinetClosed: false,
                 centerClosed: false,
+                isActingLead: false,
                 coefficient: '1.0'
             });
         }
@@ -802,6 +813,7 @@ export default function SchedulePage() {
                 date: cell.date,
                 employeeId: cell.empId,
                 ...formData,
+                isActingLead: formData.isActingLead && emp?.role === 'ADMIN',
                 id: shiftsByEmployee[cell.empId]?.[cell.date]?.id
             };
         }).filter(Boolean);
@@ -1425,6 +1437,20 @@ export default function SchedulePage() {
                                         <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">+500р.</span>
                                     </label>
                                 </div>
+                                {employees.find(e => e.id === selectedEmployeeId)?.role === 'ADMIN' && (
+                                    <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, isActingLead: !prev.isActingLead }))}>
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.isActingLead}
+                                            readOnly
+                                            className="w-5 h-5 text-indigo-600 rounded-lg focus:ring-indigo-500 border-zinc-300 transition-all pointer-events-none"
+                                        />
+                                        <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
+                                            <span>ИО Старшей смены</span>
+                                            <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-xs font-bold">+250р.</span>
+                                        </label>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex gap-3 pt-2">
