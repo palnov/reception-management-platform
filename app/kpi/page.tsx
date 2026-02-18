@@ -78,8 +78,8 @@ export default function KpiPage() {
     const [editingKpiId, setEditingKpiId] = useState<string | null>(null);
 
     // Inline Editing State for Checklist
-    const [editingChecklistEmpId, setEditingChecklistEmpId] = useState<string | null>(null);
-    const [tempChecklistValue, setTempChecklistValue] = useState<string>('');
+    const [editingCell, setEditingCell] = useState<{ empId: string, field: string } | null>(null);
+    const [tempValue, setTempValue] = useState<string>('');
 
     const initialForm = {
         qualityScore: '100',
@@ -168,7 +168,7 @@ export default function KpiPage() {
 
 
 
-    async function handleSaveChecklist(empId: string, value: string) {
+    async function handleSaveChecklist(empId: string, field: string, value: string) {
         try {
             const newValue = parseFloat(value);
             const month = currentMonth.toISOString().substring(0, 7); // Format: "2026-02"
@@ -179,13 +179,13 @@ export default function KpiPage() {
                 body: JSON.stringify({
                     month,
                     employeeId: empId,
-                    percentage: newValue,
+                    [field]: newValue,
                     updatedBy: currentUser?.name || null
                 }),
             });
 
             fetchData();
-            setEditingChecklistEmpId(null);
+            setEditingCell(null);
         } catch (e) {
             console.error('Failed to save checklist:', e);
         }
@@ -259,6 +259,12 @@ export default function KpiPage() {
             const monthStr = currentMonth.toISOString().substring(0, 7);
             const empChecklist = monthlyChecklists.find(c => c.employeeId === enrichedEmp.id && c.month === monthStr);
             const calcChecklist = empChecklist ? empChecklist.percentage : 0;
+            const sickLeaveOpening = empChecklist ? (empChecklist.sickLeaveOpening || 0) : 0;
+            const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
+            const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
+
+            const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
+            const cardBonus = cardCreation * 60;
 
             let qualityBonus = 0;
             if (avgQuality >= 95) qualityBonus = 5000;
@@ -280,7 +286,7 @@ export default function KpiPage() {
             else if (seniorityYears >= 2) seniorityBonus = 2000;
             else if (seniorityYears >= 1) seniorityBonus = 1000;
 
-            const totalPay = basePay + dayOffPayTotal + closingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus;
+            const totalPay = basePay + dayOffPayTotal + closingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus;
 
             // Aggregate all audit logs
             const allLogs = [
@@ -310,6 +316,11 @@ export default function KpiPage() {
                 qualityBonus,
                 calcChecklist,
                 checklistBonus,
+                sickLeaveOpening,
+                sickLeaveClosing,
+                sickLeaveBonus,
+                cardCreation,
+                cardBonus,
                 seniorityYears,
                 seniorityBonus,
                 totalPay,
@@ -340,6 +351,9 @@ export default function KpiPage() {
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Открытие/Закрытие</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Продажи</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Чеклист</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-center">Открытие Б/Л</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-center">Закр/Продл Б/Л</th>
+                            <th className="px-4 py-3 font-medium text-zinc-500 text-center">Карточки</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Выслуга</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Качество</th>
                             <th className="px-4 py-3 font-medium text-zinc-500 text-right">Итого</th>
@@ -382,18 +396,18 @@ export default function KpiPage() {
                                         <td className="px-4 py-3 text-right text-zinc-600 font-medium text-emerald-600">{calc.closingBonuses > 0 ? calc.closingBonuses : '-'}</td>
                                         <td className="px-4 py-3 text-right text-zinc-600">{calc.salesBonus > 0 ? calc.salesBonus : '-'}</td>
                                         <td className="px-4 py-3 text-right text-zinc-600">
-                                            {editingChecklistEmpId === calc.empId ? (
+                                            {editingCell?.empId === calc.empId && editingCell?.field === 'percentage' ? (
                                                 <div className="flex items-center justify-end gap-1">
                                                     <input
                                                         autoFocus
                                                         type="number"
                                                         className="w-16 px-1 py-0.5 border rounded text-right text-sm"
-                                                        value={tempChecklistValue}
-                                                        onChange={(e) => setTempChecklistValue(e.target.value)}
-                                                        onBlur={() => handleSaveChecklist(calc.empId, tempChecklistValue)}
+                                                        value={tempValue}
+                                                        onChange={(e) => setTempValue(e.target.value)}
+                                                        onBlur={() => handleSaveChecklist(calc.empId, 'percentage', tempValue)}
                                                         onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') handleSaveChecklist(calc.empId, tempChecklistValue);
-                                                            if (e.key === 'Escape') setEditingChecklistEmpId(null);
+                                                            if (e.key === 'Enter') handleSaveChecklist(calc.empId, 'percentage', tempValue);
+                                                            if (e.key === 'Escape') setEditingCell(null);
                                                         }}
                                                     />
                                                 </div>
@@ -403,13 +417,94 @@ export default function KpiPage() {
                                                     <div
                                                         className="text-[10px] text-zinc-400 cursor-pointer hover:text-blue-600 transition-colors"
                                                         onClick={() => {
-                                                            setEditingChecklistEmpId(calc.empId);
-                                                            setTempChecklistValue(calc.calcChecklist.toFixed(0));
+                                                            setEditingCell({ empId: calc.empId, field: 'percentage' });
+                                                            setTempValue(calc.calcChecklist.toFixed(0));
                                                         }}
                                                     >
                                                         {calc.calcChecklist.toFixed(0)}%
                                                     </div>
                                                 </>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-center text-zinc-600">
+                                            {editingCell?.empId === calc.empId && editingCell?.field === 'sickLeaveOpening' ? (
+                                                <input
+                                                    autoFocus
+                                                    type="number"
+                                                    className="w-12 px-1 py-0.5 border rounded text-center text-sm"
+                                                    value={tempValue}
+                                                    onChange={(e) => setTempValue(e.target.value)}
+                                                    onBlur={() => handleSaveChecklist(calc.empId, 'sickLeaveOpening', tempValue)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') handleSaveChecklist(calc.empId, 'sickLeaveOpening', tempValue);
+                                                        if (e.key === 'Escape') setEditingCell(null);
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div
+                                                    className="cursor-pointer hover:text-blue-600 transition-colors"
+                                                    onClick={() => {
+                                                        setEditingCell({ empId: calc.empId, field: 'sickLeaveOpening' });
+                                                        setTempValue(calc.sickLeaveOpening.toString());
+                                                    }}
+                                                >
+                                                    {calc.sickLeaveOpening > 0 && <div className="text-emerald-600 font-medium">+{calc.sickLeaveOpening * 130}</div>}
+                                                    <div className="text-[10px] text-zinc-400">{calc.sickLeaveOpening || '-'} шт.</div>
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-center text-zinc-600">
+                                            {editingCell?.empId === calc.empId && editingCell?.field === 'sickLeaveClosing' ? (
+                                                <input
+                                                    autoFocus
+                                                    type="number"
+                                                    className="w-12 px-1 py-0.5 border rounded text-center text-sm"
+                                                    value={tempValue}
+                                                    onChange={(e) => setTempValue(e.target.value)}
+                                                    onBlur={() => handleSaveChecklist(calc.empId, 'sickLeaveClosing', tempValue)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') handleSaveChecklist(calc.empId, 'sickLeaveClosing', tempValue);
+                                                        if (e.key === 'Escape') setEditingCell(null);
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div
+                                                    className="cursor-pointer hover:text-blue-600 transition-colors"
+                                                    onClick={() => {
+                                                        setEditingCell({ empId: calc.empId, field: 'sickLeaveClosing' });
+                                                        setTempValue(calc.sickLeaveClosing.toString());
+                                                    }}
+                                                >
+                                                    {calc.sickLeaveClosing > 0 && <div className="text-emerald-600 font-medium">+{calc.sickLeaveClosing * 80}</div>}
+                                                    <div className="text-[10px] text-zinc-400">{calc.sickLeaveClosing || '-'} шт.</div>
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-center text-zinc-600">
+                                            {editingCell?.empId === calc.empId && editingCell?.field === 'cardCreation' ? (
+                                                <input
+                                                    autoFocus
+                                                    type="number"
+                                                    className="w-12 px-1 py-0.5 border rounded text-center text-sm"
+                                                    value={tempValue}
+                                                    onChange={(e) => setTempValue(e.target.value)}
+                                                    onBlur={() => handleSaveChecklist(calc.empId, 'cardCreation', tempValue)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') handleSaveChecklist(calc.empId, 'cardCreation', tempValue);
+                                                        if (e.key === 'Escape') setEditingCell(null);
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div
+                                                    className="cursor-pointer hover:text-blue-600 transition-colors"
+                                                    onClick={() => {
+                                                        setEditingCell({ empId: calc.empId, field: 'cardCreation' });
+                                                        setTempValue(calc.cardCreation.toString());
+                                                    }}
+                                                >
+                                                    {calc.cardCreation > 0 && <div className="text-emerald-600 font-medium">+{calc.cardCreation * 60}</div>}
+                                                    <div className="text-[10px] text-zinc-400">{calc.cardCreation || '-'} шт.</div>
+                                                </div>
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-right text-zinc-600">

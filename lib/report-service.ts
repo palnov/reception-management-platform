@@ -290,6 +290,9 @@ export class ReportService {
                 { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Чеклист %', key: 'checklist_pct', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
                 { header: 'Чеклист Руб', key: 'checklist_rub', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'Открытие Б/Л', key: 'sick_leave_open', width: 15, style: centerStyle },
+                { header: 'Закрытие/продление Б/Л', key: 'sick_leave_close', width: 25, style: centerStyle },
+                { header: 'Карточки', key: 'cards', width: 15, style: centerStyle },
                 { header: 'Качество', key: 'quality', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
                 { header: 'KPI бонус', key: 'kpi', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Выслуга', key: 'seniority', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
@@ -348,6 +351,12 @@ export class ReportService {
                 // Get checklist from monthly checklist table (single value per month)
                 const empChecklist = allChecklists.find(c => c.employeeId === emp.id);
                 const calcChecklist = empChecklist ? empChecklist.percentage / 100 : 0;
+                const sickLeaveOpening = empChecklist ? (empChecklist.sickLeaveOpening || 0) : 0;
+                const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
+                const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
+
+                const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
+                const cardBonus = cardCreation * 60;
 
                 let kpiBonus = 0;
                 if (avgQuality >= 0.95) kpiBonus = 5000;
@@ -370,6 +379,8 @@ export class ReportService {
                 else if (seniorityYears >= 2) seniorityBonus = 2000;
                 else if (seniorityYears >= 1) seniorityBonus = 1000;
 
+                const total = Math.round(shiftPay + closingBonuses + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus);
+
                 sheet.addRow({
                     name: emp.name,
                     base: emp.baseSalary,
@@ -379,10 +390,13 @@ export class ReportService {
                     sales: salesBonus,
                     checklist_pct: calcChecklist,
                     checklist_rub: checklistBonus,
+                    sick_leave_open: sickLeaveOpening,
+                    sick_leave_close: sickLeaveClosing,
+                    cards: cardCreation,
                     quality: avgQuality,
                     kpi: kpiBonus,
                     seniority: seniorityBonus,
-                    total: Math.round(shiftPay + closingBonuses + salesBonus + kpiBonus + checklistBonus + seniorityBonus)
+                    total: total
                 });
             }
 

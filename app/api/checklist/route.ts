@@ -29,18 +29,18 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const json = await req.json();
-        const { month, employeeId, percentage, updatedBy } = json;
+        const { month, employeeId, percentage, sickLeaveOpening, sickLeaveClosing, cardCreation, updatedBy } = json;
 
-        if (!month || !employeeId || percentage === undefined) {
+        if (!month || !employeeId) {
             return NextResponse.json(
-                { error: 'Month, employeeId, and percentage are required' },
+                { error: 'Month and employeeId are required' },
                 { status: 400 }
             );
         }
 
         const now = new Date().toISOString();
 
-        // Upsert: create or update the single monthly checklist value
+        // Upsert: create or update the monthly checklist values
         const checklist = await prisma.monthlyChecklist.upsert({
             where: {
                 month_employeeId: {
@@ -49,14 +49,20 @@ export async function POST(req: NextRequest) {
                 }
             },
             update: {
-                percentage: parseFloat(percentage),
+                ...(percentage !== undefined && { percentage: parseFloat(percentage) }),
+                ...(sickLeaveOpening !== undefined && { sickLeaveOpening: parseInt(sickLeaveOpening) }),
+                ...(sickLeaveClosing !== undefined && { sickLeaveClosing: parseInt(sickLeaveClosing) }),
+                ...(cardCreation !== undefined && { cardCreation: parseInt(cardCreation) }),
                 updatedAt: now,
                 updatedBy: updatedBy || null
             },
             create: {
                 month,
                 employeeId,
-                percentage: parseFloat(percentage),
+                percentage: percentage !== undefined ? parseFloat(percentage) : 0,
+                sickLeaveOpening: sickLeaveOpening !== undefined ? parseInt(sickLeaveOpening) : 0,
+                sickLeaveClosing: sickLeaveClosing !== undefined ? parseInt(sickLeaveClosing) : 0,
+                cardCreation: cardCreation !== undefined ? parseInt(cardCreation) : 0,
                 createdAt: now,
                 updatedAt: now,
                 updatedBy: updatedBy || null

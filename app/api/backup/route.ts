@@ -210,6 +210,9 @@ export async function POST(request: Request) {
                             month: m.month,
                             employeeId: m.employeeId,
                             percentage: Number(m.percentage ?? 0),
+                            sickLeaveOpening: Number(m.sickLeaveOpening ?? 0),
+                            sickLeaveClosing: Number(m.sickLeaveClosing ?? 0),
+                            cardCreation: Number(m.cardCreation ?? 0),
                             createdAt: m.createdAt || '',
                             updatedAt: m.updatedAt || '',
                             updatedBy: m.updatedBy

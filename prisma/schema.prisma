@@ -64,11 +64,14 @@ model MonthlyChecklist {
   id         String   @id @default(uuid())
   month      String   // Format: "2026-02"
   employeeId String
-  percentage Float    @default(0)
-  createdAt  String   @default("")
-  updatedAt  String   @default("")
-  updatedBy  String?
-  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  percentage        Float    @default(0)
+  sickLeaveOpening  Int      @default(0)
+  sickLeaveClosing  Int      @default(0)
+  cardCreation      Int      @default(0)
+  createdAt         String   @default("")
+  updatedAt         String   @default("")
+  updatedBy         String?
+  employee          Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@unique([month, employeeId])
 }
