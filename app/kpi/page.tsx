@@ -310,9 +310,10 @@ export default function KpiPage() {
                 : 0;
 
             let seniorityBonus = 0;
-            if (seniorityYears >= 3) seniorityBonus = 3000;
-            else if (seniorityYears >= 2) seniorityBonus = 2000;
-            else if (seniorityYears >= 1) seniorityBonus = 1000;
+            const baseSalary = enrichedEmp.baseSalary || 0;
+            if (seniorityYears >= 3) seniorityBonus = Math.round(baseSalary * 0.10);
+            else if (seniorityYears >= 2) seniorityBonus = Math.round(baseSalary * 0.07);
+            else if (seniorityYears >= 1) seniorityBonus = Math.round(baseSalary * 0.03);
 
             const totalPay = basePay + dayOffPayTotal + closingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + actingLeadBonus;
 
