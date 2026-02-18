@@ -516,7 +516,10 @@ export default function SchedulePage() {
                     // We need to know if this was day 1 or day 2 of the 11h block.
                     // Check the day before anchorDate.
                     const prevDayKey = format(subDays(anchorDate, 1), 'yyyy-MM-dd');
-                    const wasDayBeforeReg = empHist.some(s => s.date === prevDayKey && s.type === 'REGULAR');
+                    const wasDayBeforeReg = empHist.some(s => {
+                        const sDate = format(parseISO(s.date), 'yyyy-MM-dd');
+                        return sDate === prevDayKey && s.type === 'REGULAR';
+                    });
 
                     // Cycle position: 0 (day1 of 11h), 1 (day2 of 11h), 2 (day1 empty), 3 (day2 empty)
                     let anchorCyclePos = wasDayBeforeReg ? 1 : 0;
