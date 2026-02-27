@@ -226,7 +226,7 @@ export default function RegistrationPage() {
                             </tr>
                         ))}
                     </tbody>
-                    {activeEmployeeId !== 'all' && (
+                    {filteredRecords.length > 0 && (
                         <tfoot className="bg-zinc-100 border-t-2 border-zinc-200">
                             <tr className="font-bold text-zinc-900">
                                 <td colSpan={2} className="px-6 py-4 text-right uppercase tracking-wider text-[10px]">Итого по выборке:</td>
@@ -336,6 +336,24 @@ export default function RegistrationPage() {
                     </div>
                 </div>
             )}
+
+            {/* Floating scroll buttons */}
+            <div className="fixed bottom-8 right-8 flex flex-col gap-3 z-50">
+                <button
+                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    className="p-3 bg-white border border-zinc-200 shadow-xl rounded-full hover:bg-zinc-50 transition-all text-zinc-500 hover:text-blue-600 active:scale-95"
+                    title="Вверх"
+                >
+                    <ArrowUp className="w-6 h-6" />
+                </button>
+                <button
+                    onClick={() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })}
+                    className="p-3 bg-white border border-zinc-200 shadow-xl rounded-full hover:bg-zinc-50 transition-all text-zinc-500 hover:text-blue-600 active:scale-95"
+                    title="Вниз"
+                >
+                    <ArrowDown className="w-6 h-6" />
+                </button>
+            </div>
         </div>
     );
 }
