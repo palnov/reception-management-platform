@@ -285,6 +285,7 @@ export default function KpiPage() {
             const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
             const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
             const manualClosingBonus = empChecklist ? (empChecklist.closingBonus || 0) : 0;
+            const certificatesBonus = empChecklist ? (empChecklist.certificates || 0) : 0;
 
             const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
             const cardBonus = cardCreation * 60;
@@ -318,7 +319,7 @@ export default function KpiPage() {
             else if (seniorityYears >= 1) seniorityBonus = Math.round(baseSalary * 0.03);
 
             const actualClosingBonuses = enrichedEmp.role === 'SENIOR' ? manualClosingBonus : closingBonuses;
-            const totalPay = basePay + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + actingLeadBonus;
+            const totalPay = basePay + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + actingLeadBonus + certificatesBonus;
 
             // Aggregate all audit logs
             const allLogs = [
@@ -358,6 +359,7 @@ export default function KpiPage() {
                 qualityBonus,
                 seniorityYears,
                 seniorityBonus,
+                certificatesBonus,
                 totalPay,
                 auditLogs: uniqueLogs
             };
@@ -375,36 +377,39 @@ export default function KpiPage() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-x-auto">
+            <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-auto max-h-[calc(100vh-200px)] scrollbar-custom">
                 <table className="w-full text-left text-sm">
-                    <thead className="bg-zinc-50 border-b border-zinc-200">
+                    <thead className="bg-zinc-50">
                         <tr>
-                            <th className="px-4 py-3 font-medium text-zinc-500">Сотрудник</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Часы</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Оклад</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Работа в вых.</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">
+                            <th className="sticky top-0 left-0 z-30 bg-zinc-50 px-4 py-3 font-medium text-zinc-500" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7, inset -1px 0 0 #e4e4e7, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>Сотрудник</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Часы</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Оклад</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Работа в вых..</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за открытие, закрытие центра и за закрытие кабинетов">Откр/Закр.</Tooltip>
                             </th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за исполнение обязанностей старшей смены">ИО</Tooltip>
                             </th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Продажи</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-center">
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                                <Tooltip content="Доплата старшим смены за справки">Справки</Tooltip>
+                            </th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Продажи</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за открытие больничных листов">Откр. Б/Л</Tooltip>
                             </th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-center">
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за продление и закрытие больничных листов">Закр/Продл Б/Л</Tooltip>
                             </th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-center">
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за создание карточек пациентов">Карточки</Tooltip>
                             </th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Выслуга</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Чеклист</th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Выслуга</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Чеклист</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Качество заполнения карточек первичных пациентов">Качество</Tooltip>
                             </th>
-                            <th className="px-4 py-3 font-medium text-zinc-500 text-right">Итого</th>
+                            <th className="sticky top-0 right-0 z-30 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7, inset 1px 0 0 #e4e4e7, -2px 0 10px -2px rgba(0,0,0,0.1)' }}>Итого</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
@@ -423,9 +428,9 @@ export default function KpiPage() {
                                 return (
                                     <tr
                                         key={calc.empId}
-                                        className="hover:bg-zinc-50"
+                                        className="group hover:bg-zinc-50 transition-colors"
                                     >
-                                        <td className="px-4 py-3 font-medium text-zinc-900">
+                                        <td className="sticky left-0 z-10 bg-white group-hover:bg-zinc-50 transition-colors px-4 py-3 font-medium text-zinc-900" style={{ boxShadow: 'inset -1px 0 0 #f4f4f5, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>
                                             <div className="flex items-center gap-2">
                                                 <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${calc.role === 'MANAGER' ? 'bg-purple-100 text-purple-600' :
                                                     calc.role === 'SENIOR' ? 'bg-amber-100 text-amber-600' :
@@ -445,10 +450,10 @@ export default function KpiPage() {
                                         </td>
                                         <td className="px-4 py-3 text-right text-zinc-600 font-semibold">{calc.rawHours.toFixed(1)}</td>
                                         <td className="px-4 py-3 text-right text-zinc-600">{calc.basePay.toFixed(0)}</td>
-                                        <td className="px-4 py-3 text-right text-zinc-600">
+                                        <td className="px-4 py-3 text-right">
                                             {calc.dayOffPay > 0 ? (
                                                 <div>
-                                                    <div>{calc.dayOffPay.toFixed(0)}</div>
+                                                    <div className="text-emerald-600 font-medium">+{calc.dayOffPay.toFixed(0)}</div>
                                                     <div className="text-[10px] text-zinc-400">{calc.dayOffHours}ч</div>
                                                 </div>
                                             ) : '-'}
@@ -461,6 +466,7 @@ export default function KpiPage() {
                                                         type="number"
                                                         className="w-16 px-1 py-0.5 border rounded text-right text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                         value={tempValue}
+                                                        onFocus={(e) => e.target.select()}
                                                         onChange={(e) => setTempValue(e.target.value)}
                                                         onBlur={() => handleSaveChecklist(calc.empId, 'closingBonus', tempValue)}
                                                         onKeyDown={(e) => {
@@ -474,18 +480,64 @@ export default function KpiPage() {
                                                         onClick={() => {
                                                             if (currentUser?.role !== 'MANAGER') return;
                                                             setEditingCell({ empId: calc.empId, field: 'closingBonus' });
-                                                            setTempValue(calc.closingBonuses.toString());
+                                                            setTempValue(calc.closingBonuses === 0 ? '' : calc.closingBonuses.toString());
                                                         }}
                                                     >
-                                                        {calc.closingBonuses > 0 ? calc.closingBonuses : '-'}
+                                                        {calc.closingBonuses > 0 ? (
+                                                            <div className="text-emerald-600 font-medium">+{calc.closingBonuses}</div>
+                                                        ) : '-'}
                                                     </div>
                                                 )
                                             ) : (
-                                                calc.closingBonuses > 0 ? calc.closingBonuses : '-'
+                                                calc.closingBonuses > 0 ? (
+                                                    <div className="text-emerald-600 font-medium">+{calc.closingBonuses}</div>
+                                                ) : '-'
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-right text-zinc-600 font-medium text-indigo-600">{calc.actingLeadBonus > 0 ? calc.actingLeadBonus : '-'}</td>
-                                        <td className="px-4 py-3 text-right text-zinc-600">{calc.salesBonus > 0 ? calc.salesBonus : '-'}</td>
+                                        <td className="px-4 py-3 text-right">
+                                            {calc.actingLeadBonus > 0 ? (
+                                                <div className="text-emerald-600 font-medium">+{calc.actingLeadBonus}</div>
+                                            ) : '-'}
+                                        </td>
+                                        <td className="px-4 py-3 text-center text-zinc-600">
+                                            {calc.role === 'SENIOR' ? (
+                                                currentUser?.role === 'MANAGER' && editingCell?.empId === calc.empId && editingCell?.field === 'certificates' ? (
+                                                    <input
+                                                        autoFocus
+                                                        type="number"
+                                                        className="w-16 px-1 py-0.5 border rounded text-center text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                        value={tempValue}
+                                                        onFocus={(e) => e.target.select()}
+                                                        onChange={(e) => setTempValue(e.target.value)}
+                                                        onBlur={() => handleSaveChecklist(calc.empId, 'certificates', tempValue)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') handleSaveChecklist(calc.empId, 'certificates', tempValue);
+                                                            if (e.key === 'Escape') setEditingCell(null);
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        className={currentUser?.role === 'MANAGER' ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
+                                                        onClick={() => {
+                                                            if (currentUser?.role !== 'MANAGER') return;
+                                                            setEditingCell({ empId: calc.empId, field: 'certificates' });
+                                                            setTempValue(calc.certificatesBonus === 0 ? '' : calc.certificatesBonus.toString());
+                                                        }}
+                                                    >
+                                                        {calc.certificatesBonus > 0 ? (
+                                                            <div className="text-emerald-600 font-medium">+{calc.certificatesBonus}</div>
+                                                        ) : '-'}
+                                                    </div>
+                                                )
+                                            ) : (
+                                                <div className="text-zinc-300">-</div>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            {calc.salesBonus > 0 ? (
+                                                <div className="text-emerald-600 font-medium">+{calc.salesBonus}</div>
+                                            ) : '-'}
+                                        </td>
                                         <td className="px-4 py-3 text-center text-zinc-600">
                                             {editingCell?.empId === calc.empId && editingCell?.field === 'sickLeaveOpening' ? (
                                                 <input
@@ -493,6 +545,7 @@ export default function KpiPage() {
                                                     type="number"
                                                     className="w-12 px-1 py-0.5 border rounded text-center text-sm"
                                                     value={tempValue}
+                                                    onFocus={(e) => e.target.select()}
                                                     onChange={(e) => setTempValue(e.target.value)}
                                                     onBlur={() => handleSaveChecklist(calc.empId, 'sickLeaveOpening', tempValue)}
                                                     onKeyDown={(e) => {
@@ -505,7 +558,7 @@ export default function KpiPage() {
                                                     className="cursor-pointer hover:text-blue-600 transition-colors"
                                                     onClick={() => {
                                                         setEditingCell({ empId: calc.empId, field: 'sickLeaveOpening' });
-                                                        setTempValue(calc.sickLeaveOpening.toString());
+                                                        setTempValue(calc.sickLeaveOpening === 0 ? '' : calc.sickLeaveOpening.toString());
                                                     }}
                                                 >
                                                     {calc.sickLeaveOpening > 0 && <div className="text-emerald-600 font-medium">+{calc.sickLeaveOpening * 130}</div>}
@@ -520,6 +573,7 @@ export default function KpiPage() {
                                                     type="number"
                                                     className="w-12 px-1 py-0.5 border rounded text-center text-sm"
                                                     value={tempValue}
+                                                    onFocus={(e) => e.target.select()}
                                                     onChange={(e) => setTempValue(e.target.value)}
                                                     onBlur={() => handleSaveChecklist(calc.empId, 'sickLeaveClosing', tempValue)}
                                                     onKeyDown={(e) => {
@@ -532,7 +586,7 @@ export default function KpiPage() {
                                                     className="cursor-pointer hover:text-blue-600 transition-colors"
                                                     onClick={() => {
                                                         setEditingCell({ empId: calc.empId, field: 'sickLeaveClosing' });
-                                                        setTempValue(calc.sickLeaveClosing.toString());
+                                                        setTempValue(calc.sickLeaveClosing === 0 ? '' : calc.sickLeaveClosing.toString());
                                                     }}
                                                 >
                                                     {calc.sickLeaveClosing > 0 && <div className="text-emerald-600 font-medium">+{calc.sickLeaveClosing * 80}</div>}
@@ -547,6 +601,7 @@ export default function KpiPage() {
                                                     type="number"
                                                     className="w-12 px-1 py-0.5 border rounded text-center text-sm"
                                                     value={tempValue}
+                                                    onFocus={(e) => e.target.select()}
                                                     onChange={(e) => setTempValue(e.target.value)}
                                                     onBlur={() => handleSaveChecklist(calc.empId, 'cardCreation', tempValue)}
                                                     onKeyDown={(e) => {
@@ -559,7 +614,7 @@ export default function KpiPage() {
                                                     className="cursor-pointer hover:text-blue-600 transition-colors"
                                                     onClick={() => {
                                                         setEditingCell({ empId: calc.empId, field: 'cardCreation' });
-                                                        setTempValue(calc.cardCreation.toString());
+                                                        setTempValue(calc.cardCreation === 0 ? '' : calc.cardCreation.toString());
                                                     }}
                                                 >
                                                     {calc.cardCreation > 0 && <div className="text-emerald-600 font-medium">+{calc.cardCreation * 60}</div>}
@@ -579,6 +634,7 @@ export default function KpiPage() {
                                                         type="number"
                                                         className="w-16 px-1 py-0.5 border rounded text-right text-sm"
                                                         value={tempValue}
+                                                        onFocus={(e) => e.target.select()}
                                                         onChange={(e) => setTempValue(e.target.value)}
                                                         onBlur={() => handleSaveChecklist(calc.empId, 'percentage', tempValue)}
                                                         onKeyDown={(e) => {
@@ -594,7 +650,7 @@ export default function KpiPage() {
                                                         className="text-[10px] text-zinc-400 cursor-pointer hover:text-blue-600 transition-colors"
                                                         onClick={() => {
                                                             setEditingCell({ empId: calc.empId, field: 'percentage' });
-                                                            setTempValue(calc.calcChecklist.toFixed(0));
+                                                            setTempValue(calc.calcChecklist === 0 ? '' : calc.calcChecklist.toFixed(0));
                                                         }}
                                                     >
                                                         {calc.calcChecklist.toFixed(0)}%
@@ -606,7 +662,7 @@ export default function KpiPage() {
                                             {calc.qualityBonus > 0 && <span className="text-green-600 font-medium">+{calc.qualityBonus}</span>}
                                             <div className="text-[10px] text-zinc-400">{calc.avgQuality.toFixed(1)}%</div>
                                         </td>
-                                        <td className="px-4 py-3 text-right font-bold text-zinc-900 bg-zinc-50/50">
+                                        <td className="sticky right-0 z-10 bg-zinc-50 group-hover:bg-zinc-100 transition-colors px-4 py-3 text-right font-bold text-zinc-900" style={{ boxShadow: 'inset 1px 0 0 #f4f4f5, -2px 0 10px -2px rgba(0,0,0,0.1)' }}>
                                             {calc.totalPay.toFixed(0)} ₽
                                         </td>
                                     </tr>

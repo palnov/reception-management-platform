@@ -174,7 +174,7 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
 
     return (
         <tr ref={setNodeRef} style={style} className="hover:bg-zinc-50 group border-b border-zinc-200">
-            <td className="sticky left-0 bg-white group-hover:bg-zinc-50 z-10 border-r border-zinc-200 p-3 font-medium text-zinc-900 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] transition-colors">
+            <td className="sticky left-0 bg-white group-hover:bg-zinc-50 z-40 p-3 font-medium text-zinc-900 transition-colors" style={{ boxShadow: 'inset -2px 0 0 #d4d4d8, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>
                 <div className="flex items-center gap-2">
                     <div
                         {...attributes}
@@ -1222,7 +1222,7 @@ export default function SchedulePage() {
 
             <div
                 ref={gridContainerRef}
-                className={`bg-white rounded-2xl shadow-xl border border-zinc-200/60 overflow-x-auto flex-1 pb-4 relative ${(isDragging || isFilling) ? 'select-none' : ''}`}
+                className={`bg-white rounded-2xl shadow-xl border border-zinc-200/60 overflow-auto flex-1 pb-4 relative scrollbar-custom max-h-[calc(100vh-250px)] ${(isDragging || isFilling) ? 'select-none' : ''}`}
             >
                 <DndContext
                     sensors={sensors}
@@ -1230,9 +1230,9 @@ export default function SchedulePage() {
                     onDragEnd={handleDragEnd}
                 >
                     <table className="w-full text-xs text-left border-collapse min-w-[1240px]">
-                        <thead>
+                        <thead className="sticky top-0 z-[60]">
                             <tr className="bg-zinc-50/50">
-                                <th className="sticky left-0 bg-zinc-50 z-20 border-b border-r border-zinc-200 p-3 min-w-[240px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                                <th className="sticky top-0 left-0 bg-zinc-50 z-[70] p-3 min-w-[240px]" style={{ boxShadow: 'inset 0 -2px 0 #d4d4d8, inset -2px 0 0 #d4d4d8, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>
                                     <span className="font-semibold text-zinc-500 uppercase tracking-wider text-[10px]">Сотрудник</span>
                                 </th>
                                 {days.map(day => {
@@ -1242,12 +1242,13 @@ export default function SchedulePage() {
                                     return (
                                         <th
                                             key={dateKey}
-                                            className={`border-b border-r border-zinc-200 p-2 text-center min-w-[44px] transition-colors
-                                                ${isWeekend ? 'bg-red-100/50 text-red-700' : 'bg-transparent text-zinc-700'}
+                                            className={`sticky top-0 z-20 border-r border-zinc-200 p-2 text-center min-w-[44px] transition-colors
+                                                ${isWeekend ? 'bg-[#fef1f1] text-red-700' : 'bg-[#fafafa] text-zinc-700'}
                                                 ${day.getDay() === 6 ? 'border-l-2 border-zinc-400' : ''}
                                                 ${day.getDay() === 0 ? 'border-r-2 border-zinc-400' : ''}
-                                                ${isToday ? 'ring-2 ring-inset ring-blue-500 bg-blue-50 !text-blue-700' : ''}
+                                                ${isToday ? 'ring-2 ring-inset ring-blue-500 bg-[#eff6ff] !text-blue-700' : ''}
                                             `}
+                                            style={{ boxShadow: 'inset 0 -2px 0 #d4d4d8' }}
                                         >
                                             <div className="font-bold text-xs">{format(day, 'd')}</div>
                                             <div className="text-[9px] uppercase font-bold opacity-70">{format(day, 'EEEEEE', { locale: ru })}</div>
