@@ -72,7 +72,7 @@ export async function POST(request: Request) {
             return chunks;
         };
 
-        // Transactional Restore
+        // Transactional Restore (timeout 60s for stability)
         await prisma.$transaction(async (tx) => {
             // 1. Clear all tables in correct order
             await tx.auditLog.deleteMany();
@@ -84,10 +84,8 @@ export async function POST(request: Request) {
             await tx.monthlyNorm.deleteMany();
             await tx.employee.deleteMany();
 
-            const CHUNK_SIZE = 100; // Safe for SQLite (100 * ~10 fields = 1000 params)
-
             // 2. Restore Employees
-            if (backup.employees.length > 0) {
+            if (backup.employees && backup.employees.length > 0) {
                 for (const emp of backup.employees) {
                     await tx.employee.create({
                         data: {
@@ -120,7 +118,7 @@ export async function POST(request: Request) {
             }
 
             // 4. Restore Shifts
-            if (backup.shifts.length > 0) {
+            if (backup.shifts && backup.shifts.length > 0) {
                 for (const s of backup.shifts) {
                     await tx.shift.create({
                         data: {
@@ -133,9 +131,9 @@ export async function POST(request: Request) {
                             centerClosed: Boolean(s.centerClosed),
                             isActingLead: Boolean(s.isActingLead),
                             coefficient: Number(s.coefficient ?? 1.0),
-                            comment: s.comment,
+                            comment: s.comment || '',
                             createdAt: s.createdAt || '',
-                            createdBy: s.createdBy,
+                            createdBy: s.createdBy || '',
                             isDeleted: Boolean(s.isDeleted ?? false)
                         }
                     });
@@ -155,7 +153,7 @@ export async function POST(request: Request) {
                             salesBonus: Number(k.salesBonus ?? 0),
                             checkList: Number(k.checkList ?? 0),
                             createdAt: k.createdAt || '',
-                            createdBy: k.createdBy
+                            createdBy: k.createdBy || ''
                         }
                     });
                 }
@@ -169,12 +167,12 @@ export async function POST(request: Request) {
                             id: p.id,
                             date: p.date,
                             employeeId: p.employeeId,
-                            patientId: p.patientId,
+                            patientId: p.patientId || '',
                             productName: p.productName || p.description || 'Unknown Product',
                             price: Number(p.price ?? 0),
                             bonus: Number(p.bonus ?? p.amount ?? 0),
                             createdAt: p.createdAt || '',
-                            createdBy: p.createdBy
+                            createdBy: p.createdBy || ''
                         }
                     });
                 }
@@ -188,7 +186,7 @@ export async function POST(request: Request) {
                             id: r.id,
                             date: r.date,
                             employeeId: r.employeeId,
-                            patientId: r.patientId,
+                            patientId: r.patientId || '',
                             criterion1: Number(r.criterion1 ?? 0),
                             criterion2: Number(r.criterion2 ?? 0),
                             criterion3: Number(r.criterion3 ?? 0),
@@ -196,7 +194,7 @@ export async function POST(request: Request) {
                             maxScore: Number(r.maxScore ?? 0),
                             count: Number(r.count ?? 0),
                             createdAt: r.createdAt || '',
-                            createdBy: r.createdBy
+                            createdBy: r.createdBy || ''
                         }
                     });
                 }
@@ -216,30 +214,39 @@ export async function POST(request: Request) {
                             cardCreation: Number(m.cardCreation ?? 0),
                             createdAt: m.createdAt || '',
                             updatedAt: m.updatedAt || '',
-                            updatedBy: m.updatedBy
+                            updatedBy: m.updatedBy || ''
                         }
                     });
                 }
             }
+        }, { timeout: 60000 });
 
-            // 9. Restore AuditLogs
-            if (backup.auditLogs && backup.auditLogs.length > 0) {
-                for (const l of backup.auditLogs) {
-                    await tx.auditLog.create({
-                        data: {
-                            id: l.id,
-                            entityType: l.entityType,
-                            entityId: l.entityId,
-                            action: l.action,
-                            changedBy: l.changedBy,
-                            changedByRole: l.changedByRole || 'ADMIN',
-                            timestamp: l.timestamp,
-                            details: l.details
-                        }
-                    });
-                }
+        // 9. Restore AuditLogs outside main transaction (Extreme Scalability: Mini-Transactions)
+        if (backup.auditLogs && backup.auditLogs.length > 0) {
+            console.log(`Starting audit log restoration: ${backup.auditLogs.length} records`);
+            const MINI_BATCH = 200; // Small transactions are extremely fast in SQLite
+            for (let i = 0; i < backup.auditLogs.length; i += MINI_BATCH) {
+                const chunk = backup.auditLogs.slice(i, i + MINI_BATCH);
+                await prisma.$transaction(async (mtx) => {
+                    for (const l of chunk) {
+                        await mtx.auditLog.create({
+                            data: {
+                                id: l.id,
+                                entityType: l.entityType,
+                                entityId: l.entityId,
+                                action: l.action,
+                                changedBy: l.changedBy,
+                                changedByRole: l.changedByRole || 'ADMIN',
+                                timestamp: l.timestamp,
+                                details: l.details || ''
+                            }
+                        });
+                    }
+                });
+                if (i % 1000 === 0) console.log(`Restored ${i} audit logs...`);
             }
-        });
+            console.log('Audit logs restoration complete');
+        }
 
         return NextResponse.json({ success: true, message: 'Database restored successfully' });
     } catch (error: any) {
