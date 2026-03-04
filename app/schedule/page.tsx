@@ -1414,30 +1414,34 @@ export default function SchedulePage() {
                             </div>
 
                             <div className="grid grid-cols-1 gap-3">
-                                <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, cabinetClosed: !prev.cabinetClosed }))}>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.cabinetClosed}
-                                        readOnly
-                                        className="w-5 h-5 text-blue-600 rounded-lg focus:ring-blue-500 border-zinc-300 transition-all pointer-events-none"
-                                    />
-                                    <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
-                                        <span>Открытие/Закрытие</span>
-                                        <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">+250р.</span>
-                                    </label>
-                                </div>
-                                <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, centerClosed: !prev.centerClosed }))}>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.centerClosed}
-                                        readOnly
-                                        className="w-5 h-5 text-emerald-600 rounded-lg focus:ring-emerald-500 border-zinc-300 transition-all pointer-events-none"
-                                    />
-                                    <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
-                                        <span>Открытие + Закрытие</span>
-                                        <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">+500р.</span>
-                                    </label>
-                                </div>
+                                {employees.find(e => e.id === selectedEmployeeId)?.role !== 'SENIOR' && (
+                                    <>
+                                        <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, cabinetClosed: !prev.cabinetClosed }))}>
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.cabinetClosed}
+                                                readOnly
+                                                className="w-5 h-5 text-blue-600 rounded-lg focus:ring-blue-500 border-zinc-300 transition-all pointer-events-none"
+                                            />
+                                            <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
+                                                <span>Открытие/Закрытие</span>
+                                                <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">+250р.</span>
+                                            </label>
+                                        </div>
+                                        <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, centerClosed: !prev.centerClosed }))}>
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.centerClosed}
+                                                readOnly
+                                                className="w-5 h-5 text-emerald-600 rounded-lg focus:ring-emerald-500 border-zinc-300 transition-all pointer-events-none"
+                                            />
+                                            <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
+                                                <span>Открытие + Закрытие</span>
+                                                <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">+500р.</span>
+                                            </label>
+                                        </div>
+                                    </>
+                                )}
                                 {employees.find(e => e.id === selectedEmployeeId)?.role === 'ADMIN' && (
                                     <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, isActingLead: !prev.isActingLead }))}>
                                         <input

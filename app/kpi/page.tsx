@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSharedMonth } from '@/lib/useSharedMonth';
 import { format, startOfMonth, endOfMonth, isSameDay, subMonths, addMonths, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, CheckCircle, X, Pencil, ClipboardCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, X, Pencil, ClipboardCheck, Crown, BadgeCheck, User } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
 import { Tooltip } from '@/components/Tooltip';
 
@@ -284,6 +284,7 @@ export default function KpiPage() {
             const sickLeaveOpening = empChecklist ? (empChecklist.sickLeaveOpening || 0) : 0;
             const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
             const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
+            const manualClosingBonus = empChecklist ? (empChecklist.closingBonus || 0) : 0;
 
             const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
             const cardBonus = cardCreation * 60;
@@ -316,7 +317,8 @@ export default function KpiPage() {
             else if (seniorityYears >= 2) seniorityBonus = Math.round(baseSalary * 0.07);
             else if (seniorityYears >= 1) seniorityBonus = Math.round(baseSalary * 0.03);
 
-            const totalPay = basePay + dayOffPayTotal + closingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + actingLeadBonus;
+            const actualClosingBonuses = enrichedEmp.role === 'SENIOR' ? manualClosingBonus : closingBonuses;
+            const totalPay = basePay + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + actingLeadBonus;
 
             // Aggregate all audit logs
             const allLogs = [
@@ -336,11 +338,13 @@ export default function KpiPage() {
             return {
                 empId: emp.id,
                 name: emp.name,
+                role: enrichedEmp.role,
                 rawHours,
                 basePay,
                 dayOffHours,
                 dayOffPay: dayOffPayTotal,
-                closingBonuses,
+                closingBonuses: actualClosingBonuses,
+                isClosingManual: enrichedEmp.role === 'SENIOR',
                 actingLeadBonus,
                 salesBonus,
                 sickLeaveOpening,
@@ -423,7 +427,19 @@ export default function KpiPage() {
                                     >
                                         <td className="px-4 py-3 font-medium text-zinc-900">
                                             <div className="flex items-center gap-2">
-                                                {calc.name}
+                                                <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${calc.role === 'MANAGER' ? 'bg-purple-100 text-purple-600' :
+                                                    calc.role === 'SENIOR' ? 'bg-amber-100 text-amber-600' :
+                                                        'bg-zinc-100 text-zinc-500'
+                                                    }`}>
+                                                    {calc.role === 'MANAGER' ? (
+                                                        <Crown className="w-3 h-3" />
+                                                    ) : calc.role === 'SENIOR' ? (
+                                                        <BadgeCheck className="w-3 h-3" />
+                                                    ) : (
+                                                        <User className="w-3 h-3" />
+                                                    )}
+                                                </div>
+                                                <span className="truncate">{calc.name}</span>
                                                 {calc.auditLogs && calc.auditLogs.length > 0 && <InfoTooltip logs={calc.auditLogs} />}
                                             </div>
                                         </td>
@@ -437,7 +453,37 @@ export default function KpiPage() {
                                                 </div>
                                             ) : '-'}
                                         </td>
-                                        <td className="px-4 py-3 text-right text-zinc-600 font-medium text-emerald-600">{calc.closingBonuses > 0 ? calc.closingBonuses : '-'}</td>
+                                        <td className="px-4 py-3 text-right text-zinc-600 font-medium text-emerald-600">
+                                            {calc.isClosingManual ? (
+                                                currentUser?.role === 'MANAGER' && editingCell?.empId === calc.empId && editingCell?.field === 'closingBonus' ? (
+                                                    <input
+                                                        autoFocus
+                                                        type="number"
+                                                        className="w-16 px-1 py-0.5 border rounded text-right text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                        value={tempValue}
+                                                        onChange={(e) => setTempValue(e.target.value)}
+                                                        onBlur={() => handleSaveChecklist(calc.empId, 'closingBonus', tempValue)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') handleSaveChecklist(calc.empId, 'closingBonus', tempValue);
+                                                            if (e.key === 'Escape') setEditingCell(null);
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        className={currentUser?.role === 'MANAGER' ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
+                                                        onClick={() => {
+                                                            if (currentUser?.role !== 'MANAGER') return;
+                                                            setEditingCell({ empId: calc.empId, field: 'closingBonus' });
+                                                            setTempValue(calc.closingBonuses.toString());
+                                                        }}
+                                                    >
+                                                        {calc.closingBonuses > 0 ? calc.closingBonuses : '-'}
+                                                    </div>
+                                                )
+                                            ) : (
+                                                calc.closingBonuses > 0 ? calc.closingBonuses : '-'
+                                            )}
+                                        </td>
                                         <td className="px-4 py-3 text-right text-zinc-600 font-medium text-indigo-600">{calc.actingLeadBonus > 0 ? calc.actingLeadBonus : '-'}</td>
                                         <td className="px-4 py-3 text-right text-zinc-600">{calc.salesBonus > 0 ? calc.salesBonus : '-'}</td>
                                         <td className="px-4 py-3 text-center text-zinc-600">
