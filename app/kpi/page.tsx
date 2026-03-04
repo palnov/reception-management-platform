@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useSharedMonth } from '@/lib/useSharedMonth';
 import { format, startOfMonth, endOfMonth, isSameDay, subMonths, addMonths, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, CheckCircle, X, Pencil, ClipboardCheck } from 'lucide-react';
@@ -65,7 +66,7 @@ interface RegistrationKpi {
 export default function KpiPage() {
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [isUserLoading, setIsUserLoading] = useState(true);
-    const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [currentMonth, setCurrentMonth] = useSharedMonth();
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [kpiRecords, setKpiRecords] = useState<KpiRecord[]>([]);

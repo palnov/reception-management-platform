@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
+import { useSharedMonth } from '@/lib/useSharedMonth';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, parseISO, subDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, X, DoorOpen, MapPin, GripVertical, User, Crown, BadgeCheck, Clock, Briefcase, CheckSquare, Activity, LayoutList, Timer, Percent, Layers } from 'lucide-react';
@@ -341,7 +342,7 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
 
 // --- Main Page Component ---
 export default function SchedulePage() {
-    const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [currentMonth, setCurrentMonth] = useSharedMonth();
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);

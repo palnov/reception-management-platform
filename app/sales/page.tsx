@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useSharedMonth } from '@/lib/useSharedMonth';
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, Trash2, ShoppingCart, ArrowUp, ArrowDown } from 'lucide-react';
@@ -25,7 +26,7 @@ interface Sale {
 }
 
 export default function SalesPage() {
-    const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [currentMonth, setCurrentMonth] = useSharedMonth();
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [sales, setSales] = useState<Sale[]>([]);
     const [activeEmployeeId, setActiveEmployeeId] = useState<string | 'all'>('all');

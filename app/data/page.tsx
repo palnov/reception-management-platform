@@ -13,7 +13,16 @@ export default function DataPage() {
     const [activeTab, setActiveTab] = useState<'export' | 'backup'>('export');
 
     // Export State
-    const [exportDate, setExportDate] = useState(format(new Date(), 'yyyy-MM'));
+    const [exportDate, setExportDate] = useState(() => {
+        try {
+            const stored = typeof window !== 'undefined' ? localStorage.getItem('shared_selected_month') : null;
+            if (stored) {
+                const parsed = new Date(stored);
+                if (!isNaN(parsed.getTime())) return format(parsed, 'yyyy-MM');
+            }
+        } catch { }
+        return format(new Date(), 'yyyy-MM');
+    });
     const [reportType, setReportType] = useState('FULL'); // FULL, SCHEDULE, SALES, REGISTRATION, KPI
     const [isExportingGeneral, setIsExportingGeneral] = useState(false);
     const [isExportingBatch, setIsExportingBatch] = useState(false);
