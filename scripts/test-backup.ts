@@ -15,6 +15,7 @@ async function main() {
         monthlyNorms: await prisma.monthlyNorm.findMany(),
         promotionSales: await prisma.promotionSale.findMany(),
         registrationKpis: await prisma.registrationKpi.findMany(),
+        monthlyChecklists: await prisma.monthlyChecklist.findMany(),
         auditLogs: await prisma.auditLog.findMany()
     };
 

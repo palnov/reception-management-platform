@@ -137,9 +137,11 @@ export class ReportService {
                 const mainRow = rows[0];
 
                 // Column A labels
-                mainRow.getCell(1).value = emp.name;
+                // Tag ' (Уволен)' if employee is dismissed within or before this month
+                const isDismissed = emp.dismissalDate && emp.dismissalDate !== "" && emp.dismissalDate <= format(endDate, 'yyyy-MM-dd');
+                mainRow.getCell(1).value = emp.name + (isDismissed ? ' (Уволен)' : '');
                 mainRow.getCell(1).style = cellStyle;
-                mainRow.getCell(1).font = { bold: true };
+                mainRow.getCell(1).font = { bold: true, color: isDismissed ? { argb: 'FF9CA3AF' } : { argb: 'FF000000' } };
 
                 if (useMultiRow) {
                     rows[1].getCell(1).value = 'Коэф.';
@@ -155,6 +157,17 @@ export class ReportService {
                 for (let d = 1; d <= daysInMonth; d++) {
                     const col = d + 1;
                     const dayStr = `${monthStr}-${String(d).padStart(2, '0')}`; // Results in YYYY-MM-DD
+
+                    // Safety check: skip logic for shifts on or after dismissal date (if exists)
+                    if (emp.dismissalDate && emp.dismissalDate !== "" && dayStr >= emp.dismissalDate) {
+                        rows.forEach(r => {
+                            const cell = r.getCell(col);
+                            cell.style = cellStyle;
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } }; // gray-100
+                        });
+                        continue;
+                    }
+
                     const shift = shiftMap.get(`${emp.id}|${dayStr}`);
 
                     // Initialize styling for all rows in this set
@@ -295,6 +308,7 @@ export class ReportService {
                 { header: 'Откр/Закр', key: 'closing', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'ИО', key: 'actingLead', width: 12, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'Справки', key: 'certificates', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Открытие Б/Л', key: 'sick_leave_open', width: 15, style: centerStyle },
                 { header: 'Закрытие/продление Б/Л', key: 'sick_leave_close', width: 25, style: centerStyle },
                 { header: 'Карточки', key: 'cards', width: 15, style: centerStyle },
@@ -363,6 +377,8 @@ export class ReportService {
                 const sickLeaveOpening = empChecklist ? (empChecklist.sickLeaveOpening || 0) : 0;
                 const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
                 const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
+                const manualClosingBonus = empChecklist ? (empChecklist.closingBonus || 0) : 0;
+                const certificatesBonus = empChecklist ? (empChecklist.certificates || 0) : 0;
 
                 const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
                 const cardBonus = cardCreation * 60;
@@ -393,20 +409,23 @@ export class ReportService {
                     : 0;
 
                 let seniorityBonus = 0;
-                if (seniorityYears >= 3) seniorityBonus = 3000;
-                else if (seniorityYears >= 2) seniorityBonus = 2000;
-                else if (seniorityYears >= 1) seniorityBonus = 1000;
+                const baseSalary = emp.baseSalary || 0;
+                if (seniorityYears >= 3) seniorityBonus = Math.round(baseSalary * 0.10);
+                else if (seniorityYears >= 2) seniorityBonus = Math.round(baseSalary * 0.07);
+                else if (seniorityYears >= 1) seniorityBonus = Math.round(baseSalary * 0.03);
 
-                const total = Math.round(shiftPay + closingBonuses + actingLeadBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus);
+                const actualClosingBonuses = emp.role === 'SENIOR' ? manualClosingBonus : closingBonuses;
+                const total = Math.round(shiftPay + actualClosingBonuses + actingLeadBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + certificatesBonus);
 
                 sheet.addRow({
                     name: emp.name,
                     base: emp.baseSalary,
                     hours: hoursWorked,
                     shiftPay: Math.round(shiftPay),
-                    closing: closingBonuses,
+                    closing: actualClosingBonuses,
                     actingLead: actingLeadBonus,
                     sales: salesBonus,
+                    certificates: certificatesBonus,
                     sick_leave_open: sickLeaveOpening,
                     sick_leave_close: sickLeaveClosing,
                     cards: cardCreation,
