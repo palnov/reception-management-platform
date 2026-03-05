@@ -11,6 +11,8 @@ interface Employee {
     id: string;
     name: string;
     role: string;
+    hireDate?: string;
+    dismissalDate?: string;
     seniorId?: string | null;
 }
 
