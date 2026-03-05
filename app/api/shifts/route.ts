@@ -67,7 +67,11 @@ export async function GET(request: Request) {
         return NextResponse.json(shiftsWithLogs);
     } catch (error: any) {
         console.error('API_SHIFTS_GET_ERROR:', error);
-        return NextResponse.json({ error: 'Internal Error', details: error.message }, { status: 500 });
+        return NextResponse.json({
+            error: 'Internal Error',
+            details: error.message,
+            stack: error.stack
+        }, { status: 500 });
     }
 }
 
@@ -187,8 +191,9 @@ export async function POST(request: Request) {
             }, session);
             return NextResponse.json(shift);
         }
-    } catch (error) {
-        return NextResponse.json({ error: 'Failed' }, { status: 500 });
+    } catch (error: any) {
+        console.error('API_SHIFTS_POST_ERROR:', error);
+        return NextResponse.json({ error: 'Failed', details: error.message, stack: error.stack }, { status: 500 });
     }
 }
 

@@ -44,7 +44,7 @@ export async function GET(request: Request) {
             ];
         } else if (activeInDate) {
             // Include employees who:
-            // 1. Have no dismissal date
+            // 1. Have no dismissal date (empty or null)
             // 2. Were dismissed ON or AFTER the activeInDate
             where.OR = [
                 { dismissalDate: "" },
@@ -69,8 +69,12 @@ export async function GET(request: Request) {
 
         return NextResponse.json(employees);
     } catch (error: any) {
-        console.error('API_EMPLOYEES_GET_ERROR:', error.message);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        console.error('API_EMPLOYEES_GET_ERROR:', error);
+        return NextResponse.json({
+            error: 'Internal Server Error',
+            details: error.message,
+            stack: error.stack
+        }, { status: 500 });
     }
 }
 
