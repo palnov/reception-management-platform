@@ -11,6 +11,7 @@ interface Employee {
     id: string;
     name: string;
     role: string;
+    seniorId?: string | null;
 }
 
 interface Sale {
@@ -130,11 +131,19 @@ export default function SalesPage() {
                 >
                     Все сотрудники
                 </button>
-                {employees.filter(e => e.role !== 'MANAGER').map(emp => (
+                {employees.filter(e => {
+                    if (e.role === 'MANAGER') return false;
+                    // Keep if not dismissed or if they have sales in this month
+                    const hasSales = sales.some(s => s.employeeId === e.id);
+                    if (hasSales) return true;
+
+                    const today = new Date().toISOString().split('T')[0];
+                    return !e.seniorId && (!e.dismissalDate || e.dismissalDate > today);
+                }).map(emp => (
                     <button
                         key={emp.id}
                         onClick={() => setActiveEmployeeId(emp.id)}
-                        className={`px-6 py-3 text-sm font-bold transition-all border-b-2 rounded-t-xl ${activeEmployeeId === emp.id
+                        className={`px-6 py-3 text-sm font-bold transition-all border-b-2 rounded-t-xl flex items-center gap-2 ${activeEmployeeId === emp.id
                             ? 'border-blue-600 text-blue-600 bg-blue-50'
                             : 'border-transparent text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'
                             }`}
@@ -274,7 +283,11 @@ export default function SalesPage() {
                                     onChange={e => setFormData({ ...formData, employeeId: e.target.value })}
                                     className="w-full px-4 py-3 border-2 border-zinc-100 rounded-xl focus:border-blue-500 outline-none font-medium text-sm"
                                 >
-                                    {employees.filter(e => e.role !== 'MANAGER').map(e => (
+                                    {employees.filter(e => {
+                                        if (e.role === 'MANAGER') return false;
+                                        const today = new Date().toISOString().split('T')[0];
+                                        return !e.dismissalDate || e.dismissalDate > today;
+                                    }).map(e => (
                                         <option key={e.id} value={e.id}>{e.name}</option>
                                     ))}
                                 </select>

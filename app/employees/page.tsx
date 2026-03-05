@@ -14,6 +14,7 @@ interface Employee {
     branch?: string;
     hireDate?: string;
     dismissalDate?: string;
+    seniorId?: string | null;
 }
 
 export default function EmployeesPage() {
@@ -29,7 +30,8 @@ export default function EmployeesPage() {
         baseSalary: '',
         branch: 'Дзержинского 26',
         hireDate: '',
-        dismissalDate: ''
+        dismissalDate: '',
+        subordinateIds: [] as string[]
     };
 
     const [formData, setFormData] = useState(initialForm);
@@ -58,6 +60,7 @@ export default function EmployeesPage() {
 
     function handleEdit(emp: any) {
         setEditId(emp.id);
+        const subIds = employees.filter(e => e.seniorId === emp.id).map(e => e.id);
         setFormData({
             name: emp.name,
             role: emp.role,
@@ -65,7 +68,8 @@ export default function EmployeesPage() {
             baseSalary: emp.baseSalary.toString(),
             branch: emp.branch || 'Дзержинского 26',
             hireDate: emp.hireDate || '',
-            dismissalDate: emp.dismissalDate || ''
+            dismissalDate: emp.dismissalDate || '',
+            subordinateIds: subIds
         });
         setShowForm(true);
     }
@@ -120,8 +124,8 @@ export default function EmployeesPage() {
             </div>
 
             {showForm && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in">
-                    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-2xl border border-zinc-200 w-full max-w-lg animate-in zoom-in-95">
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in overflow-y-auto">
+                    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-2xl border border-zinc-200 w-full max-w-lg my-8 animate-in zoom-in-95">
                         <h2 className="text-xl font-bold mb-4">{editId ? 'Редактировать сотрудника' : 'Новый сотрудник'}</h2>
                         <div className="space-y-4">
                             <div>
@@ -163,6 +167,87 @@ export default function EmployeesPage() {
                                     </div>
                                 )}
                             </div>
+
+                            {formData.role === 'SENIOR' && (
+                                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-sm font-bold text-amber-900">Администраторы в смене</label>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (formData.subordinateIds.length < 4) {
+                                                    setFormData({
+                                                        ...formData,
+                                                        subordinateIds: [...formData.subordinateIds, '']
+                                                    });
+                                                }
+                                            }}
+                                            disabled={formData.subordinateIds.length >= 4}
+                                            className="p-1 hover:bg-amber-100 rounded text-amber-700 disabled:opacity-30"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {formData.subordinateIds.map((subId, idx) => (
+                                            <div key={idx} className="flex gap-2">
+                                                <select
+                                                    value={subId}
+                                                    onChange={(e) => {
+                                                        const newIds = [...formData.subordinateIds];
+                                                        newIds[idx] = e.target.value;
+                                                        setFormData({ ...formData, subordinateIds: newIds });
+                                                    }}
+                                                    className="flex-1 px-3 py-1.5 border border-amber-300 rounded bg-white text-sm"
+                                                >
+                                                    <option value="">Выберите администратора</option>
+                                                    {employees
+                                                        .filter(e => e.role === 'ADMIN' && (e.seniorId === null || e.seniorId === editId || !e.seniorId))
+                                                        .filter(e => {
+                                                            const today = new Date().toISOString().split('T')[0];
+                                                            return !e.dismissalDate || e.dismissalDate > today;
+                                                        })
+                                                        .map(e => (
+                                                            <option key={e.id} value={e.id}>{e.name}</option>
+                                                        ))
+                                                    }
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newIds = formData.subordinateIds.filter((_, i) => i !== idx);
+                                                        setFormData({ ...formData, subordinateIds: newIds });
+                                                    }}
+                                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {formData.subordinateIds.length === 0 && (
+                                            <p className="text-xs text-amber-600 italic text-center">Нажмите +, чтобы добавить администраторов (макс. 4)</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {formData.role === 'ADMIN' && editId && (
+                                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                    <label className="block text-sm font-bold text-blue-900 mb-1">Старший смены</label>
+                                    {(() => {
+                                        const currentEmp = employees.find(e => e.id === editId);
+                                        const senior = currentEmp?.seniorId ? employees.find(e => e.id === currentEmp.seniorId) : null;
+                                        return senior ? (
+                                            <p className="text-sm text-blue-800 flex items-center gap-2">
+                                                <BadgeCheck className="w-4 h-4 text-amber-600" />
+                                                {senior.name}
+                                            </p>
+                                        ) : (
+                                            <p className="text-sm text-blue-600 italic">Не назначен</p>
+                                        );
+                                    })()}
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className={formData.role === 'MANAGER' ? 'col-span-2' : ''}>
@@ -269,6 +354,9 @@ export default function EmployeesPage() {
                                         <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Должность</th>
                                         <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Филиал</th>
                                         <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Дата приёма</th>
+                                        {title === "Уволенные сотрудники" && (
+                                            <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Дата увольнения</th>
+                                        )}
                                         <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500 text-right">Оклад</th>
                                     </tr>
                                 </thead>
@@ -323,6 +411,11 @@ export default function EmployeesPage() {
                                             <td className="px-6 py-4 text-zinc-600 text-sm">
                                                 {emp.hireDate ? new Date(emp.hireDate).toLocaleDateString('ru-RU') : <span className="text-zinc-400">—</span>}
                                             </td>
+                                            {title === "Уволенные сотрудники" && (
+                                                <td className="px-6 py-4 text-zinc-600 text-sm">
+                                                    {emp.dismissalDate ? new Date(emp.dismissalDate).toLocaleDateString('ru-RU') : '—'}
+                                                </td>
+                                            )}
                                             <td className="px-6 py-4 text-zinc-900 text-sm font-medium text-right">
                                                 {emp.role === 'MANAGER' ? '-' : `${(emp.baseSalary ?? 0).toLocaleString()} ₽`}
                                             </td>
@@ -330,7 +423,7 @@ export default function EmployeesPage() {
                                     ))}
                                     {list.length === 0 && !isLoading && (
                                         <tr>
-                                            <td colSpan={5} className="px-6 py-12 text-center text-zinc-500">Нет сотрудников в этом списке.</td>
+                                            <td colSpan={title === "Уволенные сотрудники" ? 6 : 5} className="px-6 py-12 text-center text-zinc-500">Нет сотрудников в этом списке.</td>
                                         </tr>
                                     )}
                                 </tbody>

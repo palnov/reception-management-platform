@@ -35,6 +35,7 @@ interface Employee {
     hireDate?: string;
     dismissalDate?: string;
     sortOrder: number;
+    seniorId?: string | null;
 }
 
 interface Shift {
@@ -639,9 +640,62 @@ export default function SchedulePage() {
 
         if (over && active.id !== over.id) {
             setEmployees((items) => {
+                const activeEmp = items.find(i => i.id === active.id);
                 const oldIndex = items.findIndex((item) => item.id === active.id);
-                const newIndex = items.findIndex((item) => item.id === over.id);
-                const newArray = arrayMove(items, oldIndex, newIndex);
+                let newIndex = items.findIndex((item) => item.id === over.id);
+
+                if (!activeEmp) return items;
+
+                let newArray = [...items];
+
+                if (activeEmp.role === 'ADMIN' && activeEmp.seniorId) {
+                    // Restrict dragging to within their Senior's group
+                    const groupMembers = items.filter(i => i.id === activeEmp.seniorId || i.seniorId === activeEmp.seniorId);
+                    if (groupMembers.length > 0) {
+                        const groupIndices = groupMembers.map(m => items.findIndex(i => i.id === m.id)).filter(idx => idx !== -1);
+                        const minGroupIdx = Math.min(...groupIndices);
+                        const maxGroupIdx = Math.max(...groupIndices);
+
+                        // Ensure ADMIN doesn't move above the SENIOR (assuming SENIOR is at minGroupIdx)
+                        const seniorIdx = items.findIndex(i => i.id === activeEmp.seniorId);
+                        const lowerBound = seniorIdx !== -1 ? seniorIdx + 1 : minGroupIdx;
+
+                        newIndex = Math.max(lowerBound, Math.min(newIndex, maxGroupIdx));
+                        newArray = arrayMove(items, oldIndex, newIndex);
+                    } else {
+                        newArray = arrayMove(items, oldIndex, newIndex);
+                    }
+                } else if (activeEmp.role === 'SENIOR') {
+                    // Drag the entire group
+                    const subordinates = items.filter(i => i.seniorId === activeEmp.id);
+                    const groupIds = [activeEmp.id, ...subordinates.map(s => s.id)];
+
+                    const itemsWithoutGroup = items.filter(i => !groupIds.includes(i.id));
+                    const overEmp = items[newIndex];
+
+                    let insertIndex = itemsWithoutGroup.findIndex(i => i.id === overEmp.id);
+
+                    if (insertIndex === -1) {
+                        // Dropped inside its own group, just keep structure
+                        return items;
+                    }
+
+                    // If dragged down, place after the overEmp
+                    if (newIndex > oldIndex) {
+                        insertIndex += 1;
+                    }
+
+                    const groupItems = groupIds.map(id => items.find(i => i.id === id)).filter(Boolean) as any[];
+
+                    newArray = [
+                        ...itemsWithoutGroup.slice(0, insertIndex),
+                        ...groupItems,
+                        ...itemsWithoutGroup.slice(insertIndex)
+                    ];
+                } else {
+                    // Independent ADMIN or Manager
+                    newArray = arrayMove(items, oldIndex, newIndex);
+                }
 
                 // Sync with database
                 const updatedEmployees = newArray.map((emp, i) => ({

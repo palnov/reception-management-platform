@@ -18,6 +18,7 @@ interface Employee {
     branch?: string;
     hireDate?: string;
     dismissalDate?: string;
+    seniorId?: string | null;
 }
 
 interface Shift {

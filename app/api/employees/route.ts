@@ -62,7 +62,8 @@ export async function GET(request: Request) {
                 baseSalary: true, // Needed to prevent UI crash
                 hireDate: true,
                 branch: true,
-                dismissalDate: true
+                dismissalDate: true,
+                seniorId: true
             }
         } as any);
 
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
     }
     const body = await request.json();
-    const { name, role, baseSalary, hourlyRate, branch, password, hireDate, dismissalDate } = body;
+    const { name, role, baseSalary, hourlyRate, branch, password, hireDate, dismissalDate, seniorId, subordinateIds } = body;
 
     const lastEmployee = await prisma.employee.findFirst({
         orderBy: { sortOrder: 'desc' },
@@ -96,9 +97,18 @@ export async function POST(request: Request) {
             branch,
             hireDate: hireDate || '',
             dismissalDate: dismissalDate || '',
-            sortOrder: nextOrder
+            sortOrder: nextOrder,
+            seniorId: seniorId || null
         } as any
     });
+
+    // Handle subordinates if role is SENIOR
+    if (role === 'SENIOR' && Array.isArray(subordinateIds)) {
+        await (prisma.employee.updateMany as any)({
+            where: { id: { in: subordinateIds } },
+            data: { seniorId: employee.id }
+        });
+    }
 
     // Automatic Shift Clearing on POST (if dismissed immediately)
     if (dismissalDate) {
@@ -143,7 +153,7 @@ export async function PUT(request: Request) {
         return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
     }
     const body = await request.json();
-    const { id, name, role, baseSalary, hourlyRate, branch, sortOrder, password, hireDate, dismissalDate } = body;
+    const { id, name, role, baseSalary, hourlyRate, branch, sortOrder, password, hireDate, dismissalDate, seniorId, subordinateIds } = body;
 
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
 
@@ -154,7 +164,8 @@ export async function PUT(request: Request) {
         hourlyRate: parseFloat(hourlyRate || 0),
         branch,
         hireDate: hireDate || '',
-        dismissalDate: dismissalDate || ''
+        dismissalDate: dismissalDate || '',
+        seniorId: seniorId || null
     };
 
     if (password !== undefined) {
@@ -169,6 +180,22 @@ export async function PUT(request: Request) {
         where: { id },
         data
     });
+
+    // Handle subordinates if role is SENIOR
+    if (role === 'SENIOR' && Array.isArray(subordinateIds)) {
+        // First disconnect all current subordinates (so we can re-assign or remove)
+        await (prisma.employee.updateMany as any)({
+            where: { seniorId: id } as any,
+            data: { seniorId: null }
+        });
+        // Then assign the ones provided
+        if (subordinateIds.length > 0) {
+            await (prisma.employee.updateMany as any)({
+                where: { id: { in: subordinateIds } },
+                data: { seniorId: id }
+            });
+        }
+    }
 
     // Automatic Shift Clearing on PUT
     if (dismissalDate) {
