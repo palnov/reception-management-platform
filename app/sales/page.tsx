@@ -319,6 +319,24 @@ export default function SalesPage() {
                     </div>
                 </div>
             )}
+
+            {/* Floating scroll buttons */}
+            <div className="fixed bottom-8 right-8 flex flex-col gap-3 z-50">
+                <button
+                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    className="p-3 bg-white border border-zinc-200 shadow-xl rounded-full hover:bg-zinc-50 transition-all text-zinc-500 hover:text-blue-600 active:scale-95"
+                    title="Вверх"
+                >
+                    <ArrowUp className="w-6 h-6" />
+                </button>
+                <button
+                    onClick={() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })}
+                    className="p-3 bg-white border border-zinc-200 shadow-xl rounded-full hover:bg-zinc-50 transition-all text-zinc-500 hover:text-blue-600 active:scale-95"
+                    title="Вниз"
+                >
+                    <ArrowDown className="w-6 h-6" />
+                </button>
+            </div>
         </div>
     );
 }
