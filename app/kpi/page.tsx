@@ -475,7 +475,7 @@ export default function KpiPage() {
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Качество заполнения карточек первичных пациентов">Качество</Tooltip>
                             </th>
-                            <th className="sticky top-0 right-0 z-30 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7, inset 1px 0 0 #e4e4e7, -2px 0 10px -2px rgba(0,0,0,0.1)' }}>Итого</th>
+                            <th className="sticky top-0 right-0 z-30 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7, inset 1px 0 0 #e4e4e7, -2px 0 10px -2px rgba(0,0,0,0.1)' }}>Итого</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
@@ -746,7 +746,7 @@ export default function KpiPage() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="sticky right-0 z-10 bg-zinc-50 group-hover:bg-zinc-100 transition-colors px-4 py-3 text-right font-bold text-zinc-900" style={{ boxShadow: 'inset 1px 0 0 #f4f4f5, -2px 0 10px -2px rgba(0,0,0,0.1)' }}>
+                                        <td className="sticky right-0 z-10 bg-zinc-50 group-hover:bg-zinc-100 transition-colors px-4 py-3 text-right font-bold text-zinc-900 whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 1px 0 0 #f4f4f5, -2px 0 10px -2px rgba(0,0,0,0.1)' }}>
                                             {calc.totalPay.toFixed(0)} ₽
                                         </td>
                                     </tr>
