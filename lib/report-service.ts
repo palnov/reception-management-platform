@@ -305,6 +305,7 @@ export class ReportService {
                 { header: 'Оклад', key: 'base', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Часы', key: 'hours', width: 12, style: { ...cellStyle, numFmt: '0.0' } },
                 { header: 'Смены (Руб)', key: 'shiftPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'Работа в вых.', key: 'dayOffPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Откр/Закр', key: 'closing', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'ИО', key: 'actingLead', width: 12, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
@@ -355,6 +356,7 @@ export class ReportService {
 
                 let hoursWorked = 0;
                 let shiftPay = 0;
+                let dayOffPayTotal = 0;
                 let closingBonuses = 0;
                 let actingLeadBonus = 0;
                 const hourlyBase = emp.baseSalary / monthNorm;
@@ -364,11 +366,11 @@ export class ReportService {
                         hoursWorked += s.hours;
                         shiftPay += hourlyBase * s.hours * s.coefficient;
                     } else if (s.type === 'DAY_OFF_WORK') {
-                        shiftPay += (3500 / 11) * s.hours;
+                        dayOffPayTotal += (3500 / 11) * s.hours;
                     }
                     if (s.cabinetClosed) closingBonuses += 250;
                     if (s.centerClosed) closingBonuses += 500;
-                    if ((s as any).isActingLead) actingLeadBonus += 250;
+                    if (s.isActingLead) actingLeadBonus += 250;
                 });
 
                 const salesBonus = empLegacyKpi.reduce((sum, k) => sum + k.salesBonus, 0) +
@@ -378,12 +380,13 @@ export class ReportService {
                 const getIndividualQuality = (e: any) => {
                     const empRegs = allRegs.filter(r => r.employeeId === e.id);
                     const empLegacyKpi = allKpi.filter(k => k.employeeId === e.id);
-                    const regCount = empRegs.length;
 
-                    if (regCount > 0) {
-                        return (empRegs.reduce((sum, r) => sum + (r.totalScore / r.maxScore), 0) / regCount);
+                    if (empRegs.length > 0) {
+                        const totalScore = empRegs.reduce((sum, r) => sum + r.totalScore, 0);
+                        const totalMax = empRegs.reduce((sum, r) => sum + (r.maxScore || (r.count * 3) || 1), 0);
+                        return totalMax > 0 ? (totalScore / totalMax) : 1;
                     } else if (empLegacyKpi.length > 0) {
-                        return empLegacyKpi.reduce((sum, k) => sum + k.qualityScore, 0) / empLegacyKpi.length / 100;
+                        return (empLegacyKpi.reduce((sum, k) => sum + k.qualityScore, 0) / empLegacyKpi.length) / 100;
                     } else {
                         return 1; // Default 100%
                     }
@@ -393,7 +396,7 @@ export class ReportService {
                 let finalQuality = ownQuality;
 
                 if (emp.role === 'SENIOR') {
-                    const subordinates = employees.filter(e => (e as any).seniorId === emp.id);
+                    const subordinates = allActiveEmployees.filter(e => e.seniorId === emp.id);
                     if (subordinates.length > 0) {
                         const subordinateQualities = subordinates.map(sub => getIndividualQuality(sub));
                         const allQualities = [ownQuality, ...subordinateQualities];
@@ -445,13 +448,14 @@ export class ReportService {
                 else if (seniorityYears >= 1) seniorityBonus = Math.round(baseSalary * 0.03);
 
                 const actualClosingBonuses = emp.role === 'SENIOR' ? manualClosingBonus : closingBonuses;
-                const total = Math.round(shiftPay + actualClosingBonuses + actingLeadBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + certificatesBonus);
+                const total = Math.round(shiftPay + dayOffPayTotal + actualClosingBonuses + actingLeadBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + certificatesBonus);
 
                 sheet.addRow({
                     name: emp.name,
                     base: emp.baseSalary,
                     hours: hoursWorked,
                     shiftPay: Math.round(shiftPay),
+                    dayOffPay: Math.round(dayOffPayTotal),
                     closing: actualClosingBonuses,
                     actingLead: actingLeadBonus,
                     sales: salesBonus,
