@@ -324,12 +324,25 @@ export class ReportService {
                 where: { date: dateFilter, isDeleted: false, ...(employeeId ? { employeeId } : {}) }
             });
             const allSales = await prisma.promotionSale.findMany({ where: { date: dateFilter, employeeId: employeeId || undefined } });
-            const allKpi = await prisma.kpiRecord.findMany({ where: { date: dateFilter, employeeId: employeeId || undefined } });
-            const allRegs = await prisma.registrationKpi.findMany({ where: { date: dateFilter, employeeId: employeeId || undefined } });
+
+            // For registrations and KPI records, we need ALL of them to calculate team averages for Seniors
+            const allKpi = await prisma.kpiRecord.findMany({ where: { date: dateFilter } });
+            const allRegs = await prisma.registrationKpi.findMany({ where: { date: dateFilter } });
+
+            // We also need ALL active employees for finding subordinates
+            const allActiveEmployees = await prisma.employee.findMany({
+                where: {
+                    role: { not: 'MANAGER' },
+                    OR: [
+                        { dismissalDate: "" },
+                        { dismissalDate: { gte: format(startDate, 'yyyy-MM-dd') } }
+                    ]
+                }
+            });
 
             // Fetch monthly checklists
             const allChecklists = await prisma.monthlyChecklist.findMany({
-                where: { month: monthStr, ...(employeeId ? { employeeId } : {}) }
+                where: { month: monthStr }
             });
 
             for (const emp of employees) {
@@ -361,18 +374,35 @@ export class ReportService {
                 const salesBonus = empLegacyKpi.reduce((sum, k) => sum + k.salesBonus, 0) +
                     empSales.reduce((sum, s) => sum + s.bonus, 0);
 
-                const regCount = empRegs.length;
-                let avgQuality = 0;
-                if (regCount > 0) {
-                    avgQuality = (empRegs.reduce((sum, r) => sum + (r.totalScore / r.maxScore), 0) / regCount);
-                } else if (empLegacyKpi.length > 0) {
-                    avgQuality = empLegacyKpi.reduce((sum, k) => sum + k.qualityScore, 0) / empLegacyKpi.length / 100;
-                } else {
-                    avgQuality = 1; // Default 100%
+                // New quality calculation logic for report service
+                const getIndividualQuality = (e: any) => {
+                    const empRegs = allRegs.filter(r => r.employeeId === e.id);
+                    const empLegacyKpi = allKpi.filter(k => k.employeeId === e.id);
+                    const regCount = empRegs.length;
+
+                    if (regCount > 0) {
+                        return (empRegs.reduce((sum, r) => sum + (r.totalScore / r.maxScore), 0) / regCount);
+                    } else if (empLegacyKpi.length > 0) {
+                        return empLegacyKpi.reduce((sum, k) => sum + k.qualityScore, 0) / empLegacyKpi.length / 100;
+                    } else {
+                        return 1; // Default 100%
+                    }
+                };
+
+                const ownQuality = getIndividualQuality(emp);
+                let finalQuality = ownQuality;
+
+                if (emp.role === 'SENIOR') {
+                    const subordinates = employees.filter(e => (e as any).seniorId === emp.id);
+                    if (subordinates.length > 0) {
+                        const subordinateQualities = subordinates.map(sub => getIndividualQuality(sub));
+                        const allQualities = [ownQuality, ...subordinateQualities];
+                        finalQuality = allQualities.reduce((sum, q) => sum + q, 0) / allQualities.length;
+                    }
                 }
 
-                // Get checklist from monthly checklist table (single value per month)
-                const empChecklist = allChecklists.find(c => c.employeeId === emp.id);
+                // Restore missing checklist/manual bonus variables
+                const empChecklist = allChecklists.find(c => c.employeeId === emp.id) as any;
                 const calcChecklist = empChecklist ? empChecklist.percentage / 100 : 0;
                 const sickLeaveOpening = empChecklist ? (empChecklist.sickLeaveOpening || 0) : 0;
                 const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
@@ -384,8 +414,8 @@ export class ReportService {
                 const cardBonus = cardCreation * 60;
 
                 let kpiBonus = 0;
-                if (avgQuality >= 0.95) kpiBonus = 5000;
-                else if (avgQuality >= 0.85) kpiBonus = 2500;
+                if (finalQuality >= 0.95) kpiBonus = 5000;
+                else if (finalQuality >= 0.85) kpiBonus = 2500;
 
                 let checklistBonus = 0;
                 if (calcChecklist >= 0.90) checklistBonus = 5000;
@@ -432,7 +462,7 @@ export class ReportService {
                     seniority: seniorityBonus,
                     checklist_pct: calcChecklist,
                     checklist_rub: checklistBonus,
-                    quality: avgQuality,
+                    quality: finalQuality,
                     kpi: kpiBonus,
                     total: total
                 });

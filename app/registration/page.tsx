@@ -43,28 +43,31 @@ export default function RegistrationPage() {
     };
     const [formData, setFormData] = useState(initialForm);
 
-    useEffect(() => {
-        fetchEmployees();
-    }, [currentMonth]);
-
-    useEffect(() => {
-        fetchRecords();
-    }, [currentMonth]);
-
-    async function fetchEmployees() {
+    const fetchEmployees = async (ignore = { val: false }) => {
         const monthStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
         const res = await fetch(`/api/employees?activeInDate=${monthStr}`);
         const data = await res.json();
-        setEmployees(Array.isArray(data) ? data : []);
-    }
+        if (!ignore.val) {
+            setEmployees(Array.isArray(data) ? data : []);
+        }
+    };
 
-    async function fetchRecords() {
-        const start = startOfMonth(currentMonth).toISOString();
-        const end = endOfMonth(currentMonth).toISOString();
-        const res = await fetch(`/api/registration?start=${start}&end=${end}`);
+    const fetchRecords = async (ignore = { val: false }) => {
+        const startStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+        const endStr = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
+        const res = await fetch(`/api/registration?start=${startStr}&end=${endStr}`);
         const data = await res.json();
-        setRecords(Array.isArray(data) ? data : []);
-    }
+        if (!ignore.val) {
+            setRecords(Array.isArray(data) ? data : []);
+        }
+    };
+
+    useEffect(() => {
+        const ignore = { val: false };
+        fetchEmployees(ignore);
+        fetchRecords(ignore);
+        return () => { ignore.val = true; };
+    }, [currentMonth]);
 
     async function handleSave(e: React.FormEvent) {
         e.preventDefault();

@@ -97,10 +97,21 @@ export async function POST(request: Request) {
                             hourlyRate: Number(emp.hourlyRate ?? 0),
                             branch: emp.branch,
                             hireDate: emp.hireDate || '',
+                            dismissalDate: emp.dismissalDate || '',
                             sortOrder: Number(emp.sortOrder ?? 0),
                             createdAt: emp.createdAt || ''
                         }
                     });
+                }
+
+                // 2.1 Second Pass for SeniorId (to avoid foreign key issues)
+                for (const emp of backup.employees) {
+                    if (emp.seniorId) {
+                        await tx.employee.update({
+                            where: { id: emp.id },
+                            data: { seniorId: emp.seniorId }
+                        });
+                    }
                 }
             }
 
@@ -212,6 +223,8 @@ export async function POST(request: Request) {
                             sickLeaveOpening: Number(m.sickLeaveOpening ?? 0),
                             sickLeaveClosing: Number(m.sickLeaveClosing ?? 0),
                             cardCreation: Number(m.cardCreation ?? 0),
+                            closingBonus: Number(m.closingBonus ?? 0),
+                            certificates: Number(m.certificates ?? 0),
                             createdAt: m.createdAt || '',
                             updatedAt: m.updatedAt || '',
                             updatedBy: m.updatedBy || ''

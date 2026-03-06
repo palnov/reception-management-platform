@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { startOfMonth } from 'date-fns';
 
 const STORAGE_KEY = 'shared_selected_month';
 
@@ -12,21 +13,28 @@ function getStoredMonth(): Date {
             const parsed = new Date(stored);
             if (!isNaN(parsed.getTime())) return parsed;
         }
-    } catch {}
+    } catch { }
     return new Date();
 }
 
 function storeMonth(date: Date) {
     try {
         localStorage.setItem(STORAGE_KEY, date.toISOString());
-    } catch {}
+    } catch { }
 }
 
 export function useSharedMonth(): [Date, (date: Date) => void] {
-    const [currentMonth, setCurrentMonthState] = useState<Date>(getStoredMonth);
+    // Start with current date normalized to start of month to avoid hydration mismatch
+    // and time-of-day issues.
+    const [currentMonth, setCurrentMonthState] = useState<Date>(() => startOfMonth(new Date()));
 
-    // Listen for changes from other tabs/pages
+    // Sync with localStorage on mount and listen for changes
     useEffect(() => {
+        const stored = getStoredMonth();
+        // Since getStoredMonth() returns new Date() when empty, only update if it's different
+        // or just always update to be sure we have the latest from storage
+        setCurrentMonthState(stored);
+
         const handleStorage = (e: StorageEvent) => {
             if (e.key === STORAGE_KEY && e.newValue) {
                 const parsed = new Date(e.newValue);

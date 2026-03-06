@@ -46,28 +46,31 @@ export default function SalesPage() {
     };
     const [formData, setFormData] = useState(initialForm);
 
-    useEffect(() => {
-        fetchEmployees();
-    }, [currentMonth]);
-
-    useEffect(() => {
-        fetchSales();
-    }, [currentMonth]);
-
-    async function fetchEmployees() {
+    const fetchEmployees = async (ignore = { val: false }) => {
         const monthStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
         const res = await fetch(`/api/employees?activeInDate=${monthStr}`);
         const data = await res.json();
-        setEmployees(Array.isArray(data) ? data : []);
-    }
+        if (!ignore.val) {
+            setEmployees(Array.isArray(data) ? data : []);
+        }
+    };
 
-    async function fetchSales() {
-        const start = startOfMonth(currentMonth).toISOString();
-        const end = endOfMonth(currentMonth).toISOString();
+    const fetchSales = async (ignore = { val: false }) => {
+        const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+        const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
         const res = await fetch(`/api/sales?start=${start}&end=${end}`);
         const data = await res.json();
-        setSales(Array.isArray(data) ? data : []);
-    }
+        if (!ignore.val) {
+            setSales(Array.isArray(data) ? data : []);
+        }
+    };
+
+    useEffect(() => {
+        const ignore = { val: false };
+        fetchEmployees(ignore);
+        fetchSales(ignore);
+        return () => { ignore.val = true; };
+    }, [currentMonth]);
 
     async function handleSave(e: React.FormEvent) {
         e.preventDefault();

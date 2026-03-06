@@ -100,9 +100,11 @@ export default function KpiPage() {
     }, []);
 
     useEffect(() => {
-        fetchEmployees();
-        fetchData();
-        fetchNorm();
+        const controller = new AbortController();
+        fetchEmployees(controller.signal);
+        fetchData(controller.signal);
+        fetchNorm(controller.signal);
+        return () => controller.abort();
     }, [currentMonth]);
 
     async function fetchCurrentUser() {
@@ -119,33 +121,35 @@ export default function KpiPage() {
         }
     }
 
-    async function fetchEmployees() {
+    async function fetchEmployees(signal?: AbortSignal) {
         try {
             const monthStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-            const res = await fetch(`/api/employees?activeInDate=${monthStr}`);
+            const res = await fetch(`/api/employees?activeInDate=${monthStr}`, { signal });
             if (res.status === 401) {
                 window.location.href = '/login';
                 return;
             }
-            const data = await res.json();
-            const list = Array.isArray(data) ? data : [];
-            setEmployees(list.filter(e => e.role !== 'MANAGER'));
-        } catch (e) {
-            console.error('FETCH_EMPLOYEES_ERROR:', e);
+            if (res.ok) {
+                const data = await res.json();
+                const list = Array.isArray(data) ? data : [];
+                setEmployees(list.filter(e => e.role !== 'MANAGER'));
+            }
+        } catch (e: any) {
+            if (e.name !== 'AbortError') console.error('FETCH_EMPLOYEES_ERROR:', e);
         }
     }
 
-    async function fetchData() {
+    async function fetchData(signal?: AbortSignal) {
         try {
             const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
             const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
 
             const [shiftsRes, kpiRes, salesRes, regRes, checklistRes] = await Promise.all([
-                fetch(`/api/shifts?start=${start}&end=${end}&includeDetails=true`),
-                fetch(`/api/kpi?start=${start}&end=${end}&includeDetails=true`),
-                fetch(`/api/sales?start=${start}&end=${end}&includeDetails=true`),
-                fetch(`/api/registration?start=${start}&end=${end}&includeDetails=true`),
-                fetch(`/api/checklist?month=${currentMonth.toISOString().substring(0, 7)}`)
+                fetch(`/api/shifts?start=${start}&end=${end}&includeDetails=true`, { signal }),
+                fetch(`/api/kpi?start=${start}&end=${end}&includeDetails=true`, { signal }),
+                fetch(`/api/sales?start=${start}&end=${end}&includeDetails=true`, { signal }),
+                fetch(`/api/registration?start=${start}&end=${end}&includeDetails=true`, { signal }),
+                fetch(`/api/checklist?month=${currentMonth.toISOString().substring(0, 7)}`, { signal })
             ]);
 
             const shiftsData = await shiftsRes.json();
@@ -159,18 +163,22 @@ export default function KpiPage() {
             setPromotionSales(Array.isArray(salesData) ? salesData : []);
             setRegistrationKpis(Array.isArray(regData) ? regData : []);
             setMonthlyChecklists(Array.isArray(checklistData) ? checklistData : []);
-        } catch (e) {
-            console.error('KPI_FETCH_DATA_ERROR:', e);
+        } catch (e: any) {
+            if (e.name !== 'AbortError') console.error('KPI_FETCH_DATA_ERROR:', e);
         }
     }
 
-    async function fetchNorm() {
+    async function fetchNorm(signal?: AbortSignal) {
         try {
             const m = format(currentMonth, 'yyyy-MM');
-            const res = await fetch(`/api/norms?month=${m}`);
-            const data = await res.json();
-            setMonthNorm(data?.hours || 176);
-        } catch (e) { console.error('KPI_FETCH_NORM_ERROR:', e); }
+            const res = await fetch(`/api/norms?month=${m}`, { signal });
+            if (res.ok) {
+                const data = await res.json();
+                setMonthNorm(data?.hours || 176);
+            }
+        } catch (e: any) {
+            if (e.name !== 'AbortError') console.error('KPI_FETCH_NORM_ERROR:', e);
+        }
     }
 
     function handleRowClick(empId: string) {
@@ -261,44 +269,6 @@ export default function KpiPage() {
             const salesBonus = Math.round(empKpis.reduce((sum, k) => sum + k.salesBonus, 0) +
                 empSales.reduce((sum, s) => sum + s.bonus, 0));
 
-            // Combine registration quality audits
-            // Combine registration quality audits
-            const regCount = empRegs.length;
-            let regQuality = 100;
-            if (regCount > 0) {
-                const totalObtained = empRegs.reduce((sum, r) => sum + r.totalScore, 0);
-                const totalMax = empRegs.reduce((sum, r) => sum + (r.maxScore || (r.count * 3) || 1), 0);
-                regQuality = totalMax > 0 ? (totalObtained / totalMax) * 100 : 100;
-            }
-
-            // Legacy quality score for backward compatibility if needed, but prioritize new audit
-            const legacyQuality = empKpis.length > 0
-                ? empKpis.reduce((sum, k) => sum + k.qualityScore, 0) / empKpis.length
-                : 100;
-
-            const avgQuality = regCount > 0 ? regQuality : legacyQuality;
-
-            // Get checklist from monthly checklist table (single value per month)
-            const monthStr = currentMonth.toISOString().substring(0, 7);
-            const empChecklist = monthlyChecklists.find(c => c.employeeId === enrichedEmp.id && c.month === monthStr);
-            const calcChecklist = empChecklist ? empChecklist.percentage : 0;
-            const sickLeaveOpening = empChecklist ? (empChecklist.sickLeaveOpening || 0) : 0;
-            const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
-            const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
-            const manualClosingBonus = empChecklist ? (empChecklist.closingBonus || 0) : 0;
-            const certificatesBonus = empChecklist ? (empChecklist.certificates || 0) : 0;
-
-            const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
-            const cardBonus = cardCreation * 60;
-
-            let qualityBonus = 0;
-            if (avgQuality >= 95) qualityBonus = 5000;
-            else if (avgQuality >= 85) qualityBonus = 2500;
-
-            let checklistBonus = 0;
-            if (calcChecklist >= 90) checklistBonus = 5000;
-            else if (calcChecklist >= 76) checklistBonus = 2500;
-
             // Seniority (Выслуга)
             const hireDateParsed = enrichedEmp.hireDate ? new Date(enrichedEmp.hireDate) : null;
             const dismissalDateParsed = enrichedEmp.dismissalDate ? new Date(enrichedEmp.dismissalDate) : null;
@@ -318,6 +288,72 @@ export default function KpiPage() {
             if (seniorityYears >= 3) seniorityBonus = Math.round(baseSalary * 0.10);
             else if (seniorityYears >= 2) seniorityBonus = Math.round(baseSalary * 0.07);
             else if (seniorityYears >= 1) seniorityBonus = Math.round(baseSalary * 0.03);
+
+            // Get checklist from monthly checklist table (single value per month)
+            const monthStr = currentMonth.toISOString().substring(0, 7);
+            const empChecklist = monthlyChecklists.find(c => c.employeeId === enrichedEmp.id && c.month === monthStr);
+            const calcChecklist = empChecklist ? empChecklist.percentage : 0;
+            const sickLeaveOpening = empChecklist ? (empChecklist.sickLeaveOpening || 0) : 0;
+            const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
+            const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
+            const manualClosingBonus = empChecklist ? (empChecklist.closingBonus || 0) : 0;
+            const certificatesBonus = empChecklist ? (empChecklist.certificates || 0) : 0;
+
+            const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
+            const cardBonus = cardCreation * 60;
+
+            let checklistBonus = 0;
+            if (calcChecklist >= 90) checklistBonus = 5000;
+            else if (calcChecklist >= 76) checklistBonus = 2500;
+
+            // New quality calculation logic
+            const getIndividualQuality = (eId: string) => {
+                const empKpis = kpiRecords.filter(k => k.employeeId === eId);
+                const empRegs = registrationKpis.filter(r => r.employeeId === eId);
+                const regCount = empRegs.length;
+
+                if (regCount > 0) {
+                    const totalObtained = empRegs.reduce((sum, r) => sum + r.totalScore, 0);
+                    const totalMax = empRegs.reduce((sum, r) => sum + (r.maxScore || (r.count * 3) || 1), 0);
+                    return totalMax > 0 ? (totalObtained / totalMax) * 100 : 100;
+                }
+                const legacyQuality = empKpis.length > 0
+                    ? empKpis.reduce((sum, k) => sum + k.qualityScore, 0) / empKpis.length
+                    : 100;
+                return legacyQuality;
+            };
+
+            const ownQuality = getIndividualQuality(enrichedEmp.id);
+            let finalQuality = ownQuality;
+            let qualityBreakdown = "";
+
+            if (enrichedEmp.role === 'SENIOR') {
+                const subordinates = employees.filter(e => e.seniorId === enrichedEmp.id);
+
+                // Build breakdown lines - always include own score for seniors
+                const lines = [`Собственное: ${ownQuality.toFixed(1)}%`];
+
+                if (subordinates.length > 0) {
+                    const subordinateQualities = subordinates.map(sub => ({
+                        name: sub.name,
+                        score: getIndividualQuality(sub.id)
+                    }));
+                    const allQualities = [ownQuality, ...subordinateQualities.map(s => s.score)];
+                    finalQuality = allQualities.reduce((sum, q) => sum + q, 0) / allQualities.length;
+
+                    subordinateQualities.forEach(s => {
+                        lines.push(`${s.name}: ${s.score.toFixed(1)}%`);
+                    });
+                    lines.push(`─────────────`);
+                    lines.push(`Среднее: ${finalQuality.toFixed(1)}%`);
+                }
+
+                qualityBreakdown = lines.join('\n');
+            }
+
+            let qualityBonus = 0;
+            if (finalQuality >= 95) qualityBonus = 5000;
+            else if (finalQuality >= 85) qualityBonus = 2500;
 
             const actualClosingBonuses = enrichedEmp.role === 'SENIOR' ? manualClosingBonus : closingBonuses;
             const totalPay = basePay + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + actingLeadBonus + certificatesBonus;
@@ -356,7 +392,8 @@ export default function KpiPage() {
                 cardBonus,
                 calcChecklist,
                 checklistBonus,
-                avgQuality,
+                avgQuality: finalQuality,
+                qualityBreakdown,
                 qualityBonus,
                 seniorityYears,
                 seniorityBonus,
@@ -661,7 +698,17 @@ export default function KpiPage() {
                                         </td>
                                         <td className="px-4 py-3 text-right text-zinc-600">
                                             {calc.qualityBonus > 0 && <span className="text-green-600 font-medium">+{calc.qualityBonus}</span>}
-                                            <div className="text-[10px] text-zinc-400">{calc.avgQuality.toFixed(1)}%</div>
+                                            <div className="text-[10px] text-zinc-400">
+                                                {calc.qualityBreakdown ? (
+                                                    <Tooltip content={calc.qualityBreakdown}>
+                                                        <span className="cursor-help border-b border-dotted border-zinc-300">
+                                                            {calc.avgQuality.toFixed(1)}%
+                                                        </span>
+                                                    </Tooltip>
+                                                ) : (
+                                                    <>{calc.avgQuality.toFixed(1)}%</>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="sticky right-0 z-10 bg-zinc-50 group-hover:bg-zinc-100 transition-colors px-4 py-3 text-right font-bold text-zinc-900" style={{ boxShadow: 'inset 1px 0 0 #f4f4f5, -2px 0 10px -2px rgba(0,0,0,0.1)' }}>
                                             {calc.totalPay.toFixed(0)} ₽
