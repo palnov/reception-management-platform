@@ -292,7 +292,7 @@ export default function KpiPage() {
             // Get checklist from monthly checklist table (single value per month)
             const monthStr = currentMonth.toISOString().substring(0, 7);
             const empChecklist = monthlyChecklists.find(c => c.employeeId === enrichedEmp.id && c.month === monthStr);
-            const calcChecklist = empChecklist ? empChecklist.percentage : 0;
+            const ownChecklist = empChecklist ? empChecklist.percentage : 0;
             const sickLeaveOpening = empChecklist ? (empChecklist.sickLeaveOpening || 0) : 0;
             const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
             const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
@@ -301,6 +301,32 @@ export default function KpiPage() {
 
             const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
             const cardBonus = cardCreation * 60;
+
+            // Calculate averaged checklist for seniors
+            let calcChecklist = ownChecklist;
+            let checklistBreakdown = "";
+
+            if (enrichedEmp.role === 'SENIOR') {
+                const subordinatesList = employees.filter(e => e.seniorId === enrichedEmp.id);
+                const lines = [`Собственное: ${ownChecklist.toFixed(1)}%`];
+
+                if (subordinatesList.length > 0) {
+                    const subChecklists = subordinatesList.map(sub => {
+                        const subCl = monthlyChecklists.find(c => c.employeeId === sub.id && c.month === monthStr);
+                        return { name: sub.name, score: subCl ? subCl.percentage : 0 };
+                    });
+                    const allScores = [ownChecklist, ...subChecklists.map(s => s.score)];
+                    calcChecklist = allScores.reduce((sum, s) => sum + s, 0) / allScores.length;
+
+                    subChecklists.forEach(s => {
+                        lines.push(`${s.name}: ${s.score.toFixed(1)}%`);
+                    });
+                    lines.push(`─────────────`);
+                    lines.push(`Среднее: ${calcChecklist.toFixed(1)}%`);
+                }
+
+                checklistBreakdown = lines.join('\n');
+            }
 
             let checklistBonus = 0;
             if (calcChecklist >= 90) checklistBonus = 5000;
@@ -391,6 +417,8 @@ export default function KpiPage() {
                 cardCreation,
                 cardBonus,
                 calcChecklist,
+                ownChecklist,
+                checklistBreakdown,
                 checklistBonus,
                 avgQuality: finalQuality,
                 qualityBreakdown,
@@ -688,10 +716,18 @@ export default function KpiPage() {
                                                         className="text-[10px] text-zinc-400 cursor-pointer hover:text-blue-600 transition-colors"
                                                         onClick={() => {
                                                             setEditingCell({ empId: calc.empId, field: 'percentage' });
-                                                            setTempValue(calc.calcChecklist === 0 ? '' : calc.calcChecklist.toFixed(0));
+                                                            setTempValue((calc.ownChecklist ?? calc.calcChecklist) === 0 ? '' : (calc.ownChecklist ?? calc.calcChecklist).toFixed(0));
                                                         }}
                                                     >
-                                                        {calc.calcChecklist.toFixed(0)}%
+                                                        {calc.checklistBreakdown ? (
+                                                            <Tooltip content={calc.checklistBreakdown}>
+                                                                <span className="cursor-help border-b border-dotted border-zinc-300">
+                                                                    {calc.calcChecklist.toFixed(1)}%
+                                                                </span>
+                                                            </Tooltip>
+                                                        ) : (
+                                                            <>{calc.calcChecklist.toFixed(0)}%</>
+                                                        )}
                                                     </div>
                                                 </>
                                             )}
