@@ -447,35 +447,35 @@ export default function KpiPage() {
                 <table className="w-full text-left text-sm">
                     <thead className="bg-zinc-50">
                         <tr>
-                            <th className="sticky top-0 left-0 z-30 bg-zinc-50 px-4 py-3 font-medium text-zinc-500" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7, inset -1px 0 0 #e4e4e7, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>Сотрудник</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Часы</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Оклад</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Работа в вых..</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                            <th className="sticky top-0 left-0 z-30 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 whitespace-nowrap min-w-[200px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7, inset -1px 0 0 #e4e4e7, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>Сотрудник</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[70px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Часы</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[80px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Оклад</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[130px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Работа в вых.</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за открытие, закрытие центра и за закрытие кабинетов">Откр/Закр.</Tooltip>
                             </th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[60px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за исполнение обязанностей старшей смены">ИО</Tooltip>
                             </th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата старшим смены за справки">Справки</Tooltip>
                             </th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Продажи</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Продажи</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за открытие больничных листов">Откр. Б/Л</Tooltip>
                             </th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center whitespace-nowrap min-w-[140px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за продление и закрытие больничных листов">Закр/Продл Б/Л</Tooltip>
                             </th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за создание карточек пациентов">Карточки</Tooltip>
                             </th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Выслуга</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Чеклист</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Выслуга</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Чеклист</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Качество заполнения карточек первичных пациентов">Качество</Tooltip>
                             </th>
-                            <th className="sticky top-0 right-0 z-30 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7, inset 1px 0 0 #e4e4e7, -2px 0 10px -2px rgba(0,0,0,0.1)' }}>Итого</th>
+                            <th className="sticky top-0 right-0 z-30 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7, inset 1px 0 0 #e4e4e7, -2px 0 10px -2px rgba(0,0,0,0.1)' }}>Итого</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
