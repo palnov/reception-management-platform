@@ -1300,9 +1300,9 @@ export default function SchedulePage() {
                                                 ${isWeekend ? 'bg-[#fef1f1] text-red-700' : 'bg-[#fafafa] text-zinc-700'}
                                                 ${day.getDay() === 6 ? 'border-l-2 border-zinc-400' : ''}
                                                 ${day.getDay() === 0 ? 'border-r-2 border-zinc-400' : ''}
-                                                ${isToday ? 'ring-2 ring-inset ring-blue-500 bg-[#eff6ff] !text-blue-700' : ''}
+                                                ${isToday ? 'bg-[#eff6ff] !text-blue-700' : ''}
                                             `}
-                                            style={{ boxShadow: 'inset 0 -2px 0 #d4d4d8' }}
+                                            style={{ boxShadow: isToday ? 'inset 0 0 0 2px #3b82f6, inset 0 -2px 0 #d4d4d8' : 'inset 0 -2px 0 #d4d4d8' }}
                                         >
                                             <div className="font-bold text-xs">{format(day, 'd')}</div>
                                             <div className="text-[9px] uppercase font-bold opacity-70">{format(day, 'EEEEEE', { locale: ru })}</div>
