@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Users, Calendar, BarChart3, ShoppingCart, FileCheck, LogOut, User as UserIcon, Database } from 'lucide-react';
+import { APP_NAME } from '@/lib/constants';
 
 interface User {
     id: string;
@@ -47,7 +48,7 @@ export function Navbar() {
     return (
         <nav className="flex items-center justify-between px-6 py-4 bg-white border-b border-zinc-200 shadow-sm sticky top-0 z-50">
             <Link href="/" className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text">
-                Администраторы ДМЦ
+                {APP_NAME}
             </Link>
 
             <div className="flex gap-6 text-sm font-medium text-zinc-600 ml-8">

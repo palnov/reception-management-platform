@@ -1,13 +1,14 @@
 
 import Link from 'next/link';
 import { Calendar, Users, BarChart3, ArrowRight } from 'lucide-react';
+import { APP_NAME } from '@/lib/constants';
 
 export default function Home() {
   return (
     <div className="max-w-5xl mx-auto">
       <div className="text-center mb-12 py-10">
         <h1 className="text-4xl font-extrabold text-zinc-900 mb-4 tracking-tight">
-          Добро пожаловать в <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Администраторы ДМЦ</span>
+          Добро пожаловать в <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">{APP_NAME}</span>
         </h1>
         <p className="text-lg text-zinc-500 max-w-2xl mx-auto">
           Управляйте графиком сотрудников, отслеживайте KPI и автоматически рассчитывайте зарплату в одной системе.

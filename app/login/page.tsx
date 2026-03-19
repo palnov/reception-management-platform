@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock, User, AlertCircle } from 'lucide-react';
+import { APP_NAME } from '@/lib/constants';
 
 interface Employee {
     id: string;
@@ -60,7 +61,7 @@ export default function LoginPage() {
                             <Lock className="w-8 h-8" />
                         </div>
                         <h1 className="text-2xl font-bold text-zinc-900">Вход в систему</h1>
-                        <p className="text-zinc-500 mt-2">Администраторы ДМЦ</p>
+                        <p className="text-zinc-500 mt-2">{APP_NAME}</p>
                     </div>
 
                     <form onSubmit={handleLogin} className="space-y-6">
