@@ -2,11 +2,12 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Navbar } from '@/components/Navbar';
+import { APP_NAME } from '@/lib/constants';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Администраторы ДМЦ',
+  title: APP_NAME,
   description: 'Система управления персоналом',
 };
 
