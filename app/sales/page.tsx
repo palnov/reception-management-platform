@@ -143,7 +143,7 @@ export default function SalesPage() {
                     if (hasSales) return true;
 
                     const today = new Date().toISOString().split('T')[0];
-                    return !e.seniorId && (!e.dismissalDate || e.dismissalDate > today);
+                    return (!e.dismissalDate || e.dismissalDate > today);
                 }).map(emp => (
                     <button
                         key={emp.id}
