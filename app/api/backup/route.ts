@@ -211,7 +211,6 @@ export async function POST(request: Request) {
                             sickLeaveClosing: Number(m.sickLeaveClosing ?? 0),
                             cardCreation: Number(m.cardCreation ?? 0),
                             closingBonus: Number(m.closingBonus ?? 0),
-                            certificates: Number(m.certificates ?? 0),
                             createdAt: m.createdAt || '',
                             updatedAt: m.updatedAt || '',
                             updatedBy: m.updatedBy || ''
