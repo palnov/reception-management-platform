@@ -30,8 +30,7 @@ try {
   }
 
   if (!neonUrl) {
-    console.error('❌ Ошибка: NEON_DATABASE_URL не найден в .env. Пожалуйста, добавьте его: NEON_DATABASE_URL="postgres://..."');
-    process.exit(1);
+    throw new Error('NEON_DATABASE_URL не найден в .env. Пожалуйста, добавьте его: NEON_DATABASE_URL="postgres://..."');
   }
 
   const env = { ...process.env, DATABASE_URL: neonUrl };
