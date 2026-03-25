@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const json = await req.json();
-        const { month, employeeId, percentage, sickLeaveOpening, sickLeaveClosing, cardCreation, closingBonus, certificates, updatedBy } = json;
+        const { month, employeeId, percentage, sickLeaveOpening, sickLeaveClosing, cardCreation, closingBonus, updatedBy } = json;
 
         if (!month || !employeeId) {
             return NextResponse.json(
@@ -57,7 +57,6 @@ export async function POST(req: NextRequest) {
                 ...(sickLeaveClosing !== undefined && { sickLeaveClosing: parseInt(sickLeaveClosing) }),
                 ...(cardCreation !== undefined && { cardCreation: parseInt(cardCreation) }),
                 ...(closingBonus !== undefined && { closingBonus: parseInt(closingBonus) }),
-                ...(certificates !== undefined && { certificates: parseInt(certificates) }),
                 updatedAt: now,
                 updatedBy: updatedBy || null
             },
@@ -69,7 +68,6 @@ export async function POST(req: NextRequest) {
                 sickLeaveClosing: sickLeaveClosing !== undefined ? parseInt(sickLeaveClosing) : 0,
                 cardCreation: cardCreation !== undefined ? parseInt(cardCreation) : 0,
                 closingBonus: closingBonus !== undefined ? parseInt(closingBonus) : 0,
-                certificates: certificates !== undefined ? parseInt(certificates) : 0,
                 createdAt: now,
                 updatedAt: now,
                 updatedBy: updatedBy || null

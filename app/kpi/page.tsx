@@ -308,7 +308,6 @@ export default function KpiPage() {
             const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
             const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
             const manualClosingBonus = empChecklist ? (empChecklist.closingBonus || 0) : 0;
-            const certificatesBonus = empChecklist ? (empChecklist.certificates || 0) : 0;
 
             const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
             const cardBonus = cardCreation * 60;
@@ -393,7 +392,7 @@ export default function KpiPage() {
             else if (finalQuality >= 85) qualityBonus = 2500;
 
             const actualClosingBonuses = enrichedEmp.role === 'SENIOR' ? manualClosingBonus : closingBonuses;
-            const totalPay = basePay + coeffBonus + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + actingLeadBonus + certificatesBonus;
+            const totalPay = basePay + coeffBonus + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + actingLeadBonus;
 
             // Aggregate all audit logs
             const allLogs = [
@@ -437,7 +436,6 @@ export default function KpiPage() {
                 qualityBonus,
                 seniorityYears,
                 seniorityBonus,
-                certificatesBonus,
                 totalPay,
                 auditLogs: uniqueLogs
             };
@@ -479,9 +477,6 @@ export default function KpiPage() {
                             </th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[60px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за исполнение обязанностей старшей смены">ИО</Tooltip>
-                            </th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
-                                <Tooltip content="Доплата старшим смены за справки">Справки</Tooltip>
                             </th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Продажи</th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
@@ -592,40 +587,6 @@ export default function KpiPage() {
                                             {calc.actingLeadBonus > 0 ? (
                                                 <div className="text-emerald-600 font-medium">+{calc.actingLeadBonus}</div>
                                             ) : '-'}
-                                        </td>
-                                        <td className="px-4 py-3 text-center text-zinc-600">
-                                            {calc.role === 'SENIOR' ? (
-                                                currentUser?.role === 'MANAGER' && editingCell?.empId === calc.empId && editingCell?.field === 'certificates' ? (
-                                                    <input
-                                                        autoFocus
-                                                        type="number"
-                                                        className="w-16 px-1 py-0.5 border rounded text-center text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                        value={tempValue}
-                                                        onFocus={(e) => e.target.select()}
-                                                        onChange={(e) => setTempValue(e.target.value)}
-                                                        onBlur={() => handleSaveChecklist(calc.empId, 'certificates', tempValue)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') handleSaveChecklist(calc.empId, 'certificates', tempValue);
-                                                            if (e.key === 'Escape') setEditingCell(null);
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <div
-                                                        className={!isClosed && currentUser?.role === 'MANAGER' ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
-                                                        onClick={() => {
-                                                            if (isClosed || currentUser?.role !== 'MANAGER') return;
-                                                            setEditingCell({ empId: calc.empId, field: 'certificates' });
-                                                            setTempValue(calc.certificatesBonus === 0 ? '' : calc.certificatesBonus.toString());
-                                                        }}
-                                                    >
-                                                        {calc.certificatesBonus > 0 ? (
-                                                            <div className="text-emerald-600 font-medium">+{calc.certificatesBonus}</div>
-                                                        ) : '-'}
-                                                    </div>
-                                                )
-                                            ) : (
-                                                <div className="text-zinc-300">-</div>
-                                            )}
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             {calc.salesBonus > 0 ? (

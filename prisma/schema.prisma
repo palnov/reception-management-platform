@@ -74,7 +74,6 @@ model MonthlyChecklist {
   sickLeaveClosing Int      @default(0)
   cardCreation     Int      @default(0)
   closingBonus     Int      @default(0)
-  certificates     Int      @default(0)
   createdAt        String   @default("")
   updatedAt        String   @default("")
   updatedBy        String?

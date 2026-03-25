@@ -309,7 +309,6 @@ export class ReportService {
                 { header: 'Откр/Закр', key: 'closing', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'ИО', key: 'actingLead', width: 12, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                { header: 'Справки', key: 'certificates', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Открытие Б/Л', key: 'sick_leave_open', width: 15, style: centerStyle },
                 { header: 'Закрытие/продление Б/Л', key: 'sick_leave_close', width: 25, style: centerStyle },
                 { header: 'Карточки', key: 'cards', width: 15, style: centerStyle },
@@ -411,7 +410,6 @@ export class ReportService {
                 const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
                 const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
                 const manualClosingBonus = empChecklist ? (empChecklist.closingBonus || 0) : 0;
-                const certificatesBonus = empChecklist ? (empChecklist.certificates || 0) : 0;
 
                 // Calculate averaged checklist for seniors
                 let calcChecklist = ownChecklist;
@@ -462,7 +460,7 @@ export class ReportService {
                 else if (seniorityYears >= 1) seniorityBonus = Math.round(baseSalary * 0.03);
 
                 const actualClosingBonuses = emp.role === 'SENIOR' ? manualClosingBonus : closingBonuses;
-                const total = Math.round(shiftPay + dayOffPayTotal + actualClosingBonuses + actingLeadBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + certificatesBonus);
+                const total = Math.round(shiftPay + dayOffPayTotal + actualClosingBonuses + actingLeadBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus);
 
                 sheet.addRow({
                     name: emp.name,
@@ -473,7 +471,6 @@ export class ReportService {
                     closing: actualClosingBonuses,
                     actingLead: actingLeadBonus,
                     sales: salesBonus,
-                    certificates: certificatesBonus,
                     sick_leave_open: sickLeaveOpening,
                     sick_leave_close: sickLeaveClosing,
                     cards: cardCreation,
