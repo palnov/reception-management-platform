@@ -248,6 +248,7 @@ export default function KpiPage() {
 
             let rawHours = 0;
             let basePay = 0;
+            let coeffBonus = 0;
             let dayOffHours = 0;
             let dayOffPayTotal = 0;
             let closingBonuses = 0;
@@ -266,7 +267,8 @@ export default function KpiPage() {
                     dayOffPayTotal += dayOffRate * s.hours;
                 } else if (s.type === 'REGULAR') {
                     rawHours += s.hours;
-                    basePay += shiftPay;
+                    basePay += hourlyBase * s.hours;
+                    coeffBonus += hourlyBase * s.hours * (coeff - 1.0);
                 }
 
                 if (s.cabinetClosed) closingBonuses += 250;
@@ -391,7 +393,7 @@ export default function KpiPage() {
             else if (finalQuality >= 85) qualityBonus = 2500;
 
             const actualClosingBonuses = enrichedEmp.role === 'SENIOR' ? manualClosingBonus : closingBonuses;
-            const totalPay = basePay + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + actingLeadBonus + certificatesBonus;
+            const totalPay = basePay + coeffBonus + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + actingLeadBonus + certificatesBonus;
 
             // Aggregate all audit logs
             const allLogs = [
@@ -414,6 +416,7 @@ export default function KpiPage() {
                 role: enrichedEmp.role,
                 rawHours,
                 basePay,
+                coeffBonus,
                 dayOffHours,
                 dayOffPay: dayOffPayTotal,
                 closingBonuses: actualClosingBonuses,
@@ -469,6 +472,7 @@ export default function KpiPage() {
                             <th className="sticky top-0 left-0 z-30 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 whitespace-nowrap min-w-[200px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7, inset -1px 0 0 #e4e4e7, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>Сотрудник</th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[70px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Часы</th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[80px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Оклад</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[80px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Коэф.</th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[130px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Работа в вых.</th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за открытие, закрытие центра и за закрытие кабинетов">Откр/Закр.</Tooltip>
@@ -500,11 +504,11 @@ export default function KpiPage() {
                     <tbody className="divide-y divide-zinc-100">
                         {isUserLoading ? (
                             <tr>
-                                <td colSpan={14} className="px-4 py-12 text-center text-zinc-500">Загрузка данных...</td>
+                                <td colSpan={15} className="px-4 py-12 text-center text-zinc-500">Загрузка данных...</td>
                             </tr>
                         ) : payrollData.length === 0 ? (
                             <tr>
-                                <td colSpan={14} className="px-4 py-12 text-center text-zinc-500">Нет данных для отображения.</td>
+                                <td colSpan={15} className="px-4 py-12 text-center text-zinc-500">Нет данных для отображения.</td>
                             </tr>
                         ) : (
                             payrollData.map(calc => {
@@ -535,6 +539,11 @@ export default function KpiPage() {
                                         </td>
                                         <td className="px-4 py-3 text-right text-zinc-600 font-semibold">{calc.rawHours.toFixed(1)}</td>
                                         <td className="px-4 py-3 text-right text-zinc-600">{calc.basePay.toFixed(0)}</td>
+                                        <td className="px-4 py-3 text-right">
+                                            {calc.coeffBonus > 0 ? (
+                                                <div className="text-emerald-600 font-medium">+{calc.coeffBonus.toFixed(0)}</div>
+                                            ) : '-'}
+                                        </td>
                                         <td className="px-4 py-3 text-right">
                                             {calc.dayOffPay > 0 ? (
                                                 <div>
