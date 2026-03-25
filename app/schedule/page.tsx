@@ -237,7 +237,7 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                     textClass = 'text-zinc-300';
                 } else if (shift) {
                     if (shift.type === 'SICK') { bgClass = 'bg-red-100'; textClass = 'text-red-900'; }
-                    else if (shift.type === 'DAY_OFF_WORK') { bgClass = 'bg-amber-100'; textClass = 'text-amber-900'; }
+                    else if (shift.type === 'ARCHIVE_WORK') { bgClass = 'bg-amber-100'; textClass = 'text-amber-900'; }
                     else if (shift.type === 'VACATION') { bgClass = 'bg-green-100'; textClass = 'text-green-900'; }
                     else { bgClass = 'bg-blue-100'; textClass = 'text-blue-900'; }
                 } else if (isWeekend) {
@@ -1430,7 +1430,7 @@ export default function SchedulePage() {
                                     <div className="grid grid-cols-2 gap-2">
                                         {[
                                             { id: 'REGULAR', label: 'Рабочая', icon: Briefcase, borderColor: 'border-blue-500', bgColor: 'bg-blue-50', iconBg: 'bg-blue-500', textColor: 'text-blue-900' },
-                                            { id: 'DAY_OFF_WORK', label: 'Работа в вых.', icon: CheckSquare, borderColor: 'border-amber-500', bgColor: 'bg-amber-50', iconBg: 'bg-amber-500', textColor: 'text-amber-900' },
+                                            { id: 'ARCHIVE_WORK', label: 'Работа в арх.', icon: CheckSquare, borderColor: 'border-amber-500', bgColor: 'bg-amber-50', iconBg: 'bg-amber-500', textColor: 'text-amber-900' },
                                             { id: 'SICK', label: 'Больничный', icon: Activity, borderColor: 'border-red-500', bgColor: 'bg-red-50', iconBg: 'bg-red-500', textColor: 'text-red-900' },
                                             { id: 'VACATION', label: 'Отпуск', icon: LayoutList, borderColor: 'border-emerald-500', bgColor: 'bg-emerald-50', iconBg: 'bg-emerald-500', textColor: 'text-emerald-900' }
                                         ].map(type => (
@@ -1577,7 +1577,7 @@ export default function SchedulePage() {
                                     <div className="grid grid-cols-2 gap-2">
                                         {[
                                             { id: 'REGULAR', label: 'Рабочая', icon: Briefcase, borderColor: 'border-blue-500', bgColor: 'bg-blue-50', iconBg: 'bg-blue-500', textColor: 'text-blue-900' },
-                                            { id: 'DAY_OFF_WORK', label: 'Работа в вых.', icon: CheckSquare, borderColor: 'border-amber-500', bgColor: 'bg-amber-50', iconBg: 'bg-amber-500', textColor: 'text-amber-900' },
+                                            { id: 'ARCHIVE_WORK', label: 'Работа в арх.', icon: CheckSquare, borderColor: 'border-amber-500', bgColor: 'bg-amber-50', iconBg: 'bg-amber-500', textColor: 'text-amber-900' },
                                             { id: 'SICK', label: 'Больничный', icon: Activity, borderColor: 'border-red-500', bgColor: 'bg-red-50', iconBg: 'bg-red-500', textColor: 'text-red-900' },
                                             { id: 'VACATION', label: 'Отпуск', icon: LayoutList, borderColor: 'border-emerald-500', bgColor: 'bg-emerald-50', iconBg: 'bg-emerald-500', textColor: 'text-emerald-900' }
                                         ].map(type => (

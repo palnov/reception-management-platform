@@ -183,7 +183,7 @@ export class ReportService {
                             cell.value = shift.hours;
                             cell.fill = fillRegular;
                             cell.font = { bold: true, color: { argb: 'FF1E3A5F' } };
-                        } else if (shift.type === 'DAY_OFF_WORK') {
+                        } else if (shift.type === 'ARCHIVE_WORK') {
                             cell.value = shift.hours;
                             cell.fill = fillDayOff;
                             cell.font = { bold: true, color: { argb: 'FF78350F' } };
@@ -305,7 +305,7 @@ export class ReportService {
                 { header: 'Оклад', key: 'base', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Часы', key: 'hours', width: 12, style: { ...cellStyle, numFmt: '0.0' } },
                 { header: 'Смены (Руб)', key: 'shiftPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                { header: 'Работа в вых.', key: 'dayOffPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                { header: 'Работа в арх.', key: 'dayOffPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Откр/Закр', key: 'closing', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'ИО', key: 'actingLead', width: 12, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
@@ -365,7 +365,7 @@ export class ReportService {
                     if (s.type === 'REGULAR') {
                         hoursWorked += s.hours;
                         shiftPay += hourlyBase * s.hours * s.coefficient;
-                    } else if (s.type === 'DAY_OFF_WORK') {
+                    } else if (s.type === 'ARCHIVE_WORK') {
                         dayOffPayTotal += (3500 / 11) * s.hours;
                     }
                     if (s.cabinetClosed) closingBonuses += 250;

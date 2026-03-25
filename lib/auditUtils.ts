@@ -45,7 +45,7 @@ export function formatValue(value: any, key?: string): string {
     if (key === 'type') {
         const types: Record<string, string> = {
             'REGULAR': 'Смена',
-            'DAY_OFF_WORK': 'Работа в вых.',
+            'ARCHIVE_WORK': 'Работа в арх.',
             'SICK': 'Больничный',
             'VACATION': 'Отпуск'
         };

@@ -261,7 +261,7 @@ export default function KpiPage() {
                 const hourlyBase = enrichedEmp.baseSalary / monthNorm;
                 const shiftPay = hourlyBase * s.hours * coeff;
 
-                if (s.type === 'DAY_OFF_WORK') {
+                if (s.type === 'ARCHIVE_WORK') {
                     dayOffHours += s.hours;
                     const dayOffRate = 3500 / 11;
                     dayOffPayTotal += dayOffRate * s.hours;
@@ -473,7 +473,7 @@ export default function KpiPage() {
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[70px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Часы</th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[80px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Оклад</th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[80px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Коэф.</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[130px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Работа в вых.</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[130px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Работа в арх.</th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за открытие, закрытие центра и за закрытие кабинетов">Откр/Закр.</Tooltip>
                             </th>
