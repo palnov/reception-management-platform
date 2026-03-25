@@ -6,6 +6,9 @@ import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns
 import { ru } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, Trash2, ShoppingCart, ArrowUp, ArrowDown } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
+import { useMonthStatus } from '@/lib/useMonthStatus';
+import { MonthStatusBadge } from '@/components/MonthStatusBadge';
+import { MonthClosureControls } from '@/components/MonthClosureControls';
 
 interface Employee {
     id: string;
@@ -30,6 +33,7 @@ interface Sale {
 
 export default function SalesPage() {
     const [currentMonth, setCurrentMonth] = useSharedMonth();
+    const { isClosed, refresh: refreshMonthStatus } = useMonthStatus(currentMonth);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [sales, setSales] = useState<Sale[]>([]);
     const [activeEmployeeId, setActiveEmployeeId] = useState<string | 'all'>('all');
@@ -74,6 +78,7 @@ export default function SalesPage() {
 
     async function handleSave(e: React.FormEvent) {
         e.preventDefault();
+        if (isClosed) return;
         const method = formData.id ? 'PUT' : 'POST';
         await fetch('/api/sales', {
             method,
@@ -84,6 +89,7 @@ export default function SalesPage() {
     }
 
     async function handleDelete(id: string) {
+        if (isClosed) return;
         if (!confirm('Удалить запись о продаже?')) return;
         await fetch(`/api/sales?id=${id}`, { method: 'DELETE' });
         fetchSales();
@@ -118,10 +124,20 @@ export default function SalesPage() {
                     <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Продажи акционных продуктов</h1>
                     <p className="text-zinc-500 mt-2">Бонус составляет 7% от стоимости</p>
                 </div>
-                <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm">
-                    <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 text-zinc-600" /></button>
-                    <span className="text-lg font-semibold w-40 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
-                    <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
+                <div className="flex items-center gap-4">
+                    <MonthStatusBadge isClosed={isClosed} />
+                    {employees.find(e => e.role === 'MANAGER') && ( // Crude check for manager role in current view (better check auth)
+                        <MonthClosureControls 
+                            currentMonth={currentMonth} 
+                            isClosed={isClosed} 
+                            onStatusChange={refreshMonthStatus}
+                        />
+                    )}
+                    <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm">
+                        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 text-zinc-600" /></button>
+                        <span className="text-lg font-semibold w-40 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
+                        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
+                    </div>
                 </div>
             </div>
 
@@ -180,13 +196,15 @@ export default function SalesPage() {
                 <div className="flex items-center justify-center">
                     <button
                         onClick={() => {
+                            if (isClosed) return;
                             setFormData({
                                 ...initialForm,
                                 employeeId: activeEmployeeId !== 'all' ? activeEmployeeId : (employees.find(e => e.role !== 'MANAGER')?.id || '')
                             });
                             setShowModal(true);
                         }}
-                        className="w-full h-full bg-zinc-900 text-white rounded-2xl hover:bg-zinc-800 transition-all shadow-lg flex items-center justify-center gap-2 font-bold py-6 px-8"
+                        disabled={isClosed}
+                        className={`w-full h-full bg-zinc-900 text-white rounded-2xl hover:bg-zinc-800 transition-all shadow-lg flex items-center justify-center gap-2 font-bold py-6 px-8 ${isClosed ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         <Plus className="w-6 h-6" /> Добавить продажу
                     </button>
@@ -216,8 +234,9 @@ export default function SalesPage() {
                         {filteredSales.map(s => (
                             <tr
                                 key={s.id}
-                                className="hover:bg-zinc-50 transition-colors cursor-pointer group"
+                                className={`hover:bg-zinc-50 transition-colors ${isClosed ? 'cursor-default' : 'cursor-pointer'} group`}
                                 onClick={(e) => {
+                                    if (isClosed) return;
                                     if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
                                     setFormData({
                                         id: s.id,

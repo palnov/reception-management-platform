@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { isMonthClosed } from '@/lib/monthStatus';
 
 export async function GET(request: Request) {
     try {
@@ -27,6 +28,10 @@ export async function POST(request: Request) {
 
     if (!month || hours === undefined) {
         return NextResponse.json({ error: 'Month and hours required' }, { status: 400 });
+    }
+
+    if (await isMonthClosed(month)) {
+        return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
     }
 
     const norm = await prisma.monthlyNorm.upsert({

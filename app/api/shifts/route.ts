@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { startOfDay, endOfDay } from 'date-fns';
 import { getSession } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
+import { isMonthClosed } from '@/lib/monthStatus';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,6 +84,10 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { id, date, employeeId, type, hours, cabinetClosed, centerClosed, isActingLead, coefficient } = body;
+
+    if (await isMonthClosed(date)) {
+        return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
+    }
 
     try {
         const emp = await prisma.employee.findUnique({ where: { id: employeeId } }) as any;
@@ -207,6 +212,11 @@ export async function DELETE(request: Request) {
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
 
     const existing = await prisma.shift.findUnique({ where: { id } });
+    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    if (await isMonthClosed(existing.date)) {
+        return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
+    }
 
     if (existing) {
         await logAudit('SHIFT', id, 'DELETE', existing, session); // Log what was deleted

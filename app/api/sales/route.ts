@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { logAudit, calculateDiff } from '@/lib/audit';
+import { isMonthClosed } from '@/lib/monthStatus';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -69,6 +70,10 @@ export async function PUT(request: Request) {
         const body = await request.json();
         const { id, date, employeeId, patientId, productName, price } = body;
 
+        if (await isMonthClosed(date)) {
+            return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
+        }
+
         if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
 
         const existing = await prisma.promotionSale.findUnique({ where: { id } });
@@ -108,6 +113,10 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { date, employeeId, patientId, productName, price } = body;
 
+        if (await isMonthClosed(date)) {
+            return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
+        }
+
         const bonus = (Number(price) || 0) * 0.07;
 
         const sale = await prisma.promotionSale.create({
@@ -140,6 +149,12 @@ export async function DELETE(request: Request) {
 
     try {
         const existing = await prisma.promotionSale.findUnique({ where: { id } });
+        if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+        if (await isMonthClosed(existing.date)) {
+            return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
+        }
+
         if (existing) {
             await logAudit('SALE', id, 'DELETE', existing, session);
             await prisma.promotionSale.delete({ where: { id } });

@@ -122,3 +122,10 @@ model AuditLog {
   timestamp     String
   details       String?
 }
+
+model ClosedMonth {
+  month     String   @id // Format: "YYYY-MM"
+  isClosed  Boolean  @default(true)
+  createdAt String   @default("")
+  updatedAt String   @default("")
+}

@@ -8,6 +8,9 @@ import { ru } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, CheckCircle, X, Pencil, ClipboardCheck, Crown, BadgeCheck, User } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
 import { Tooltip } from '@/components/Tooltip';
+import { useMonthStatus } from '@/lib/useMonthStatus';
+import { MonthStatusBadge } from '@/components/MonthStatusBadge';
+import { MonthClosureControls } from '@/components/MonthClosureControls';
 
 interface Employee {
     id: string;
@@ -68,6 +71,7 @@ export default function KpiPage() {
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [isUserLoading, setIsUserLoading] = useState(true);
     const [currentMonth, setCurrentMonth] = useSharedMonth();
+    const { isClosed, refresh: refreshMonthStatus } = useMonthStatus(currentMonth);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [kpiRecords, setKpiRecords] = useState<KpiRecord[]>([]);
@@ -182,6 +186,7 @@ export default function KpiPage() {
     }
 
     function handleRowClick(empId: string) {
+        if (isClosed) return;
         // Only managers or the employee themselves can edit (but user said everyone can edit for now)
         // However, it makes sense to only allow if authorized.
         setSelectedEmployeeId(empId);
@@ -193,6 +198,10 @@ export default function KpiPage() {
 
 
     async function handleSaveChecklist(empId: string, field: string, value: string) {
+        if (isClosed) {
+            setEditingCell(null);
+            return;
+        }
         try {
             const newValue = parseFloat(value);
             const month = currentMonth.toISOString().substring(0, 7); // Format: "2026-02"
@@ -436,10 +445,20 @@ export default function KpiPage() {
         <div>
             <div className="flex items-center justify-between mb-8">
                 <h1 className="text-3xl font-bold">KPI и Зарплата</h1>
-                <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm">
-                    <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full"><ChevronLeft className="w-5 h-5" /></button>
-                    <span className="text-lg font-medium w-40 text-center capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
-                    <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full"><ChevronRight className="w-5 h-5" /></button>
+                <div className="flex items-center gap-4">
+                    <MonthStatusBadge isClosed={isClosed} />
+                    {currentUser?.role === 'MANAGER' && (
+                        <MonthClosureControls 
+                            currentMonth={currentMonth} 
+                            isClosed={isClosed} 
+                            onStatusChange={refreshMonthStatus}
+                        />
+                    )}
+                    <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm">
+                        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full"><ChevronLeft className="w-5 h-5" /></button>
+                        <span className="text-lg font-medium w-40 text-center capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
+                        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full"><ChevronRight className="w-5 h-5" /></button>
+                    </div>
                 </div>
             </div>
 
@@ -542,9 +561,9 @@ export default function KpiPage() {
                                                     />
                                                 ) : (
                                                     <div
-                                                        className={currentUser?.role === 'MANAGER' ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
+                                                        className={!isClosed && currentUser?.role === 'MANAGER' ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
                                                         onClick={() => {
-                                                            if (currentUser?.role !== 'MANAGER') return;
+                                                            if (isClosed || currentUser?.role !== 'MANAGER') return;
                                                             setEditingCell({ empId: calc.empId, field: 'closingBonus' });
                                                             setTempValue(calc.closingBonuses === 0 ? '' : calc.closingBonuses.toString());
                                                         }}
@@ -583,9 +602,9 @@ export default function KpiPage() {
                                                     />
                                                 ) : (
                                                     <div
-                                                        className={currentUser?.role === 'MANAGER' ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
+                                                        className={!isClosed && currentUser?.role === 'MANAGER' ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
                                                         onClick={() => {
-                                                            if (currentUser?.role !== 'MANAGER') return;
+                                                            if (isClosed || currentUser?.role !== 'MANAGER') return;
                                                             setEditingCell({ empId: calc.empId, field: 'certificates' });
                                                             setTempValue(calc.certificatesBonus === 0 ? '' : calc.certificatesBonus.toString());
                                                         }}
@@ -621,8 +640,9 @@ export default function KpiPage() {
                                                 />
                                             ) : (
                                                 <div
-                                                    className="cursor-pointer hover:text-blue-600 transition-colors"
+                                                    className={!isClosed ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
                                                     onClick={() => {
+                                                        if (isClosed) return;
                                                         setEditingCell({ empId: calc.empId, field: 'sickLeaveOpening' });
                                                         setTempValue(calc.sickLeaveOpening === 0 ? '' : calc.sickLeaveOpening.toString());
                                                     }}
@@ -649,8 +669,9 @@ export default function KpiPage() {
                                                 />
                                             ) : (
                                                 <div
-                                                    className="cursor-pointer hover:text-blue-600 transition-colors"
+                                                    className={!isClosed ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
                                                     onClick={() => {
+                                                        if (isClosed) return;
                                                         setEditingCell({ empId: calc.empId, field: 'sickLeaveClosing' });
                                                         setTempValue(calc.sickLeaveClosing === 0 ? '' : calc.sickLeaveClosing.toString());
                                                     }}
@@ -677,8 +698,9 @@ export default function KpiPage() {
                                                 />
                                             ) : (
                                                 <div
-                                                    className="cursor-pointer hover:text-blue-600 transition-colors"
+                                                    className={!isClosed ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
                                                     onClick={() => {
+                                                        if (isClosed) return;
                                                         setEditingCell({ empId: calc.empId, field: 'cardCreation' });
                                                         setTempValue(calc.cardCreation === 0 ? '' : calc.cardCreation.toString());
                                                     }}
@@ -713,8 +735,9 @@ export default function KpiPage() {
                                                 <>
                                                     {calc.checklistBonus > 0 && <span className="text-green-600 font-medium">+{calc.checklistBonus}</span>}
                                                     <div
-                                                        className="text-[10px] text-zinc-400 cursor-pointer hover:text-blue-600 transition-colors"
+                                                        className={!isClosed ? "text-[10px] text-zinc-400 cursor-pointer hover:text-blue-600 transition-colors" : "text-[10px] text-zinc-400"}
                                                         onClick={() => {
+                                                            if (isClosed) return;
                                                             setEditingCell({ empId: calc.empId, field: 'percentage' });
                                                             setTempValue((calc.ownChecklist ?? calc.calcChecklist) === 0 ? '' : (calc.ownChecklist ?? calc.calcChecklist).toFixed(0));
                                                         }}

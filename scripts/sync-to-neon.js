@@ -21,12 +21,25 @@ try {
 
   // 3. Пушим схему в Neon
   console.log('3. Синхронизируем структуру базы (db push)...');
-  execSync('npx --yes prisma db push', { stdio: 'inherit', cwd: projectRoot });
+  // Пытаемся взять URL из NEON_DATABASE_URL или ищем в .env
+  let neonUrl = process.env.NEON_DATABASE_URL;
+  if (!neonUrl) {
+    const envContent = fs.readFileSync(path.join(projectRoot, '.env'), 'utf8');
+    const match = envContent.match(/NEON_DATABASE_URL=["']?(.+?)["']?(\s|$)/);
+    if (match) neonUrl = match[1];
+  }
+
+  if (!neonUrl) {
+    console.error('❌ Ошибка: NEON_DATABASE_URL не найден в .env. Пожалуйста, добавьте его: NEON_DATABASE_URL="postgres://..."');
+    process.exit(1);
+  }
+
+  const env = { ...process.env, DATABASE_URL: neonUrl };
+  execSync('npx --yes prisma db push', { stdio: 'inherit', cwd: projectRoot, env });
 
   // 4. Загружаем начальные данные
   console.log('4. Загружаем стартовые данные (seed)...');
-  // Используем node напрямую для сида, так как путь должен быть относительно projectRoot
-  execSync('node prisma/seed_norms.js', { stdio: 'inherit', cwd: projectRoot });
+  execSync('node prisma/seed_norms.js', { stdio: 'inherit', cwd: projectRoot, env });
 
   console.log('--- Синхронизация успешно завершена! ---');
 } catch (error) {

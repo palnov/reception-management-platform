@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
 import { useSharedMonth } from '@/lib/useSharedMonth';
+import { useMonthStatus } from '@/lib/useMonthStatus';
+import { MonthStatusBadge } from '@/components/MonthStatusBadge';
+import { MonthClosureControls } from '@/components/MonthClosureControls';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, parseISO, subDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, X, DoorOpen, MapPin, GripVertical, User, Crown, BadgeCheck, Clock, Briefcase, CheckSquare, Activity, LayoutList, Timer, Percent, Layers } from 'lucide-react';
@@ -133,7 +136,8 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
     handleCell,
     selection,
     isInSelection,
-    currentUser
+    currentUser,
+    isClosed
 }: {
     emp: Employee,
     days: Date[],
@@ -147,7 +151,8 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
     handleCell: { empId: string, dateKey: string } | null,
     selection: any,
     isInSelection: (empId: string, dateKey: string) => boolean,
-    currentUser: any // Typed as Employee or similar
+    currentUser: any, // Typed as Employee or similar
+    isClosed: boolean
 }) {
     const {
         attributes,
@@ -179,8 +184,8 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                 <div className="flex items-center gap-2">
                     <div
                         {...attributes}
-                        {...listeners}
-                        className="cursor-grab active:cursor-grabbing p-1 hover:bg-zinc-100 rounded text-zinc-400 group-hover:text-zinc-600 transition-colors"
+                        {...(!isClosed ? listeners : {})}
+                        className={`${isClosed ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} p-1 hover:bg-zinc-100 rounded text-zinc-400 group-hover:text-zinc-600 transition-colors`}
                     >
                         <GripVertical className="w-4 h-4" />
                     </div>
@@ -252,19 +257,19 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                                 (selection && isInSelection(emp.id, dateKey))) && !dismissed ? 'z-30' : ''}
                         `}
                         onMouseDown={(e) => {
-                            if (dismissed) return;
+                            if (dismissed || isClosed) return;
                             if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
                             if (e.button === 0) onMouseDown(e, emp.id, dateKey);
                         }}
-                        onMouseEnter={() => !dismissed && onMouseEnter(emp.id, dateKey)}
+                        onMouseEnter={() => !dismissed && !isClosed && onMouseEnter(emp.id, dateKey)}
                         onContextMenu={(e) => {
-                            if (dismissed) return;
+                            if (dismissed || isClosed) return;
                             if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
                             onContextMenu(e, emp.id, dateKey, shift);
                         }}
                     >
                         {/* Hover handle trigger (bottom-right corner) - Exactly matches visual handle position */}
-                        {!dismissed && (
+                        {!dismissed && !isClosed && (
                             <div
                                 className="absolute -bottom-[5px] -right-[5px] w-2.5 h-2.5 z-40 cursor-crosshair"
                                 onMouseEnter={() => onHandleHover(emp.id, dateKey)}
@@ -344,6 +349,7 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
 // --- Main Page Component ---
 export default function SchedulePage() {
     const [currentMonth, setCurrentMonth] = useSharedMonth();
+    const { isClosed, refresh: refreshMonthStatus } = useMonthStatus(currentMonth);
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -494,6 +500,7 @@ export default function SchedulePage() {
     }
 
     async function handleSaveNorm() {
+        if (isClosed) return;
         try {
             const m = format(currentMonth, 'yyyy-MM');
             const res = await fetch('/api/norms', {
@@ -1250,16 +1257,25 @@ export default function SchedulePage() {
                 <div>
                     <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">График смен</h1>
                     <div
-                        className="flex items-center gap-2 mt-2 text-sm text-zinc-500 cursor-pointer hover:text-blue-600 transition-colors group"
-                        onClick={() => setShowNormModal(true)}
+                        className={`flex items-center gap-2 mt-2 text-sm text-zinc-500 ${isClosed ? 'cursor-default' : 'cursor-pointer hover:text-blue-600'} transition-colors group`}
+                        onClick={() => !isClosed && setShowNormModal(true)}
                     >
                         <span>Норма часов в этом месяце: </span>
-                        <span className="font-bold text-zinc-900 group-hover:text-blue-600">{monthNorm}</span>
-                        <div className="px-1.5 py-0.5 rounded bg-zinc-100 text-[10px] font-bold uppercase tracking-wider">Изм.</div>
+                        <span className={`font-bold ${isClosed ? 'text-zinc-500' : 'text-zinc-900 group-hover:text-blue-600'}`}>{monthNorm}</span>
+                        {!isClosed && <div className="px-1.5 py-0.5 rounded bg-zinc-100 text-[10px] font-bold uppercase tracking-wider">Изм.</div>}
                     </div>
                 </div>
-                <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm border-zinc-200/60 transition-all">
-                    {isMonthEmpty && prevMonthHasShifts && (
+                <div className="flex items-center gap-4">
+                    <MonthStatusBadge isClosed={isClosed} />
+                    {userData?.role === 'MANAGER' && (
+                        <MonthClosureControls 
+                            currentMonth={currentMonth} 
+                            isClosed={isClosed} 
+                            onStatusChange={refreshMonthStatus}
+                        />
+                    )}
+                    <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm border-zinc-200/60 transition-all">
+                    {isMonthEmpty && prevMonthHasShifts && !isClosed && (
                         <button
                             onClick={handleAutoFill}
                             disabled={isAutoFilling}
@@ -1273,6 +1289,7 @@ export default function SchedulePage() {
                     <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
                 </div>
             </div>
+        </div>
 
             <div
                 ref={gridContainerRef}
@@ -1281,7 +1298,7 @@ export default function SchedulePage() {
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
+                    onDragEnd={(e) => !isClosed && handleDragEnd(e)}
                 >
                     <table className="w-full text-xs text-left border-collapse min-w-[1240px]">
                         <thead className="sticky top-0 z-[60]">
@@ -1332,6 +1349,7 @@ export default function SchedulePage() {
                                         handleCell={handleCell}
                                         selection={selection}
                                         isInSelection={isInSelection}
+                                        isClosed={isClosed}
                                     />
                                 ))}
                             </SortableContext>

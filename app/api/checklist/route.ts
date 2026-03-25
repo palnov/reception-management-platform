@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
+import { isMonthClosed } from '@/lib/monthStatus';
 
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
@@ -36,6 +35,10 @@ export async function POST(req: NextRequest) {
                 { error: 'Month and employeeId are required' },
                 { status: 400 }
             );
+        }
+
+        if (await isMonthClosed(month)) {
+            return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
         }
 
         const now = new Date().toISOString();

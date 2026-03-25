@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "node scripts/switch-prisma-provider.js && prisma generate && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sync-neon": "node scripts/sync-to-neon.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

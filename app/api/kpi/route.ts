@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { logAudit, calculateDiff } from '@/lib/audit';
+import { isMonthClosed } from '@/lib/monthStatus';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -68,6 +69,10 @@ export async function POST(request: Request) {
         if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const json = await request.json();
+
+        if (await isMonthClosed(json.date)) {
+            return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
+        }
 
         // Check if record exists for this employee on this day
         const existing = await prisma.kpiRecord.findFirst({

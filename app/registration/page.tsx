@@ -7,6 +7,9 @@ import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns
 import { ru } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, Trash2, FileCheck, Star, BadgeCheck, ArrowUp, ArrowDown } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
+import { useMonthStatus } from '@/lib/useMonthStatus';
+import { MonthStatusBadge } from '@/components/MonthStatusBadge';
+import { MonthClosureControls } from '@/components/MonthClosureControls';
 
 interface Employee {
     id: string;
@@ -28,6 +31,7 @@ interface RegistrationKpi {
 
 export default function RegistrationPage() {
     const [currentMonth, setCurrentMonth] = useSharedMonth();
+    const { isClosed, refresh: refreshMonthStatus } = useMonthStatus(currentMonth);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [records, setRecords] = useState<RegistrationKpi[]>([]);
     const [activeEmployeeId, setActiveEmployeeId] = useState<string | 'all'>('all');
@@ -71,6 +75,7 @@ export default function RegistrationPage() {
 
     async function handleSave(e: React.FormEvent) {
         e.preventDefault();
+        if (isClosed) return;
         const method = formData.id ? 'PUT' : 'POST';
         const maxPoints = Number(formData.count) * 3;
         if (Number(formData.totalScore) > maxPoints) {
@@ -95,6 +100,7 @@ export default function RegistrationPage() {
     }
 
     async function handleDelete(id: string) {
+        if (isClosed) return;
         if (!confirm('Удалить запись об оформлении?')) return;
         await fetch(`/api/registration?id=${id}`, { method: 'DELETE' });
         fetchRecords();
@@ -120,23 +126,35 @@ export default function RegistrationPage() {
                         <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Качество оформления</h1>
                         <button
                             onClick={() => {
+                                if (isClosed) return;
                                 setFormData({
                                     ...initialForm,
                                     employeeId: activeEmployeeId !== 'all' ? activeEmployeeId : (employees.find(e => e.role !== 'MANAGER')?.id || '')
                                 });
                                 setShowModal(true);
                             }}
-                            className="bg-zinc-900 text-white px-4 py-2 rounded-xl hover:bg-zinc-800 transition-all shadow-lg flex items-center gap-2 font-bold text-sm"
+                            disabled={isClosed}
+                            className={`bg-zinc-900 text-white px-4 py-2 rounded-xl hover:bg-zinc-800 transition-all shadow-lg flex items-center gap-2 font-bold text-sm ${isClosed ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                             <Plus className="w-4 h-4" /> Добавить запись
                         </button>
                     </div>
                     <p className="text-zinc-500 mt-1 text-sm">Ежедневный аудит качества заполнения карт.</p>
                 </div>
-                <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200/60 shadow-sm">
-                    <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 text-zinc-600" /></button>
-                    <span className="text-sm font-bold w-32 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
-                    <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
+                <div className="flex items-center gap-4">
+                    <MonthStatusBadge isClosed={isClosed} />
+                    {employees.find(e => e.role === 'MANAGER') && ( // Crude check for manager
+                        <MonthClosureControls 
+                            currentMonth={currentMonth} 
+                            isClosed={isClosed} 
+                            onStatusChange={refreshMonthStatus}
+                        />
+                    )}
+                    <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200/60 shadow-sm">
+                        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 text-zinc-600" /></button>
+                        <span className="text-sm font-bold w-32 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
+                        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
+                    </div>
                 </div>
             </div>
 
@@ -188,8 +206,9 @@ export default function RegistrationPage() {
                         {filteredRecords.map(r => (
                             <tr
                                 key={r.id}
-                                className="hover:bg-zinc-50 transition-colors cursor-pointer group"
+                                className={`hover:bg-zinc-50 transition-colors ${isClosed ? 'cursor-default' : 'cursor-pointer'} group`}
                                 onClick={(e) => {
+                                    if (isClosed) return;
                                     if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
                                     setFormData({
                                         id: r.id,
