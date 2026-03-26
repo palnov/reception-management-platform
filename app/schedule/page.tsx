@@ -1513,7 +1513,7 @@ export default function SchedulePage() {
                                         </label>
                                     </div>
                                 </>
-                                {employees.find(e => e.id === selectedEmployeeId)?.role === 'ADMIN' && (
+                                {employees.find(e => e.id === selectedEmployeeId)?.role === 'ADMIN' && selectedDate && selectedDate < new Date('2026-04-01') && (
                                     <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, isActingLead: !prev.isActingLead }))}>
                                         <input
                                             type="checkbox"

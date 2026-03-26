@@ -300,14 +300,20 @@ export class ReportService {
         // =============================================
         if (type === 'FULL' || type === 'KPI') {
             const sheet = workbook.addWorksheet('Зарплата');
-            sheet.columns = [
+            const salaryCols = [
                 { header: 'Сотрудник', key: 'name', width: 25, style: cellStyle },
                 { header: 'Оклад', key: 'base', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Часы', key: 'hours', width: 12, style: { ...cellStyle, numFmt: '0.0' } },
                 { header: 'Смены (Руб)', key: 'shiftPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Работа в арх.', key: 'dayOffPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Откр/Закр', key: 'closing', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                { header: 'ИО', key: 'actingLead', width: 12, style: { ...cellStyle, numFmt: '#,##0' } },
+            ];
+
+            if (startDate < new Date('2026-04-01')) {
+                salaryCols.push({ header: 'ИО', key: 'actingLead', width: 12, style: { ...cellStyle, numFmt: '#,##0' } });
+            }
+
+            salaryCols.push(
                 { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Открытие Б/Л', key: 'sick_leave_open', width: 15, style: centerStyle },
                 { header: 'Закрытие/продление Б/Л', key: 'sick_leave_close', width: 25, style: centerStyle },
@@ -318,7 +324,8 @@ export class ReportService {
                 { header: 'Качество', key: 'quality', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
                 { header: 'KPI бонус', key: 'kpi', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'ИТОГО', key: 'total', width: 15, style: { ...cellStyle, font: { bold: true }, numFmt: '#,##0' } },
-            ];
+            );
+            sheet.columns = salaryCols;
 
             const allShifts = await prisma.shift.findMany({
                 where: { date: dateFilter, isDeleted: false, ...(employeeId ? { employeeId } : {}) }
@@ -369,7 +376,7 @@ export class ReportService {
                     }
                     if (s.cabinetClosed) closingBonuses += 250;
                     if (s.centerClosed) closingBonuses += 500;
-                    if (s.isActingLead) actingLeadBonus += 250;
+                    if (s.isActingLead && startDate < new Date('2026-04-01')) actingLeadBonus += 250;
                 });
 
                 const salesBonus = empLegacyKpi.reduce((sum, k) => sum + k.salesBonus, 0) +

@@ -346,7 +346,7 @@ export default function KpiPage() {
             else if (finalQuality >= 85) qualityBonus = 2500;
 
             const actualClosingBonuses = closingBonuses;
-            const totalPay = basePay + coeffBonus + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + actingLeadBonus;
+            const totalPay = basePay + coeffBonus + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + (currentMonth < new Date('2026-04-01') ? actingLeadBonus : 0);
 
             // Aggregate all audit logs
             const allLogs = [
@@ -428,9 +428,11 @@ export default function KpiPage() {
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за открытие, закрытие центра и за закрытие кабинетов">Откр/Закр.</Tooltip>
                             </th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[60px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
-                                <Tooltip content="Доплата за исполнение обязанностей старшей смены">ИО</Tooltip>
-                            </th>
+                            {currentMonth < new Date('2026-04-01') && (
+                                <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[60px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                                    <Tooltip content="Доплата за исполнение обязанностей старшей смены">ИО</Tooltip>
+                                </th>
+                            )}
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Продажи</th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за открытие больничных листов">Откр. Б/Л</Tooltip>
@@ -505,11 +507,13 @@ export default function KpiPage() {
                                                 <div className="text-emerald-600 font-medium">+{calc.closingBonuses}</div>
                                             ) : '-'}
                                         </td>
-                                        <td className="px-4 py-3 text-right">
-                                            {calc.actingLeadBonus > 0 ? (
-                                                <div className="text-emerald-600 font-medium">+{calc.actingLeadBonus}</div>
-                                            ) : '-'}
-                                        </td>
+                                        {currentMonth < new Date('2026-04-01') && (
+                                            <td className="px-4 py-3 text-right">
+                                                {calc.actingLeadBonus > 0 ? (
+                                                    <div className="text-emerald-600 font-medium">+{calc.actingLeadBonus}</div>
+                                                ) : '-'}
+                                            </td>
+                                        )}
                                         <td className="px-4 py-3 text-right">
                                             {calc.salesBonus > 0 ? (
                                                 <div className="text-emerald-600 font-medium">+{calc.salesBonus}</div>
