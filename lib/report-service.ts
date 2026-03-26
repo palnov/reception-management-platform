@@ -21,9 +21,19 @@ export class ReportService {
 
         const empFilter: any = employeeId ? { id: employeeId } : {
             role: { not: 'MANAGER' },
-            OR: [
-                { dismissalDate: "" },
-                { dismissalDate: { gte: format(startDate, 'yyyy-MM-dd') } }
+            AND: [
+                {
+                    OR: [
+                        { dismissalDate: "" },
+                        { dismissalDate: { gte: format(startDate, 'yyyy-MM-dd') } }
+                    ]
+                },
+                {
+                    OR: [
+                        { hireDate: "" },
+                        { hireDate: { lte: format(endDate, 'yyyy-MM-dd') } }
+                    ]
+                }
             ]
         };
         const employees = await prisma.employee.findMany({
@@ -158,8 +168,11 @@ export class ReportService {
                     const col = d + 1;
                     const dayStr = `${monthStr}-${String(d).padStart(2, '0')}`; // Results in YYYY-MM-DD
 
-                    // Safety check: skip logic for shifts on or after dismissal date (if exists)
-                    if (emp.dismissalDate && emp.dismissalDate !== "" && dayStr >= emp.dismissalDate) {
+                    // Safety check: skip logic for shifts before hire or after dismissal
+                    const isBeforeHire = emp.hireDate && emp.hireDate !== "" && dayStr < emp.hireDate;
+                    const isAfterDismissal = emp.dismissalDate && emp.dismissalDate !== "" && dayStr >= emp.dismissalDate;
+
+                    if (isBeforeHire || isAfterDismissal) {
                         rows.forEach(r => {
                             const cell = r.getCell(col);
                             cell.style = cellStyle;

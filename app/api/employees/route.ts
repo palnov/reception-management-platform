@@ -119,9 +119,25 @@ export async function GET(request: Request) {
                 { dismissalDate: { gt: today } }
             ];
         } else if (activeInDate) {
-            where.OR = [
-                { dismissalDate: "" },
-                { dismissalDate: { gte: activeInDate } }
+            // Normalize activeInDate to the end of its month
+            const year = parseInt(activeInDate.substring(0, 4));
+            const month = parseInt(activeInDate.substring(5, 7));
+            const lastDay = new Date(year, month, 0).getDate();
+            const monthEnd = `${activeInDate.substring(0, 7)}-${String(lastDay).padStart(2, '0')}`;
+
+            where.AND = [
+                {
+                    OR: [
+                        { dismissalDate: "" },
+                        { dismissalDate: { gte: activeInDate } }
+                    ]
+                },
+                {
+                    OR: [
+                        { hireDate: "" },
+                        { hireDate: { lte: monthEnd } }
+                    ]
+                }
             ];
         }
 

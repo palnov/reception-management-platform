@@ -68,7 +68,11 @@ export async function POST(request: Request) {
 
             const validOperations = operations.filter(op => {
                 const dDate = dismissalMap.get(op.employeeId);
-                return !dDate || op.date < dDate;
+                const hDate = involvedEmps.find(e => e.id === op.employeeId)?.hireDate;
+                
+                if (dDate && op.date >= dDate) return false;
+                if (hDate && op.date < hDate) return false;
+                return true;
             });
 
             if (validOperations.length === 0 && operations.length > 0) {

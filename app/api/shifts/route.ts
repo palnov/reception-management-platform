@@ -94,6 +94,9 @@ export async function POST(request: Request) {
         if (emp?.dismissalDate && date >= emp.dismissalDate) {
             return NextResponse.json({ error: `Employee dismissed on ${emp.dismissalDate}. Cannot create shift on ${date}.` }, { status: 400 });
         }
+        if (emp?.hireDate && date < emp.hireDate) {
+            return NextResponse.json({ error: `Employee hired on ${emp.hireDate}. Cannot create shift on ${date}.` }, { status: 400 });
+        }
 
         if (id) {
             // Update existing (by ID)

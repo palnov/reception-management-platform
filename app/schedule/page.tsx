@@ -178,6 +178,14 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
         };
     }, [emp.dismissalDate]);
 
+    const isBeforeHire = useMemo(() => {
+        const hDate = emp.hireDate;
+        if (!hDate) return (date: string) => false;
+        return (date: string) => {
+            return hDate !== "" && date < hDate;
+        };
+    }, [emp.hireDate]);
+
     return (
         <tr ref={setNodeRef} style={style} className="hover:bg-zinc-50 group border-b border-zinc-200">
             <td className="sticky left-0 bg-white group-hover:bg-zinc-50 z-40 p-3 font-medium text-zinc-900 transition-colors" style={{ boxShadow: 'inset -2px 0 0 #d4d4d8, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>
@@ -228,11 +236,13 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                 const shift = empShifts[dateKey];
                 const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                 const dismissed = isDismissed(dateKey);
+                const beforeHire = isBeforeHire(dateKey);
+                const isRestricted = dismissed || beforeHire;
 
                 let bgClass = '';
                 let textClass = '';
 
-                if (dismissed) {
+                if (isRestricted) {
                     bgClass = 'bg-zinc-100/50';
                     textClass = 'text-zinc-300';
                 } else if (shift) {
@@ -248,28 +258,28 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                     <td
                         key={dateKey}
                         className={`border-r border-zinc-200 text-center cursor-pointer relative h-12 w-11 p-0 select-none transition-all
-                            ${shift && !shift.isDeleted ? bgClass : (isWeekend || dismissed ? bgClass : '')}
-                            ${shift && !shift.isDeleted ? textClass : (dismissed ? textClass : '')}
-                            ${!shift || shift.isDeleted ? (dismissed ? '' : 'hover:bg-blue-50/50') : 'hover:brightness-95'}
+                            ${shift && !shift.isDeleted ? bgClass : (isWeekend || isRestricted ? bgClass : '')}
+                            ${shift && !shift.isDeleted ? textClass : (isRestricted ? textClass : '')}
+                            ${!shift || shift.isDeleted ? (isRestricted ? '' : 'hover:bg-blue-50/50') : 'hover:brightness-95'}
                             ${day.getDay() === 6 ? 'border-l-2 border-zinc-400' : ''}
                             ${day.getDay() === 0 ? 'border-r-2 border-zinc-400' : ''}
                             ${((handleCell?.empId === emp.id && handleCell?.dateKey === dateKey) ||
-                                (selection && isInSelection(emp.id, dateKey))) && !dismissed ? 'z-30' : ''}
+                                (selection && isInSelection(emp.id, dateKey))) && !isRestricted ? 'z-30' : ''}
                         `}
                         onMouseDown={(e) => {
-                            if (dismissed || isClosed) return;
+                            if (isRestricted || isClosed) return;
                             if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
                             if (e.button === 0) onMouseDown(e, emp.id, dateKey);
                         }}
-                        onMouseEnter={() => !dismissed && !isClosed && onMouseEnter(emp.id, dateKey)}
+                        onMouseEnter={() => !isRestricted && !isClosed && onMouseEnter(emp.id, dateKey)}
                         onContextMenu={(e) => {
-                            if (dismissed || isClosed) return;
+                            if (isRestricted || isClosed) return;
                             if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
                             onContextMenu(e, emp.id, dateKey, shift);
                         }}
                     >
                         {/* Hover handle trigger (bottom-right corner) - Exactly matches visual handle position */}
-                        {!dismissed && !isClosed && (
+                        {!isRestricted && !isClosed && (
                             <div
                                 className="absolute -bottom-[5px] -right-[5px] w-2.5 h-2.5 z-40 cursor-crosshair"
                                 onMouseEnter={() => onHandleHover(emp.id, dateKey)}
@@ -278,9 +288,11 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                             />
                         )}
 
-                        {dismissed && (
+                        {isRestricted && (
                             <div className="absolute inset-0 flex items-center justify-center opacity-40 pointer-events-none">
-                                <span className="text-[7px] font-black uppercase tracking-tighter rotate-[-15deg] border border-current px-0.5 rounded leading-tight">Уволен</span>
+                                <span className="text-[7px] font-black uppercase tracking-tighter rotate-[-15deg] border border-current px-0.5 rounded leading-tight">
+                                    {dismissed ? 'Уволен' : 'Ожидает'}
+                                </span>
                             </div>
                         )}
 
@@ -604,9 +616,10 @@ export default function SchedulePage() {
                         const isWorkDay = (currentCyclePos === 0 || currentCyclePos === 1);
                         const dateStr = format(day, 'yyyy-MM-dd');
 
-                        // Only add shifts that fall into the target month and respect dismissal date
+                        // Only add shifts that fall into the target month and respect dismissal/hire dates
                         if (day >= currentMonthStart && isWorkDay) {
-                            if (emp.dismissalDate && dateStr > emp.dismissalDate) return;
+                            if (emp.dismissalDate && dateStr >= emp.dismissalDate) return;
+                            if (emp.hireDate && dateStr < emp.hireDate) return;
 
                             operations.push({
                                 date: dateStr,
@@ -722,8 +735,12 @@ export default function SchedulePage() {
 
     const openModal = useCallback((date: Date, empId: string, existingShift?: Shift) => {
         const emp = employees.find(e => e.id === empId);
-        if (emp?.dismissalDate && format(date, 'yyyy-MM-dd') > emp.dismissalDate) {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        if (emp?.dismissalDate && dateStr >= emp.dismissalDate) {
             return; // Don't open modal for dismissed days
+        }
+        if (emp?.hireDate && dateStr < emp.hireDate) {
+            return; // Don't open modal for days before hire
         }
 
         setSelectedDate(date);
@@ -1268,28 +1285,28 @@ export default function SchedulePage() {
                 <div className="flex items-center gap-4">
                     <MonthStatusBadge isClosed={isClosed} />
                     {userData?.role === 'MANAGER' && (
-                        <MonthClosureControls 
-                            currentMonth={currentMonth} 
-                            isClosed={isClosed} 
+                        <MonthClosureControls
+                            currentMonth={currentMonth}
+                            isClosed={isClosed}
                             onStatusChange={refreshMonthStatus}
                         />
                     )}
                     <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm border-zinc-200/60 transition-all">
-                    {isMonthEmpty && prevMonthHasShifts && !isClosed && (
-                        <button
-                            onClick={handleAutoFill}
-                            disabled={isAutoFilling}
-                            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-all shadow-sm font-bold text-sm disabled:opacity-50 animate-in fade-in slide-in-from-right-4"
-                        >
-                            {isAutoFilling ? 'Заполнение...' : 'Заполнить'}
-                        </button>
-                    )}
-                    <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 text-zinc-600" /></button>
-                    <span className="text-lg font-semibold w-40 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
-                    <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
+                        {isMonthEmpty && prevMonthHasShifts && !isClosed && (
+                            <button
+                                onClick={handleAutoFill}
+                                disabled={isAutoFilling}
+                                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-all shadow-sm font-bold text-sm disabled:opacity-50 animate-in fade-in slide-in-from-right-4"
+                            >
+                                {isAutoFilling ? 'Заполнение...' : 'Заполнить'}
+                            </button>
+                        )}
+                        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 text-zinc-600" /></button>
+                        <span className="text-lg font-semibold w-40 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
+                        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
+                    </div>
                 </div>
             </div>
-        </div>
 
             <div
                 ref={gridContainerRef}
@@ -1430,7 +1447,7 @@ export default function SchedulePage() {
                                     <div className="grid grid-cols-2 gap-2">
                                         {[
                                             { id: 'REGULAR', label: 'Рабочая', icon: Briefcase, borderColor: 'border-blue-500', bgColor: 'bg-blue-50', iconBg: 'bg-blue-500', textColor: 'text-blue-900' },
-                                            { id: 'ARCHIVE_WORK', label: 'Работа в арх.', icon: CheckSquare, borderColor: 'border-amber-500', bgColor: 'bg-amber-50', iconBg: 'bg-amber-500', textColor: 'text-amber-900' },
+                                            { id: 'ARCHIVE_WORK', label: 'Работа в архиве', icon: CheckSquare, borderColor: 'border-amber-500', bgColor: 'bg-amber-50', iconBg: 'bg-amber-500', textColor: 'text-amber-900' },
                                             { id: 'SICK', label: 'Больничный', icon: Activity, borderColor: 'border-red-500', bgColor: 'bg-red-50', iconBg: 'bg-red-500', textColor: 'text-red-900' },
                                             { id: 'VACATION', label: 'Отпуск', icon: LayoutList, borderColor: 'border-emerald-500', bgColor: 'bg-emerald-50', iconBg: 'bg-emerald-500', textColor: 'text-emerald-900' }
                                         ].map(type => (
