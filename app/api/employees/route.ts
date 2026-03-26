@@ -292,7 +292,15 @@ export async function PUT(request: Request) {
 
     const dateToUse = effectiveDate || new Date().toISOString().split('T')[0];
 
-    await updateEmployeeHistory(id, role, seniorId || null, dateToUse);
+    const oldEmployee = await prisma.employee.findUnique({
+        where: { id },
+        select: { seniorId: true }
+    });
+    
+    // If the frontend didn't send 'seniorId' at all (undefined), preserve the existing one
+    const resolvedSeniorId = seniorId !== undefined ? (seniorId || null) : oldEmployee?.seniorId;
+
+    await updateEmployeeHistory(id, role, resolvedSeniorId, dateToUse);
 
     const data: any = {
         name,
@@ -302,7 +310,7 @@ export async function PUT(request: Request) {
         branch,
         hireDate: hireDate || '',
         dismissalDate: dismissalDate || '',
-        seniorId: seniorId || null
+        seniorId: resolvedSeniorId
     };
 
     if (password !== undefined) data.password = password;
