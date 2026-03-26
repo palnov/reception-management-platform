@@ -345,7 +345,7 @@ export default function KpiPage() {
             if (finalQuality >= 95) qualityBonus = 5000;
             else if (finalQuality >= 85) qualityBonus = 2500;
 
-            const actualClosingBonuses = enrichedEmp.role === 'SENIOR' ? manualClosingBonus : closingBonuses;
+            const actualClosingBonuses = closingBonuses;
             const totalPay = basePay + coeffBonus + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + actingLeadBonus;
 
             // Aggregate all audit logs
@@ -373,7 +373,6 @@ export default function KpiPage() {
                 dayOffHours,
                 dayOffPay: dayOffPayTotal,
                 closingBonuses: actualClosingBonuses,
-                isClosingManual: enrichedEmp.role === 'SENIOR',
                 actingLeadBonus,
                 salesBonus,
                 sickLeaveOpening,
@@ -502,40 +501,9 @@ export default function KpiPage() {
                                             ) : '-'}
                                         </td>
                                         <td className="px-4 py-3 text-right text-zinc-600 font-medium text-emerald-600">
-                                            {calc.isClosingManual ? (
-                                                currentUser?.role === 'MANAGER' && editingCell?.empId === calc.empId && editingCell?.field === 'closingBonus' ? (
-                                                    <input
-                                                        autoFocus
-                                                        type="number"
-                                                        className="w-16 px-1 py-0.5 border rounded text-right text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                        value={tempValue}
-                                                        onFocus={(e) => e.target.select()}
-                                                        onChange={(e) => setTempValue(e.target.value)}
-                                                        onBlur={() => handleSaveChecklist(calc.empId, 'closingBonus', tempValue)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') handleSaveChecklist(calc.empId, 'closingBonus', tempValue);
-                                                            if (e.key === 'Escape') setEditingCell(null);
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <div
-                                                        className={!isClosed && currentUser?.role === 'MANAGER' ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
-                                                        onClick={() => {
-                                                            if (isClosed || currentUser?.role !== 'MANAGER') return;
-                                                            setEditingCell({ empId: calc.empId, field: 'closingBonus' });
-                                                            setTempValue(calc.closingBonuses === 0 ? '' : calc.closingBonuses.toString());
-                                                        }}
-                                                    >
-                                                        {calc.closingBonuses > 0 ? (
-                                                            <div className="text-emerald-600 font-medium">+{calc.closingBonuses}</div>
-                                                        ) : '-'}
-                                                    </div>
-                                                )
-                                            ) : (
-                                                calc.closingBonuses > 0 ? (
-                                                    <div className="text-emerald-600 font-medium">+{calc.closingBonuses}</div>
-                                                ) : '-'
-                                            )}
+                                            {calc.closingBonuses > 0 ? (
+                                                <div className="text-emerald-600 font-medium">+{calc.closingBonuses}</div>
+                                            ) : '-'}
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             {calc.actingLeadBonus > 0 ? (

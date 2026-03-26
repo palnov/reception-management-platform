@@ -439,7 +439,7 @@ export class ReportService {
                 else if (seniorityYears >= 2) seniorityBonus = Math.round(baseSalary * 0.07);
                 else if (seniorityYears >= 1) seniorityBonus = Math.round(baseSalary * 0.03);
 
-                const actualClosingBonuses = emp.role === 'SENIOR' ? manualClosingBonus : closingBonuses;
+                const actualClosingBonuses = closingBonuses;
                 const total = Math.round(shiftPay + dayOffPayTotal + actualClosingBonuses + actingLeadBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus);
 
                 sheet.addRow({
