@@ -128,7 +128,7 @@ export default function KpiPage() {
     async function fetchEmployees(signal?: AbortSignal) {
         try {
             const monthStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-            const res = await fetch(`/api/employees?activeInDate=${monthStr}`, { signal });
+            const res = await fetch(`/api/employees?activeInDate=${monthStr}&atDate=${monthStr}`, { signal });
             if (res.status === 401) {
                 window.location.href = '/login';
                 return;

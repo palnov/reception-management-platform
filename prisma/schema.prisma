@@ -27,6 +27,19 @@ model Employee {
   promotionSales    PromotionSale[]
   registrationKpis  RegistrationKpi[]
   shifts            Shift[]
+  roleHistory       EmployeeRoleHistory[]
+}
+
+model EmployeeRoleHistory {
+  id         String   @id @default(uuid())
+  employeeId String
+  role       String   @default("ADMIN")
+  seniorId   String?
+  startDate  String   // "YYYY-MM-DD"
+  endDate    String?  // "YYYY-MM-DD"
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, startDate])
 }
 
 model Shift {

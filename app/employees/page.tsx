@@ -22,6 +22,7 @@ export default function EmployeesPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
+    const [originalRole, setOriginalRole] = useState<string | null>(null);
 
     const initialForm = {
         name: '',
@@ -31,7 +32,8 @@ export default function EmployeesPage() {
         branch: 'Дзержинского 26',
         hireDate: '',
         dismissalDate: '',
-        subordinateIds: [] as string[]
+        subordinateIds: [] as string[],
+        effectiveDate: new Date().toISOString().split('T')[0]
     };
 
     const [formData, setFormData] = useState(initialForm);
@@ -69,8 +71,10 @@ export default function EmployeesPage() {
             branch: emp.branch || 'Дзержинского 26',
             hireDate: emp.hireDate || '',
             dismissalDate: emp.dismissalDate || '',
-            subordinateIds: subIds
+            subordinateIds: subIds,
+            effectiveDate: new Date().toISOString().split('T')[0]
         });
+        setOriginalRole(emp.role);
         setShowForm(true);
     }
 
@@ -167,6 +171,20 @@ export default function EmployeesPage() {
                                     </div>
                                 )}
                             </div>
+
+                            {editId && formData.role !== originalRole && (
+                                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 animate-in slide-in-from-top-2">
+                                    <label className="block text-sm font-bold text-blue-900 mb-1">Дата вступления роли в силу</label>
+                                    <p className="text-xs text-blue-600 mb-2">Изменение роли будет сохранено в истории. В предыдущие месяцы сотрудник сохранит старую роль.</p>
+                                    <input
+                                        type="date"
+                                        value={formData.effectiveDate}
+                                        onChange={e => setFormData({ ...formData, effectiveDate: e.target.value })}
+                                        className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                                        required
+                                    />
+                                </div>
+                            )}
 
                             {formData.role === 'SENIOR' && (
                                 <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
