@@ -394,15 +394,6 @@ export class ReportService {
                 const ownQuality = getIndividualQuality(emp);
                 let finalQuality = ownQuality;
 
-                if (emp.role === 'SENIOR') {
-                    const subordinates = allActiveEmployees.filter(e => e.seniorId === emp.id);
-                    if (subordinates.length > 0) {
-                        const subordinateQualities = subordinates.map(sub => getIndividualQuality(sub));
-                        const allQualities = [ownQuality, ...subordinateQualities];
-                        finalQuality = allQualities.reduce((sum, q) => sum + q, 0) / allQualities.length;
-                    }
-                }
-
                 // Restore missing checklist/manual bonus variables
                 const empChecklist = allChecklists.find(c => c.employeeId === emp.id) as any;
                 const ownChecklist = empChecklist ? empChecklist.percentage / 100 : 0;
@@ -411,19 +402,8 @@ export class ReportService {
                 const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
                 const manualClosingBonus = empChecklist ? (empChecklist.closingBonus || 0) : 0;
 
-                // Calculate averaged checklist for seniors
+                // Use checklist percentage
                 let calcChecklist = ownChecklist;
-                if (emp.role === 'SENIOR') {
-                    const subList = allActiveEmployees.filter(e => e.seniorId === emp.id);
-                    if (subList.length > 0) {
-                        const subScores = subList.map(sub => {
-                            const subCl = allChecklists.find(c => c.employeeId === sub.id) as any;
-                            return subCl ? subCl.percentage / 100 : 0;
-                        });
-                        const allScores = [ownChecklist, ...subScores];
-                        calcChecklist = allScores.reduce((sum, s) => sum + s, 0) / allScores.length;
-                    }
-                }
 
                 const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
                 const cardBonus = cardCreation * 60;
