@@ -444,7 +444,14 @@ export default function KpiPage() {
                                 <Tooltip content="Доплата за создание карточек пациентов">Карточки</Tooltip>
                             </th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Выслуга</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Чеклист</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                                <Tooltip content={(() => {
+                                    const visible = payrollData.filter(c => c.rawHours > 0 || c.dayOffHours > 0 || c.totalPay > 0 || c.seniorityBonus > 0);
+                                    if (visible.length === 0) return 'Нет данных';
+                                    const avg = visible.reduce((sum, c) => sum + c.calcChecklist, 0) / visible.length;
+                                    return `Общий чеклист: ${avg.toFixed(1)}%`;
+                                })()}>Чеклист</Tooltip>
+                            </th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Качество заполнения карточек первичных пациентов">Качество</Tooltip>
                             </th>
