@@ -100,7 +100,8 @@ export default function ChecklistPage() {
 
         if (!res.ok) {
             const data = await res.json();
-            if (res.status === 409) {
+            // Handle duplicate entry conflict (409) or error message
+            if (res.status === 409 || data.error?.includes('уже существует')) {
                 setDuplicateError(true);
                 setIsShaking(true);
                 setTimeout(() => setIsShaking(false), 500);
