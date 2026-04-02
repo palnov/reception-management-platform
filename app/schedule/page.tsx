@@ -987,19 +987,8 @@ export default function SchedulePage() {
         if (contextMenu) setContextMenu(null);
 
         // Regular users can only click existing shifts, not drag or select multiple cells
-        if (!isManager) {
-            if (!sourceShift) {
-                // If it's an empty cell, do nothing for non-managers
-                return;
-            }
-            // For existing shifts, allow selection of only THIS cell (handled in isSingleCell in handleMouseUp)
-            setSelection({
-                start: { empId, date, shift: sourceShift },
-                end: { empId, date }
-            });
-            setIsDragging(false); // No dragging for admins
-            setIsFilling(false);
-            setHandleCell(null);
+        if (!isManager && !sourceShift) {
+            // If it's an empty cell, do nothing for non-managers
             return;
         }
 
@@ -1010,12 +999,13 @@ export default function SchedulePage() {
         setIsDragging(true);
         setIsFilling(false);
         setHandleCell(null);
-    }, [shiftsByEmployee, selection, contextMenu]);
+    }, [shiftsByEmployee, selection, contextMenu, isManager]);
 
     const handleMouseEnter = useCallback((empId: string, date: string) => {
         if (!isDragging && !isFilling) return;
+        if (!isManager && isDragging) return; // Prevent extending selection for non-managers
         setSelection(prev => prev ? { ...prev, end: { empId, date } } : null);
-    }, [isDragging, isFilling]);
+    }, [isDragging, isFilling, isManager]);
 
     const handleMouseUp = useCallback(async () => {
         if (!isDragging && !isFilling) {
