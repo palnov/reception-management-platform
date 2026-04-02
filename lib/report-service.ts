@@ -24,12 +24,14 @@ export class ReportService {
             AND: [
                 {
                     OR: [
+                        { dismissalDate: null },
                         { dismissalDate: "" },
                         { dismissalDate: { gte: format(startDate, 'yyyy-MM-dd') } }
                     ]
                 },
                 {
                     OR: [
+                        { hireDate: null },
                         { hireDate: "" },
                         { hireDate: { lte: format(endDate, 'yyyy-MM-dd') } }
                     ]
@@ -382,11 +384,23 @@ export class ReportService {
             const allActiveEmployees = await prisma.employee.findMany({
                 where: {
                     role: { not: 'MANAGER' },
-                    OR: [
-                        { dismissalDate: "" },
-                        { dismissalDate: { gte: format(startDate, 'yyyy-MM-dd') } }
+                    AND: [
+                        {
+                            OR: [
+                                { dismissalDate: null },
+                                { dismissalDate: "" },
+                                { dismissalDate: { gte: format(startDate, 'yyyy-MM-dd') } }
+                            ]
+                        },
+                        {
+                            OR: [
+                                { hireDate: null },
+                                { hireDate: "" },
+                                { hireDate: { lte: format(endDate, 'yyyy-MM-dd') } }
+                            ]
+                        }
                     ]
-                }
+                } as any
             });
 
             // Fetch monthly checklists

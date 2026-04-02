@@ -115,6 +115,7 @@ export async function GET(request: Request) {
         if (activeOnly) {
             const today = new Date().toISOString().split('T')[0];
             where.OR = [
+                { dismissalDate: null },
                 { dismissalDate: "" },
                 { dismissalDate: { gt: today } }
             ];
@@ -128,12 +129,14 @@ export async function GET(request: Request) {
             where.AND = [
                 {
                     OR: [
+                        { dismissalDate: null },
                         { dismissalDate: "" },
                         { dismissalDate: { gte: activeInDate } }
                     ]
                 },
                 {
                     OR: [
+                        { hireDate: null },
                         { hireDate: "" },
                         { hireDate: { lte: monthEnd } }
                     ]
