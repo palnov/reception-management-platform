@@ -51,6 +51,7 @@ model Shift {
   cabinetClosed Boolean  @default(false)
   centerClosed  Boolean  @default(false)
   isActingLead  Boolean  @default(false)
+  isTrainee     Boolean  @default(false)
   coefficient   Float    @default(1.0)
   comment       String?
   createdAt     String   @default("")

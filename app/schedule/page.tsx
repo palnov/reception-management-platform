@@ -7,7 +7,7 @@ import { MonthStatusBadge } from '@/components/MonthStatusBadge';
 import { MonthClosureControls } from '@/components/MonthClosureControls';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, parseISO, subDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, X, DoorOpen, MapPin, GripVertical, User, Crown, BadgeCheck, Clock, Briefcase, CheckSquare, Activity, LayoutList, Timer, Percent, Layers } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, DoorOpen, MapPin, GripVertical, User, Crown, BadgeCheck, Clock, Briefcase, CheckSquare, Activity, LayoutList, Timer, Percent, Layers, GraduationCap } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
 import { QuickContextMenu } from '@/components/QuickContextMenu';
 import {
@@ -51,6 +51,7 @@ interface Shift {
     centerClosed: boolean;
     coefficient: number;
     isActingLead: boolean;
+    isTrainee?: boolean;
     createdBy?: string;
     auditLogs?: any[];
     isDeleted?: boolean;
@@ -314,6 +315,9 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                                     {shift.isActingLead && (
                                         <Crown className="w-2.5 h-2.5 text-amber-500" />
                                     )}
+                                    {shift.isTrainee && (
+                                        <GraduationCap className="w-2.5 h-2.5 text-indigo-500" />
+                                    )}
                                     {shift.auditLogs && shift.auditLogs.length > 0 && (
                                         <InfoTooltip
                                             logs={shift.auditLogs}
@@ -380,6 +384,7 @@ export default function SchedulePage() {
         cabinetClosed: false,
         centerClosed: false,
         isActingLead: false,
+        isTrainee: false,
         coefficient: '1.0'
     });
 
@@ -752,6 +757,7 @@ export default function SchedulePage() {
                 cabinetClosed: !!existingShift.cabinetClosed,
                 centerClosed: !!existingShift.centerClosed,
                 isActingLead: !!existingShift.isActingLead,
+                isTrainee: !!existingShift.isTrainee,
                 coefficient: (existingShift.coefficient || 1.0).toString()
             });
         } else {
@@ -761,6 +767,7 @@ export default function SchedulePage() {
                 cabinetClosed: false,
                 centerClosed: false,
                 isActingLead: false,
+                isTrainee: false,
                 coefficient: '1.0'
             });
         }
@@ -893,6 +900,7 @@ export default function SchedulePage() {
                 employeeId: cell.empId,
                 ...formData,
                 isActingLead: formData.isActingLead && emp?.role === 'ADMIN',
+                isTrainee: formData.isTrainee,
                 id: shiftsByEmployee[cell.empId]?.[cell.date]?.id
             };
         }).filter(Boolean);
@@ -1041,6 +1049,8 @@ export default function SchedulePage() {
                     hours: sourceShift.hours,
                     cabinetClosed: sourceShift.cabinetClosed,
                     centerClosed: sourceShift.centerClosed,
+                    isActingLead: sourceShift.isActingLead,
+                    isTrainee: sourceShift.isTrainee,
                     coefficient: sourceShift.coefficient,
                     id: shiftsByEmployee[cell.empId]?.[cell.date]?.id
                 };
@@ -1544,6 +1554,18 @@ export default function SchedulePage() {
                                         </label>
                                     </div>
                                 )}
+                                <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, isTrainee: !prev.isTrainee }))}>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.isTrainee}
+                                        readOnly
+                                        className="w-5 h-5 text-purple-600 rounded-lg focus:ring-purple-500 border-zinc-300 transition-all pointer-events-none"
+                                    />
+                                    <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
+                                        <span>Обучение стажёра</span>
+                                        <span className="text-purple-600 bg-purple-50 px-2 py-0.5 rounded text-xs font-bold">+500р.</span>
+                                    </label>
+                                </div>
                             </div>
 
                             <div className="flex gap-3 pt-2">
@@ -1673,6 +1695,19 @@ export default function SchedulePage() {
                                         <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">+500р.</span>
                                     </label>
                                 </div>
+                            </div>
+
+                            <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, isTrainee: !prev.isTrainee }))}>
+                                <input
+                                    type="checkbox"
+                                    checked={formData.isTrainee}
+                                    readOnly
+                                    className="w-5 h-5 text-purple-600 rounded-lg focus:ring-purple-500 border-zinc-300 transition-all pointer-events-none"
+                                />
+                                <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
+                                    <span>Обучение стажёра</span>
+                                    <span className="text-purple-600 bg-purple-50 px-2 py-0.5 rounded text-xs font-bold">+500р.</span>
+                                </label>
                             </div>
 
                             <div className="flex gap-3 pt-2">

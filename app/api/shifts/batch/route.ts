@@ -91,6 +91,7 @@ export async function POST(request: Request) {
                         cabinetClosed: !!op.cabinetClosed,
                         centerClosed: !!op.centerClosed,
                         isActingLead: !!op.isActingLead,
+                        isTrainee: !!op.isTrainee,
                         coefficient: Math.min(parseFloat(op.coefficient || 1.0), 1.5),
                         isDeleted: false
                     };

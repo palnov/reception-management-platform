@@ -325,6 +325,7 @@ export class ReportService {
             if (startDate < new Date('2026-04-01')) {
                 salaryCols.push({ header: 'ИО', key: 'actingLead', width: 12, style: { ...cellStyle, numFmt: '#,##0' } });
             }
+            salaryCols.push({ header: 'Стажёр', key: 'trainee', width: 12, style: { ...cellStyle, numFmt: '#,##0' } });
 
             salaryCols.push(
                 { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
@@ -378,6 +379,7 @@ export class ReportService {
                 let dayOffPayTotal = 0;
                 let closingBonuses = 0;
                 let actingLeadBonus = 0;
+                let traineeBonus = 0;
                 const hourlyBase = emp.baseSalary / monthNorm;
 
                 empShifts.forEach(s => {
@@ -390,6 +392,7 @@ export class ReportService {
                     if (s.cabinetClosed) closingBonuses += 250;
                     if (s.centerClosed) closingBonuses += 500;
                     if (s.isActingLead && startDate < new Date('2026-04-01')) actingLeadBonus += 250;
+                    if (s.isTrainee) traineeBonus += 500;
                 });
 
                 const salesBonus = empLegacyKpi.reduce((sum, k) => sum + k.salesBonus, 0) +
@@ -460,7 +463,7 @@ export class ReportService {
                 else if (seniorityYears >= 1) seniorityBonus = Math.round(baseSalary * 0.03);
 
                 const actualClosingBonuses = closingBonuses;
-                const total = Math.round(shiftPay + dayOffPayTotal + actualClosingBonuses + actingLeadBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus);
+                const total = Math.round(shiftPay + dayOffPayTotal + actualClosingBonuses + actingLeadBonus + traineeBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus);
 
                 sheet.addRow({
                     name: emp.name,
@@ -470,6 +473,7 @@ export class ReportService {
                     dayOffPay: Math.round(dayOffPayTotal),
                     closing: actualClosingBonuses,
                     actingLead: actingLeadBonus,
+                    trainee: traineeBonus,
                     sales: salesBonus,
                     sick_leave_open: sickLeaveOpening,
                     sick_leave_close: sickLeaveClosing,

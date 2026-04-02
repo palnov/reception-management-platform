@@ -34,6 +34,7 @@ interface Shift {
     employeeId: string;
     coefficient: number;
     isActingLead: boolean;
+    isTrainee?: boolean;
     isDeleted?: boolean;
     auditLogs?: any[];
 }
@@ -253,6 +254,7 @@ export default function KpiPage() {
             let dayOffPayTotal = 0;
             let closingBonuses = 0;
             let actingLeadBonus = 0;
+            let traineeBonus = 0;
             empShifts.forEach(s => {
                 // Safety check: skip shifts on or after dismissal date
                 if (dismissalDate && s.date >= dismissalDate) return;
@@ -274,6 +276,7 @@ export default function KpiPage() {
                 if (s.cabinetClosed) closingBonuses += 250;
                 if (s.centerClosed) closingBonuses += 500;
                 if (s.isActingLead) actingLeadBonus += 250;
+                if (s.isTrainee) traineeBonus += 500;
             });
 
             // Combine legacy sales bonus with new promotional sales
@@ -346,7 +349,7 @@ export default function KpiPage() {
             else if (finalQuality >= 85) qualityBonus = 2500;
 
             const actualClosingBonuses = closingBonuses;
-            const totalPay = basePay + coeffBonus + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + (currentMonth < new Date('2026-04-01') ? actingLeadBonus : 0);
+            const totalPay = basePay + coeffBonus + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + traineeBonus + (currentMonth < new Date('2026-04-01') ? actingLeadBonus : 0);
 
             // Aggregate all audit logs
             const allLogs = [
@@ -374,6 +377,7 @@ export default function KpiPage() {
                 dayOffPay: dayOffPayTotal,
                 closingBonuses: actualClosingBonuses,
                 actingLeadBonus,
+                traineeBonus,
                 salesBonus,
                 sickLeaveOpening,
                 sickLeaveClosing,
@@ -433,6 +437,7 @@ export default function KpiPage() {
                                     <Tooltip content="Доплата за исполнение обязанностей старшей смены">ИО</Tooltip>
                                 </th>
                             )}
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[80px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Стажёр</th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Продажи</th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за открытие больничных листов">Откр. Б/Л</Tooltip>
@@ -521,6 +526,11 @@ export default function KpiPage() {
                                                 ) : '-'}
                                             </td>
                                         )}
+                                        <td className="px-4 py-3 text-right">
+                                            {calc.traineeBonus > 0 ? (
+                                                <div className="text-emerald-600 font-medium">+{calc.traineeBonus}</div>
+                                            ) : '-'}
+                                        </td>
                                         <td className="px-4 py-3 text-right">
                                             {calc.salesBonus > 0 ? (
                                                 <div className="text-emerald-600 font-medium">+{calc.salesBonus}</div>
