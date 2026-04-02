@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { Users, Calendar, BarChart3, ShoppingCart, FileCheck, LogOut, User as UserIcon, Database } from 'lucide-react';
+import { Users, Calendar, BarChart3, ShoppingCart, FileCheck, BadgeCheck, LogOut, User as UserIcon, Database } from 'lucide-react';
 import { APP_NAME } from '@/lib/constants';
 
 interface User {
@@ -65,6 +65,9 @@ export function Navbar() {
                 </Link>
                 <Link href="/registration" className={`flex items-center gap-2 hover:text-blue-600 transition-colors ${pathname === '/registration' ? 'text-blue-600' : ''}`}>
                     <FileCheck className="w-4 h-4" /> Качество оформления
+                </Link>
+                <Link href="/checklist" className={`flex items-center gap-2 hover:text-blue-600 transition-colors ${pathname === '/checklist' ? 'text-blue-600' : ''}`}>
+                    <BadgeCheck className="w-4 h-4" /> Чеклист
                 </Link>
                 <Link href="/kpi" className={`flex items-center gap-2 hover:text-blue-600 transition-colors ${pathname === '/kpi' ? 'text-blue-600' : ''}`}>
                     <BarChart3 className="w-4 h-4" /> KPI и Зарплата

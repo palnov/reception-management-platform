@@ -3,7 +3,7 @@ import { prisma } from './prisma';
 import { getSession } from './auth';
 
 export async function logAudit(
-    entityType: 'SHIFT' | 'KPI' | 'SALE' | 'REGISTRATION',
+    entityType: 'SHIFT' | 'KPI' | 'SALE' | 'REGISTRATION' | 'DAILY_CHECKLIST',
     entityId: string,
     action: 'CREATE' | 'UPDATE' | 'DELETE',
     details?: any,

@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { useSharedMonth } from '@/lib/useSharedMonth';
 import { format, startOfMonth, endOfMonth, isSameDay, subMonths, addMonths, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -79,6 +80,7 @@ export default function KpiPage() {
     const [promotionSales, setPromotionSales] = useState<PromotionSale[]>([]);
     const [registrationKpis, setRegistrationKpis] = useState<RegistrationKpi[]>([]);
     const [monthlyChecklists, setMonthlyChecklists] = useState<any[]>([]);
+    const [dailyChecklists, setDailyChecklists] = useState<any[]>([]);
     const [monthNorm, setMonthNorm] = useState<number>(176);
 
     // Entry Form State
@@ -149,12 +151,13 @@ export default function KpiPage() {
             const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
             const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
 
-            const [shiftsRes, kpiRes, salesRes, regRes, checklistRes] = await Promise.all([
+            const [shiftsRes, kpiRes, salesRes, regRes, checklistRes, dailyCheckRes] = await Promise.all([
                 fetch(`/api/shifts?start=${start}&end=${end}&includeDetails=true`, { signal }),
                 fetch(`/api/kpi?start=${start}&end=${end}&includeDetails=true`, { signal }),
                 fetch(`/api/sales?start=${start}&end=${end}&includeDetails=true`, { signal }),
                 fetch(`/api/registration?start=${start}&end=${end}&includeDetails=true`, { signal }),
-                fetch(`/api/checklist?month=${currentMonth.toISOString().substring(0, 7)}`, { signal })
+                fetch(`/api/checklist?month=${currentMonth.toISOString().substring(0, 7)}`, { signal }),
+                fetch(`/api/checklist/daily?start=${start}&end=${end}&includeDetails=true`, { signal })
             ]);
 
             const shiftsData = await shiftsRes.json();
@@ -162,12 +165,14 @@ export default function KpiPage() {
             const salesData = await salesRes.json();
             const regData = await regRes.json();
             const checklistData = await checklistRes.json();
+            const dailyCheckData = await dailyCheckRes.json();
 
             setShifts(Array.isArray(shiftsData) ? shiftsData : []);
             setKpiRecords(Array.isArray(kpiData) ? kpiData : []);
             setPromotionSales(Array.isArray(salesData) ? salesData : []);
             setRegistrationKpis(Array.isArray(regData) ? regData : []);
             setMonthlyChecklists(Array.isArray(checklistData) ? checklistData : []);
+            setDailyChecklists(Array.isArray(dailyCheckData) ? dailyCheckData : []);
         } catch (e: any) {
             if (e.name !== 'AbortError') console.error('KPI_FETCH_DATA_ERROR:', e);
         }
@@ -303,9 +308,15 @@ export default function KpiPage() {
             else if (seniorityYears >= 2) seniorityBonus = Math.round(baseSalary * 0.07);
             else if (seniorityYears >= 1) seniorityBonus = Math.round(baseSalary * 0.03);
 
-            // Get checklist from monthly checklist table (single value per month)
+            // Get checklist from daily audits
+            const empDailyChecklists = dailyChecklists.filter(c => c.employeeId === enrichedEmp.id);
+            const avgDailyChecklist = empDailyChecklists.length > 0
+                ? empDailyChecklists.reduce((sum, c) => sum + c.totalScore, 0) / empDailyChecklists.length
+                : 0;
+
             const monthStr = currentMonth.toISOString().substring(0, 7);
             const empChecklist = monthlyChecklists.find(c => c.employeeId === enrichedEmp.id && c.month === monthStr);
+            // Use daily average for calculation, ownChecklist is monthly constant (legacy if needed)
             const ownChecklist = empChecklist ? empChecklist.percentage : 0;
             const sickLeaveOpening = empChecklist ? (empChecklist.sickLeaveOpening || 0) : 0;
             const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
@@ -315,8 +326,8 @@ export default function KpiPage() {
             const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
             const cardBonus = cardCreation * 60;
 
-            // Use checklist from monthly checklist table
-            let calcChecklist = ownChecklist;
+            // Use checklist average from daily audits for KPI bonus
+            let calcChecklist = avgDailyChecklist || ownChecklist; // Fallback to legacy if no daily audits
             let checklistBreakdown = "";
 
             let checklistBonus = 0;
@@ -397,7 +408,7 @@ export default function KpiPage() {
                 auditLogs: uniqueLogs
             };
         });
-    }, [employees, shifts, kpiRecords, promotionSales, registrationKpis, monthlyChecklists, monthNorm, currentUser, isUserLoading, currentMonth]);
+    }, [employees, shifts, kpiRecords, promotionSales, registrationKpis, monthlyChecklists, dailyChecklists, monthNorm, currentUser, isUserLoading, currentMonth]);
 
     return (
         <div>
@@ -628,46 +639,14 @@ export default function KpiPage() {
                                             <div className="text-[10px] text-zinc-400">{calc.seniorityYears > 0 ? calc.seniorityYears.toFixed(1) + ' г.' : ''}</div>
                                         </td>
                                         <td className="px-4 py-3 text-right text-zinc-600">
-                                            {editingCell?.empId === calc.empId && editingCell?.field === 'percentage' ? (
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <input
-                                                        autoFocus
-                                                        type="number"
-                                                        className="w-16 px-1 py-0.5 border rounded text-right text-sm"
-                                                        value={tempValue}
-                                                        onFocus={(e) => e.target.select()}
-                                                        onChange={(e) => setTempValue(e.target.value)}
-                                                        onBlur={() => handleSaveChecklist(calc.empId, 'percentage', tempValue)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') handleSaveChecklist(calc.empId, 'percentage', tempValue);
-                                                            if (e.key === 'Escape') setEditingCell(null);
-                                                        }}
-                                                    />
+                                            <div className="flex flex-col items-end">
+                                                {calc.checklistBonus > 0 && <span className="text-green-600 font-medium">+{calc.checklistBonus}</span>}
+                                                <div className="text-[10px] text-zinc-400 font-bold">
+                                                    {calc.calcChecklist.toFixed(1)}%
                                                 </div>
-                                            ) : (
-                                                <>
-                                                    {calc.checklistBonus > 0 && <span className="text-green-600 font-medium">+{calc.checklistBonus}</span>}
-                                                    <div
-                                                        className={!isClosed ? "text-[10px] text-zinc-400 cursor-pointer hover:text-blue-600 transition-colors" : "text-[10px] text-zinc-400"}
-                                                        onClick={() => {
-                                                            if (isClosed) return;
-                                                            setEditingCell({ empId: calc.empId, field: 'percentage' });
-                                                            setTempValue((calc.ownChecklist ?? calc.calcChecklist) === 0 ? '' : (calc.ownChecklist ?? calc.calcChecklist).toFixed(0));
-                                                        }}
-                                                    >
-                                                        {calc.checklistBreakdown ? (
-                                                            <Tooltip content={calc.checklistBreakdown}>
-                                                                <span className="cursor-help border-b border-dotted border-zinc-300">
-                                                                    {calc.calcChecklist.toFixed(1)}%
-                                                                </span>
-                                                            </Tooltip>
-                                                        ) : (
-                                                            <>{calc.calcChecklist.toFixed(0)}%</>
-                                                        )}
-                                                    </div>
-                                                </>
-                                            )}
+                                            </div>
                                         </td>
+
                                         <td className="px-4 py-3 text-right text-zinc-600">
                                             {calc.qualityBonus > 0 && <span className="text-green-600 font-medium">+{calc.qualityBonus}</span>}
                                             <div className="text-[10px] text-zinc-400">
@@ -755,21 +734,9 @@ export default function KpiPage() {
                                 </div>
 
                                 <div className="p-3 bg-zinc-50 rounded-lg border border-zinc-200">
-                                    <label className="block text-sm font-medium mb-1">Чек-лист (%)</label>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="number"
-                                            value={formData.checkList}
-                                            onChange={e => setFormData({ ...formData, checkList: e.target.value })}
-                                            className="w-full px-3 py-2 border rounded-lg"
-                                            max="100" min="0"
-                                        />
-                                        <div className="text-xs font-bold whitespace-nowrap">
-                                            {parseFloat(formData.checkList) >= 90 ? <span className="text-green-600">+5000р</span> :
-                                                parseFloat(formData.checkList) >= 76 ? <span className="text-blue-600">+2500р</span> :
-                                                    <span className="text-zinc-400">0р</span>}
-                                        </div>
-                                    </div>
+                                    <p className="text-xs text-zinc-500 text-center">
+                                        Показатель чеклиста теперь рассчитывается автоматически на основе ежедневных аудитов на странице <Link href="/checklist" className="text-blue-600 underline">Чеклист</Link>.
+                                    </p>
                                 </div>
 
                                 <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium">

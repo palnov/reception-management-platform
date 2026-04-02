@@ -28,6 +28,7 @@ model Employee {
   registrationKpis  RegistrationKpi[]
   shifts            Shift[]
   roleHistory       EmployeeRoleHistory[]
+  dailyChecklists   DailyChecklist[]
 }
 
 model EmployeeRoleHistory {
@@ -123,6 +124,25 @@ model RegistrationKpi {
   createdAt  String   @default("")
   createdBy  String?
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model DailyChecklist {
+  id         String   @id @default(uuid())
+  date       String
+  employeeId String
+  criterion1 Float    @default(0) // Внешний вид и дисциплина
+  criterion2 Float    @default(0) // Приветствие и первичный контакт
+  criterion3 Float    @default(0) // Соблюдение алгоритма приема
+  criterion4 Float    @default(0) // Стимулирование услуг
+  criterion5 Float    @default(0) // Работа с возражениями
+  criterion6 Float    @default(0) // Завершение контакта
+  totalScore Float    @default(0)
+  maxScore   Float    @default(100)
+  createdAt  String   @default("")
+  createdBy  String?
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, date])
 }
 
 model AuditLog {
