@@ -52,14 +52,20 @@ export class ReportService {
         const monthNorm = normRecord?.hours || 176;
 
         // Styles
+        const borderStyle: Partial<ExcelJS.Borders> = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+        };
+
         const headerStyle: Partial<ExcelJS.Style> = {
             font: { bold: true, size: 12, color: { argb: 'FFFFFFFF' } },
             fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } },
             alignment: { horizontal: 'center', vertical: 'middle' },
-            border: { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }
+            border: borderStyle
         };
         const cellStyle: Partial<ExcelJS.Style> = {
-            border: { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } },
             alignment: { vertical: 'middle' }
         };
         const centerStyle: Partial<ExcelJS.Style> = {
@@ -163,6 +169,13 @@ export class ReportService {
                     rows[3].getCell(1).style = { ...cellStyle, font: { italic: true, size: 9, color: { argb: 'FF059669' } } };
                 }
 
+                // Apply borders to the labels column and all day columns
+                rows.forEach(r => {
+                    for (let c = 1; c <= daysInMonth + 1; c++) {
+                        r.getCell(c).border = borderStyle;
+                    }
+                });
+
                 // Day columns
                 for (let d = 1; d <= daysInMonth; d++) {
                     const col = d + 1;
@@ -187,7 +200,6 @@ export class ReportService {
                     rows.forEach(r => {
                         const cell = r.getCell(col);
                         cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                        if (cellStyle.border) cell.border = cellStyle.border;
                     });
 
                     if (shift) {
@@ -258,7 +270,7 @@ export class ReportService {
             });
 
             sales.forEach(s => {
-                sheet.addRow({
+                const row = sheet.addRow({
                     date: parseISO(s.date),
                     patient: s.patientId || '-',
                     employee: s.employee.name,
@@ -266,6 +278,7 @@ export class ReportService {
                     price: s.price,
                     bonus: s.bonus
                 });
+                row.eachCell((cell) => { cell.border = borderStyle; });
             });
             applyHeader(sheet);
         }
@@ -296,7 +309,7 @@ export class ReportService {
             regs.forEach(r => {
                 const maxScore = r.count * 3;
                 const percent = maxScore > 0 ? r.totalScore / maxScore : 0;
-                sheet.addRow({
+                const row = sheet.addRow({
                     date: parseISO(r.date),
                     employee: r.employee.name,
                     count: r.count,
@@ -304,6 +317,7 @@ export class ReportService {
                     max: maxScore,
                     percent: percent
                 });
+                row.eachCell((cell) => { cell.border = borderStyle; });
             });
             applyHeader(sheet);
         }
@@ -480,7 +494,7 @@ export class ReportService {
                 const total = Math.round(shiftPay + bonuses);
 
                 if (salarySheet) {
-                    salarySheet.addRow({
+                    const row = salarySheet.addRow({
                         name: emp.name,
                         base: emp.baseSalary,
                         hours: hoursWorked,
@@ -500,16 +514,18 @@ export class ReportService {
                         kpi: kpiBonus,
                         total: total
                     });
+                    row.eachCell((cell) => { cell.border = borderStyle; });
                 }
 
                 if (accountantSheet) {
-                    accountantSheet.addRow({
+                    const row = accountantSheet.addRow({
                         name: emp.name,
                         hours: hoursWorked,
                         base_paid: Math.round(shiftPay),
                         bonuses: bonuses,
                         total: total
                     });
+                    row.eachCell((cell) => { cell.border = borderStyle; });
                 }
             }
 
