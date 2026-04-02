@@ -1517,7 +1517,6 @@ export default function SchedulePage() {
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Коэффициент</label>
-                                    <Tooltip content={!isManager ? "Для изменения графика обратитесь к руководителю" : ""}>
                                         <div className="relative group">
                                             <input
                                                 type="number"
@@ -1525,15 +1524,13 @@ export default function SchedulePage() {
                                                 min="0"
                                                 max="1.5"
                                                 value={formData.coefficient}
-                                                disabled={!isManager}
                                                 onChange={e => setFormData(prev => ({ ...prev, coefficient: e.target.value }))}
-                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${!isManager ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
+                                                className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"
                                             />
                                             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
                                                 <Percent className="w-4 h-4" />
                                             </div>
                                         </div>
-                                    </Tooltip>
                                 </div>
                             </div>
 
@@ -1683,7 +1680,6 @@ export default function SchedulePage() {
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Коэффициент</label>
-                                    <Tooltip content={!isManager ? "Для изменения графика обратитесь к руководителю" : ""}>
                                         <div className="relative group">
                                             <input
                                                 type="number"
@@ -1691,15 +1687,13 @@ export default function SchedulePage() {
                                                 min="0"
                                                 max="1.5"
                                                 value={formData.coefficient}
-                                                disabled={!isManager}
                                                 onChange={e => setFormData(prev => ({ ...prev, coefficient: e.target.value }))}
-                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${!isManager ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
+                                                className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"
                                             />
                                             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
                                                 <Percent className="w-4 h-4" />
                                             </div>
                                         </div>
-                                    </Tooltip>
                                 </div>
                             </div>
 
