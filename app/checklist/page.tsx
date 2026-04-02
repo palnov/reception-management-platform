@@ -344,12 +344,6 @@ export default function ChecklistPage() {
                                     <span className="text-sm font-bold text-purple-400 block uppercase tracking-wider mb-1">Итоговый результат:</span>
                                     <span className="text-3xl font-black text-purple-600">{averagePercent.toFixed(1)} <small className="text-lg font-bold opacity-60">%</small></span>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-1">Ожидаемый бонус</div>
-                                    {averagePercent >= 90 ? <span className="text-green-600 font-black">+5000р</span> :
-                                     averagePercent >= 76 ? <span className="text-blue-600 font-black">+2500р</span> :
-                                     <span className="text-zinc-400 font-black">0р</span>}
-                                </div>
                             </div>
 
                             <div className="flex gap-4">
