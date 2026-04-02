@@ -311,9 +311,12 @@ export class ReportService {
         // =============================================
         // 4. KPI & SALARY SHEET
         // =============================================
-        if (type === 'FULL' || type === 'KPI') {
-            const sheet = workbook.addWorksheet('Зарплата');
-            const salaryCols = [
+        if (type === 'FULL' || type === 'KPI' || type === 'ACCOUNTANT') {
+            const salarySheet = (type === 'FULL' || type === 'KPI') ? workbook.addWorksheet('Зарплата') : null;
+            const accountantSheet = (type === 'FULL' || type === 'ACCOUNTANT') ? workbook.addWorksheet('Для бухгалтера') : null;
+
+            if (salarySheet) {
+                const salaryCols = [
                 { header: 'Сотрудник', key: 'name', width: 25, style: cellStyle },
                 { header: 'Оклад', key: 'base', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 { header: 'Часы', key: 'hours', width: 12, style: { ...cellStyle, numFmt: '0.0' } },
@@ -327,19 +330,30 @@ export class ReportService {
             }
             salaryCols.push({ header: 'Стажёр', key: 'trainee', width: 12, style: { ...cellStyle, numFmt: '#,##0' } });
 
-            salaryCols.push(
-                { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                { header: 'Открытие Б/Л', key: 'sick_leave_open', width: 15, style: centerStyle },
-                { header: 'Закрытие/продление Б/Л', key: 'sick_leave_close', width: 25, style: centerStyle },
-                { header: 'Карточки', key: 'cards', width: 15, style: centerStyle },
-                { header: 'Выслуга', key: 'seniority', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                { header: 'Чеклист %', key: 'checklist_pct', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
-                { header: 'Чеклист Руб', key: 'checklist_rub', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                { header: 'Качество', key: 'quality', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
-                { header: 'KPI бонус', key: 'kpi', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                { header: 'ИТОГО', key: 'total', width: 15, style: { ...cellStyle, font: { bold: true }, numFmt: '#,##0' } },
-            );
-            sheet.columns = salaryCols;
+                salaryCols.push(
+                    { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                    { header: 'Открытие Б/Л', key: 'sick_leave_open', width: 15, style: centerStyle },
+                    { header: 'Закрытие/продление Б/Л', key: 'sick_leave_close', width: 25, style: centerStyle },
+                    { header: 'Карточки', key: 'cards', width: 15, style: centerStyle },
+                    { header: 'Выслуга', key: 'seniority', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                    { header: 'Чеклист %', key: 'checklist_pct', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
+                    { header: 'Чеклист Руб', key: 'checklist_rub', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                    { header: 'Качество', key: 'quality', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
+                    { header: 'KPI бонус', key: 'kpi', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                    { header: 'ИТОГО', key: 'total', width: 15, style: { ...cellStyle, font: { bold: true }, numFmt: '#,##0' } },
+                );
+                salarySheet.columns = salaryCols;
+            }
+
+            if (accountantSheet) {
+                accountantSheet.columns = [
+                    { header: 'Сотрудник', key: 'name', width: 25, style: cellStyle },
+                    { header: 'Часы', key: 'hours', width: 12, style: { ...cellStyle, numFmt: '0.0' } },
+                    { header: 'Оклад', key: 'base_paid', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                    { header: 'Надбавки', key: 'bonuses', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                    { header: 'ИТОГО', key: 'total', width: 15, style: { ...cellStyle, font: { bold: true }, numFmt: '#,##0' } },
+                ];
+            }
 
             const allShifts = await prisma.shift.findMany({
                 where: { date: dateFilter, isDeleted: false, ...(employeeId ? { employeeId } : {}) }
@@ -462,32 +476,45 @@ export class ReportService {
                 else if (seniorityYears >= 2) seniorityBonus = Math.round(baseSalary * 0.07);
                 else if (seniorityYears >= 1) seniorityBonus = Math.round(baseSalary * 0.03);
 
-                const actualClosingBonuses = closingBonuses;
-                const total = Math.round(shiftPay + dayOffPayTotal + actualClosingBonuses + actingLeadBonus + traineeBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus);
+                const bonuses = Math.round(dayOffPayTotal + closingBonuses + actingLeadBonus + traineeBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus);
+                const total = Math.round(shiftPay + bonuses);
 
-                sheet.addRow({
-                    name: emp.name,
-                    base: emp.baseSalary,
-                    hours: hoursWorked,
-                    shiftPay: Math.round(shiftPay),
-                    dayOffPay: Math.round(dayOffPayTotal),
-                    closing: actualClosingBonuses,
-                    actingLead: actingLeadBonus,
-                    trainee: traineeBonus,
-                    sales: salesBonus,
-                    sick_leave_open: sickLeaveOpening,
-                    sick_leave_close: sickLeaveClosing,
-                    cards: cardCreation,
-                    seniority: seniorityBonus,
-                    checklist_pct: calcChecklist,
-                    checklist_rub: checklistBonus,
-                    quality: finalQuality,
-                    kpi: kpiBonus,
-                    total: total
-                });
+                if (salarySheet) {
+                    salarySheet.addRow({
+                        name: emp.name,
+                        base: emp.baseSalary,
+                        hours: hoursWorked,
+                        shiftPay: Math.round(shiftPay),
+                        dayOffPay: Math.round(dayOffPayTotal),
+                        closing: closingBonuses,
+                        actingLead: actingLeadBonus,
+                        trainee: traineeBonus,
+                        sales: salesBonus,
+                        sick_leave_open: sickLeaveOpening,
+                        sick_leave_close: sickLeaveClosing,
+                        cards: cardCreation,
+                        seniority: seniorityBonus,
+                        checklist_pct: calcChecklist,
+                        checklist_rub: checklistBonus,
+                        quality: finalQuality,
+                        kpi: kpiBonus,
+                        total: total
+                    });
+                }
+
+                if (accountantSheet) {
+                    accountantSheet.addRow({
+                        name: emp.name,
+                        hours: hoursWorked,
+                        base_paid: Math.round(shiftPay),
+                        bonuses: bonuses,
+                        total: total
+                    });
+                }
             }
 
-            applyHeader(sheet);
+            if (salarySheet) applyHeader(salarySheet);
+            if (accountantSheet) applyHeader(accountantSheet);
         }
 
         return workbook;
