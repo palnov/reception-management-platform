@@ -51,6 +51,8 @@ export default function ChecklistPage() {
     const [activeEmployeeId, setActiveEmployeeId] = useState<string | 'all'>('all');
     const [showModal, setShowModal] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    const [duplicateError, setDuplicateError] = useState(false);
+    const [isShaking, setIsShaking] = useState(false);
 
     const initialForm = {
         id: '',
@@ -98,6 +100,12 @@ export default function ChecklistPage() {
 
         if (!res.ok) {
             const data = await res.json();
+            if (res.status === 409) {
+                setDuplicateError(true);
+                setIsShaking(true);
+                setTimeout(() => setIsShaking(false), 500);
+                return;
+            }
             alert(`Ошибка при сохранении: ${data.error || 'Неизвестная ошибка'}`);
             return;
         }
@@ -150,6 +158,7 @@ export default function ChecklistPage() {
                                     ...initialForm,
                                     employeeId: activeEmployeeId !== 'all' ? activeEmployeeId : (employees.find(e => e.role !== 'MANAGER')?.id || '')
                                 });
+                                setDuplicateError(false);
                                 setShowModal(true);
                             }}
                             disabled={isClosed}
@@ -233,6 +242,7 @@ export default function ChecklistPage() {
                                         criterion5: r.criterion5.toString(),
                                         criterion6: r.criterion6.toString(),
                                     });
+                                    setDuplicateError(false);
                                     setShowModal(true);
                                 }}
                             >
@@ -301,15 +311,30 @@ export default function ChecklistPage() {
                                     <input
                                         type="date"
                                         value={formData.date}
-                                        onChange={e => setFormData({ ...formData, date: e.target.value })}
-                                        className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl px-4 py-3 focus:border-purple-500 focus:bg-white outline-none font-bold text-sm transition-all"
+                                        onChange={e => {
+                                            setFormData({ ...formData, date: e.target.value });
+                                            setDuplicateError(false);
+                                        }}
+                                        className={`w-full bg-zinc-50 border-2 rounded-xl px-4 py-3 focus:bg-white outline-none font-bold text-sm transition-all ${
+                                            duplicateError 
+                                            ? 'border-red-500 text-red-600 bg-red-50 focus:border-red-600' 
+                                            : 'border-zinc-100 focus:border-purple-500'
+                                        } ${isShaking ? 'shake' : ''}`}
                                     />
+                                    {duplicateError && (
+                                        <p className="text-[10px] font-bold text-red-500 mt-1 ml-1 uppercase tracking-wider animate-in fade-in slide-in-from-top-1">
+                                            На эту дату уже есть запись
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2 ml-1">Сотрудник</label>
                                     <select
                                         value={formData.employeeId}
-                                        onChange={e => setFormData({ ...formData, employeeId: e.target.value })}
+                                        onChange={e => {
+                                            setFormData({ ...formData, employeeId: e.target.value });
+                                            setDuplicateError(false);
+                                        }}
                                         className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl px-4 py-3 focus:border-purple-500 focus:bg-white outline-none font-bold text-sm transition-all"
                                     >
                                         {employees.filter(e => e.role !== 'MANAGER').map(e => <option key={e.id} value={e.id}>{e.name}</option>)}

@@ -79,6 +79,20 @@ export async function PUT(request: Request) {
         const existing = await prisma.registrationKpi.findUnique({ where: { id } });
         if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+        // Check for duplicate (if date or employee changed)
+        if (existing.date !== date || existing.employeeId !== employeeId) {
+            const conflict = await prisma.registrationKpi.findFirst({
+                where: {
+                    employeeId,
+                    date,
+                    id: { not: id }
+                }
+            });
+            if (conflict) {
+                return NextResponse.json({ error: 'Запись на эту дату уже существует' }, { status: 409 });
+            }
+        }
+
         const registrationCount = Number(count) || 0;
         const score = Number(totalScore) || 0;
         const maxPoints = registrationCount * 3;
@@ -125,6 +139,15 @@ export async function POST(request: Request) {
 
         if (await isMonthClosed(date)) {
             return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
+        }
+
+        // Check for duplicate
+        const existingRecord = await prisma.registrationKpi.findFirst({
+            where: { employeeId, date }
+        });
+
+        if (existingRecord) {
+            return NextResponse.json({ error: 'Запись на эту дату уже существует' }, { status: 409 });
         }
 
         const registrationCount = Number(count) || 0;

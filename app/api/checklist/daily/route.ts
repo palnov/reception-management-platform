@@ -74,6 +74,15 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
         }
 
+        // Check for duplicate
+        const existingRecord = await prisma.dailyChecklist.findFirst({
+            where: { employeeId, date }
+        });
+
+        if (existingRecord) {
+            return NextResponse.json({ error: 'Запись на эту дату уже существует' }, { status: 409 });
+        }
+
         const c1 = Number(criterion1) || 0;
         const c2 = Number(criterion2) || 0;
         const c3 = Number(criterion3) || 0;
@@ -127,6 +136,20 @@ export async function PUT(request: Request) {
 
         if (await isMonthClosed(date)) {
             return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
+        }
+
+        // Check for duplicate (if date or employee changed)
+        if (existing.date !== date || existing.employeeId !== employeeId) {
+            const conflict = await prisma.dailyChecklist.findFirst({
+                where: {
+                    employeeId,
+                    date,
+                    id: { not: id }
+                }
+            });
+            if (conflict) {
+                return NextResponse.json({ error: 'Запись на эту дату уже существует' }, { status: 409 });
+            }
         }
 
         const c1 = Number(criterion1) || 0;

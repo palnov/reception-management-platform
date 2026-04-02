@@ -59,3 +59,13 @@ input[type=number] {
   scrollbar-width: thin;
   scrollbar-color: #d4d4d8 transparent;
 }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+
+.shake {
+  animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}

@@ -124,6 +124,8 @@ model RegistrationKpi {
   createdAt  String   @default("")
   createdBy  String?
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, date])
 }
 
 model DailyChecklist {
@@ -142,6 +144,7 @@ model DailyChecklist {
   createdBy  String?
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
+  @@unique([employeeId, date])
   @@index([employeeId, date])
 }
 
