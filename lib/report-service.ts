@@ -19,19 +19,17 @@ export class ReportService {
         };
         const monthStr = format(startDate, 'yyyy-MM'); // e.g. "2026-02"
 
-        const empFilter: any = employeeId ? { id: employeeId } : {
+        const empFilter = employeeId ? { id: employeeId } : {
             role: { not: 'MANAGER' },
             AND: [
                 {
                     OR: [
-                        { dismissalDate: null },
                         { dismissalDate: "" },
                         { dismissalDate: { gte: format(startDate, 'yyyy-MM-dd') } }
                     ]
                 },
                 {
                     OR: [
-                        { hireDate: null },
                         { hireDate: "" },
                         { hireDate: { lte: format(endDate, 'yyyy-MM-dd') } }
                     ]
@@ -387,20 +385,18 @@ export class ReportService {
                     AND: [
                         {
                             OR: [
-                                { dismissalDate: null },
                                 { dismissalDate: "" },
                                 { dismissalDate: { gte: format(startDate, 'yyyy-MM-dd') } }
                             ]
                         },
                         {
                             OR: [
-                                { hireDate: null },
                                 { hireDate: "" },
                                 { hireDate: { lte: format(endDate, 'yyyy-MM-dd') } }
                             ]
                         }
                     ]
-                } as any
+                }
             });
 
             // Fetch monthly checklists
