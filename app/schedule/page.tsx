@@ -10,6 +10,7 @@ import { ru } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, X, DoorOpen, MapPin, GripVertical, User, Crown, BadgeCheck, Clock, Briefcase, CheckSquare, Activity, LayoutList, Timer, Percent, Layers, GraduationCap } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
 import { QuickContextMenu } from '@/components/QuickContextMenu';
+import { Tooltip } from '@/components/Tooltip';
 import {
     DndContext,
     closestCenter,
@@ -410,6 +411,10 @@ export default function SchedulePage() {
     const [userData, setUserData] = useState<any>(null);
     const [prevMonthShifts, setPrevMonthShifts] = useState<Shift[]>([]);
     const [isAutoFilling, setIsAutoFilling] = useState(false);
+
+    const isManager = useMemo(() => {
+        return userData?.role === 'MANAGER';
+    }, [userData]);
 
     // Track whether audit icon was clicked to prevent modal
     const auditIconClickedRef = useRef(false);
@@ -981,6 +986,23 @@ export default function SchedulePage() {
 
         if (contextMenu) setContextMenu(null);
 
+        // Regular users can only click existing shifts, not drag or select multiple cells
+        if (!isManager) {
+            if (!sourceShift) {
+                // If it's an empty cell, do nothing for non-managers
+                return;
+            }
+            // For existing shifts, allow selection of only THIS cell (handled in isSingleCell in handleMouseUp)
+            setSelection({
+                start: { empId, date, shift: sourceShift },
+                end: { empId, date }
+            });
+            setIsDragging(false); // No dragging for admins
+            setIsFilling(false);
+            setHandleCell(null);
+            return;
+        }
+
         setSelection({
             start: { empId, date, shift: sourceShift },
             end: { empId, date }
@@ -1104,6 +1126,7 @@ export default function SchedulePage() {
         }
 
         if (e.key === 'Delete' || e.key === 'Backspace') {
+            if (!isManager) return; // Non-managers cannot delete
             e.preventDefault();
             const range = getSelectedRange(selection);
             const deleteIds = range
@@ -1136,6 +1159,7 @@ export default function SchedulePage() {
 
     const handleContextMenu = useCallback((e: React.MouseEvent, empId: string, dateKey: string, shift?: Shift) => {
         e.preventDefault();
+        if (!isManager) return; // Non-managers have no context menu
 
         const isPointInSelection = isInSelection(empId, dateKey);
         const isRange = selection && (selection.start.empId !== selection.end.empId || selection.start.date !== selection.end.date);
@@ -1252,6 +1276,7 @@ export default function SchedulePage() {
     const handleHandleMouseDown = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
         e.preventDefault();
+        if (!isManager) return; // Non-managers cannot drag-to-fill
         if (handleCell && !selection) {
             const bounds = selectionBounds;
             if (bounds) {
@@ -1302,7 +1327,7 @@ export default function SchedulePage() {
                         />
                     )}
                     <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm border-zinc-200/60 transition-all">
-                        {isMonthEmpty && prevMonthHasShifts && !isClosed && (
+                        {isMonthEmpty && prevMonthHasShifts && !isClosed && isManager && (
                             <button
                                 onClick={handleAutoFill}
                                 disabled={isAutoFilling}
@@ -1454,62 +1479,71 @@ export default function SchedulePage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2 col-span-2">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Тип смены</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {[
-                                            { id: 'REGULAR', label: 'Рабочая', icon: Briefcase, borderColor: 'border-blue-500', bgColor: 'bg-blue-50', iconBg: 'bg-blue-500', textColor: 'text-blue-900' },
-                                            { id: 'ARCHIVE_WORK', label: 'Работа в архиве', icon: CheckSquare, borderColor: 'border-amber-500', bgColor: 'bg-amber-50', iconBg: 'bg-amber-500', textColor: 'text-amber-900' },
-                                            { id: 'SICK', label: 'Больничный', icon: Activity, borderColor: 'border-red-500', bgColor: 'bg-red-50', iconBg: 'bg-red-500', textColor: 'text-red-900' },
-                                            { id: 'VACATION', label: 'Отпуск', icon: LayoutList, borderColor: 'border-emerald-500', bgColor: 'bg-emerald-50', iconBg: 'bg-emerald-500', textColor: 'text-emerald-900' }
-                                        ].map(type => (
-                                            <div
-                                                key={type.id}
-                                                onClick={() => setFormData(prev => ({ ...prev, type: type.id as any }))}
-                                                className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all cursor-pointer group
-                                                    ${formData.type === type.id
-                                                        ? `${type.borderColor} ${type.bgColor}`
-                                                        : 'border-zinc-100 bg-zinc-50/50 hover:border-zinc-200 hover:bg-zinc-50'}`}
-                                            >
-                                                <div className={`p-1.5 rounded-lg transition-colors
-                                                    ${formData.type === type.id ? `${type.iconBg} text-white` : 'bg-white text-zinc-400 group-hover:text-zinc-500'}`}>
-                                                    <type.icon className="w-3.5 h-3.5" />
+                                    <Tooltip content={!isManager ? "Для изменения графика обратитесь к руководителю" : ""}>
+                                        <div className={`grid grid-cols-2 gap-2 ${!isManager ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                                            {[
+                                                { id: 'REGULAR', label: 'Рабочая', icon: Briefcase, borderColor: 'border-blue-500', bgColor: 'bg-blue-50', iconBg: 'bg-blue-500', textColor: 'text-blue-900' },
+                                                { id: 'ARCHIVE_WORK', label: 'Работа в архиве', icon: CheckSquare, borderColor: 'border-amber-500', bgColor: 'bg-amber-50', iconBg: 'bg-amber-500', textColor: 'text-amber-900' },
+                                                { id: 'SICK', label: 'Больничный', icon: Activity, borderColor: 'border-red-500', bgColor: 'bg-red-50', iconBg: 'bg-red-500', textColor: 'text-red-900' },
+                                                { id: 'VACATION', label: 'Отпуск', icon: LayoutList, borderColor: 'border-emerald-500', bgColor: 'bg-emerald-50', iconBg: 'bg-emerald-500', textColor: 'text-emerald-900' }
+                                            ].map(type => (
+                                                <div
+                                                    key={type.id}
+                                                    onClick={() => isManager && setFormData(prev => ({ ...prev, type: type.id as any }))}
+                                                    className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all group
+                                                        ${!isManager ? 'pointer-events-none' : 'cursor-pointer'}
+                                                        ${formData.type === type.id
+                                                            ? `${type.borderColor} ${type.bgColor}`
+                                                            : 'border-zinc-100 bg-zinc-50/50 hover:border-zinc-200 hover:bg-zinc-50'}`}
+                                                >
+                                                    <div className={`p-1.5 rounded-lg transition-colors
+                                                        ${formData.type === type.id ? `${type.iconBg} text-white` : 'bg-white text-zinc-400 group-hover:text-zinc-500'}`}>
+                                                        <type.icon className="w-3.5 h-3.5" />
+                                                    </div>
+                                                    <span className={`text-sm font-bold ${formData.type === type.id ? type.textColor : 'text-zinc-600'}`}>{type.label}</span>
                                                 </div>
-                                                <span className={`text-sm font-bold ${formData.type === type.id ? type.textColor : 'text-zinc-600'}`}>{type.label}</span>
-                                            </div>
-                                        ))}
-                                    </div>
+                                            ))}
+                                        </div>
+                                    </Tooltip>
                                 </div>
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Часы</label>
-                                    <div className="relative group">
-                                        <input
-                                            type="number"
-                                            value={formData.hours}
-                                            onChange={e => setFormData(prev => ({ ...prev, hours: e.target.value }))}
-                                            className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"
-                                        />
-                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
-                                            <Timer className="w-4 h-4" />
+                                    <Tooltip content={!isManager ? "Для изменения графика обратитесь к руководителю" : ""}>
+                                        <div className="relative group">
+                                            <input
+                                                type="number"
+                                                value={formData.hours}
+                                                disabled={!isManager}
+                                                onChange={e => setFormData(prev => ({ ...prev, hours: e.target.value }))}
+                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${!isManager ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
+                                            />
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
+                                                <Timer className="w-4 h-4" />
+                                            </div>
                                         </div>
-                                    </div>
+                                    </Tooltip>
                                 </div>
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Коэффициент</label>
-                                    <div className="relative group">
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            min="0"
-                                            max="1.5"
-                                            value={formData.coefficient}
-                                            onChange={e => setFormData(prev => ({ ...prev, coefficient: e.target.value }))}
-                                            className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"
-                                        />
-                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
-                                            <Percent className="w-4 h-4" />
+                                    <Tooltip content={!isManager ? "Для изменения графика обратитесь к руководителю" : ""}>
+                                        <div className="relative group">
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                min="0"
+                                                max="1.5"
+                                                value={formData.coefficient}
+                                                disabled={!isManager}
+                                                onChange={e => setFormData(prev => ({ ...prev, coefficient: e.target.value }))}
+                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${!isManager ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
+                                            />
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
+                                                <Percent className="w-4 h-4" />
+                                            </div>
                                         </div>
-                                    </div>
+                                    </Tooltip>
                                 </div>
                             </div>
 
@@ -1569,13 +1603,16 @@ export default function SchedulePage() {
                             </div>
 
                             <div className="flex gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={handleDeleteShift}
-                                    className="px-6 py-3 border-2 border-red-50 rounded-xl text-red-500 bg-red-50/50 hover:bg-red-50 hover:border-red-100 transition-all font-bold text-sm"
-                                >
-                                    Удалить
-                                </button>
+                                <Tooltip content={!isManager ? "Для изменения графика обратитесь к руководителю" : ""}>
+                                    <button
+                                        type="button"
+                                        onClick={handleDeleteShift}
+                                        disabled={!isManager}
+                                        className={`px-6 py-3 border-2 border-red-50 rounded-xl text-red-500 bg-red-50/50 hover:bg-red-50 hover:border-red-100 transition-all font-bold text-sm ${!isManager ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    >
+                                        Удалить
+                                    </button>
+                                </Tooltip>
                                 <button
                                     type="submit"
                                     className="flex-1 bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-200 font-bold text-sm"
@@ -1638,35 +1675,41 @@ export default function SchedulePage() {
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Часы</label>
-                                    <div className="relative group">
-                                        <input
-                                            type="number"
-                                            value={formData.hours}
-                                            onChange={e => setFormData(prev => ({ ...prev, hours: e.target.value }))}
-                                            className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"
-                                        />
-                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
-                                            <Timer className="w-4 h-4" />
+                                    <Tooltip content={!isManager ? "Для изменения графика обратитесь к руководителю" : ""}>
+                                        <div className="relative group">
+                                            <input
+                                                type="number"
+                                                value={formData.hours}
+                                                disabled={!isManager}
+                                                onChange={e => setFormData(prev => ({ ...prev, hours: e.target.value }))}
+                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${!isManager ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
+                                            />
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
+                                                <Timer className="w-4 h-4" />
+                                            </div>
                                         </div>
-                                    </div>
+                                    </Tooltip>
                                 </div>
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Коэффициент</label>
-                                    <div className="relative group">
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            min="0"
-                                            max="1.5"
-                                            value={formData.coefficient}
-                                            onChange={e => setFormData(prev => ({ ...prev, coefficient: e.target.value }))}
-                                            className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"
-                                        />
-                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
-                                            <Percent className="w-4 h-4" />
+                                    <Tooltip content={!isManager ? "Для изменения графика обратитесь к руководителю" : ""}>
+                                        <div className="relative group">
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                min="0"
+                                                max="1.5"
+                                                value={formData.coefficient}
+                                                disabled={!isManager}
+                                                onChange={e => setFormData(prev => ({ ...prev, coefficient: e.target.value }))}
+                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${!isManager ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
+                                            />
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
+                                                <Percent className="w-4 h-4" />
+                                            </div>
                                         </div>
-                                    </div>
+                                    </Tooltip>
                                 </div>
                             </div>
 
