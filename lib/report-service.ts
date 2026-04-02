@@ -10,7 +10,13 @@ export class ReportService {
         workbook.created = new Date();
 
         const startDate = startOfMonth(parseISO(date));
-        const endDate = endOfMonth(parseISO(date));
+        let endDate = endOfMonth(parseISO(date));
+
+        if (type === 'ACCOUNTANT_15') {
+            endDate = new Date(startDate);
+            endDate.setDate(15);
+        }
+
         const daysInMonth = endDate.getDate();
 
         const dateFilter = {
@@ -325,9 +331,10 @@ export class ReportService {
         // =============================================
         // 4. KPI & SALARY SHEET
         // =============================================
-        if (type === 'FULL' || type === 'KPI' || type === 'ACCOUNTANT') {
+        if (type === 'FULL' || type === 'KPI' || type === 'ACCOUNTANT' || type === 'ACCOUNTANT_15') {
             const salarySheet = (type === 'FULL' || type === 'KPI') ? workbook.addWorksheet('Зарплата') : null;
             const accountantSheet = (type === 'FULL' || type === 'ACCOUNTANT') ? workbook.addWorksheet('Для бухгалтера') : null;
+            const accountant15Sheet = (type === 'ACCOUNTANT_15') ? workbook.addWorksheet('Бухгалтерия (1-15)') : null;
 
             if (salarySheet) {
                 const salaryCols = [
@@ -366,6 +373,14 @@ export class ReportService {
                     { header: 'Оклад', key: 'base_paid', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                     { header: 'Надбавки', key: 'bonuses', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                     { header: 'ИТОГО', key: 'total', width: 15, style: { ...cellStyle, font: { bold: true }, numFmt: '#,##0' } },
+                ];
+            }
+
+            if (accountant15Sheet) {
+                accountant15Sheet.columns = [
+                    { header: 'Сотрудник', key: 'name', width: 25, style: cellStyle },
+                    { header: 'Часы', key: 'hours', width: 12, style: { ...cellStyle, numFmt: '0.0' } },
+                    { header: 'Оклад', key: 'base_paid', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                 ];
             }
 
@@ -537,10 +552,20 @@ export class ReportService {
                     });
                     row.eachCell((cell) => { cell.border = borderStyle; });
                 }
+
+                if (accountant15Sheet) {
+                    const row = accountant15Sheet.addRow({
+                        name: emp.name,
+                        hours: hoursWorked,
+                        base_paid: Math.round(shiftPay),
+                    });
+                    row.eachCell((cell) => { cell.border = borderStyle; });
+                }
             }
 
             if (salarySheet) applyHeader(salarySheet);
             if (accountantSheet) applyHeader(accountantSheet);
+            if (accountant15Sheet) applyHeader(accountant15Sheet);
         }
 
         return workbook;

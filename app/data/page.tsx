@@ -218,6 +218,7 @@ export default function DataPage() {
                                         <option value="REGISTRATION">Только Оформления</option>
                                         <option value="KPI">KPI и Зарплата</option>
                                         <option value="ACCOUNTANT">Для бухгалтера</option>
+                                        <option value="ACCOUNTANT_15">Для бухгалтера (1-15 число)</option>
                                     </select>
                                 </div>
                             </div>
