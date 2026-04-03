@@ -515,8 +515,10 @@ export class ReportService {
                 else if (seniorityYears >= 2) seniorityBonus = Math.round(baseSalary * 0.07);
                 else if (seniorityYears >= 1) seniorityBonus = Math.round(baseSalary * 0.03);
 
+                const baseShiftPay = Math.round(hourlyBase * hoursWorked);
                 const bonuses = Math.round(dayOffPayTotal + closingBonuses + actingLeadBonus + traineeBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus);
                 const total = Math.round(shiftPay + bonuses);
+                const totalBonuses = total - baseShiftPay;
 
                 if (salarySheet) {
                     const row = salarySheet.addRow({
@@ -546,8 +548,8 @@ export class ReportService {
                     const row = accountantSheet.addRow({
                         name: emp.name,
                         hours: hoursWorked,
-                        base_paid: Math.round(shiftPay),
-                        bonuses: bonuses,
+                        base_paid: baseShiftPay,
+                        bonuses: totalBonuses,
                         total: total
                     });
                     row.eachCell((cell) => { cell.border = borderStyle; });
@@ -557,7 +559,7 @@ export class ReportService {
                     const row = accountant15Sheet.addRow({
                         name: emp.name,
                         hours: hoursWorked,
-                        base_paid: Math.round(shiftPay),
+                        base_paid: baseShiftPay,
                     });
                     row.eachCell((cell) => { cell.border = borderStyle; });
                 }
