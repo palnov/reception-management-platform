@@ -28,6 +28,7 @@ model Employee {
   registrationKpis  RegistrationKpi[]
   shifts            Shift[]
   roleHistory       EmployeeRoleHistory[]
+  salaryHistory     EmployeeSalaryHistory[]
   dailyChecklists   DailyChecklist[]
 }
 
@@ -36,6 +37,18 @@ model EmployeeRoleHistory {
   employeeId String
   role       String   @default("ADMIN")
   seniorId   String?
+  startDate  String   // "YYYY-MM-DD"
+  endDate    String?  // "YYYY-MM-DD"
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, startDate])
+}
+
+model EmployeeSalaryHistory {
+  id         String   @id @default(uuid())
+  employeeId String
+  baseSalary Float    @default(0)
+  hourlyRate Float    @default(0)
   startDate  String   // "YYYY-MM-DD"
   endDate    String?  // "YYYY-MM-DD"
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)

@@ -28,10 +28,10 @@ function main() {
 
     // 2. Perform db push
     console.log('Synchronizing with Neon (npx prisma db push)...');
-    console.log('You might see a warning about dropping "certificates" - this is expected.');
     
-    // We run it interactively so the user can answer 'yes'
-    execSync('npx prisma db push', { stdio: 'inherit' });
+    // Pass any arguments from the command line (like --accept-data-loss)
+    const args = process.argv.slice(2).join(' ');
+    execSync(`npx prisma db push ${args}`, { stdio: 'inherit' });
 
     console.log('✅ Synchronization with Neon successful!');
   } catch (err) {

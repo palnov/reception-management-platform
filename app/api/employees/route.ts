@@ -86,6 +86,83 @@ async function updateEmployeeHistory(employeeId: string, role: string, seniorId:
     }
 }
 
+async function updateSalaryHistory(employeeId: string, baseSalary: number, hourlyRate: number, effectiveDate?: string) {
+    const oldEmployee = await prisma.employee.findUnique({
+        where: { id: employeeId },
+        select: { baseSalary: true, hourlyRate: true, hireDate: true }
+    });
+
+    const salaryChanged = oldEmployee?.baseSalary !== baseSalary || oldEmployee?.hourlyRate !== hourlyRate;
+
+    if (salaryChanged) {
+        // Normalize to 1st of the month as per requirements
+        const dateToUse = effectiveDate 
+            ? (effectiveDate.substring(0, 7) + '-01') 
+            : (new Date().toISOString().substring(0, 7) + '-01');
+
+        const currentHist = await (prisma as any).employeeSalaryHistory.findFirst({
+            where: { employeeId, endDate: null }
+        });
+
+        if (currentHist) {
+            if (currentHist.startDate === dateToUse) {
+                await (prisma as any).employeeSalaryHistory.update({
+                    where: { id: currentHist.id },
+                    data: { baseSalary, hourlyRate }
+                });
+            } else {
+                const prevMonthEnd = new Date(new Date(dateToUse).getTime() - 86400000).toISOString().split('T')[0];
+                await (prisma as any).employeeSalaryHistory.update({
+                    where: { id: currentHist.id },
+                    data: { endDate: prevMonthEnd }
+                });
+                await (prisma as any).employeeSalaryHistory.create({
+                    data: {
+                        employeeId,
+                        baseSalary,
+                        hourlyRate,
+                        startDate: dateToUse,
+                        endDate: null
+                    }
+                });
+            }
+        } else {
+            const initialStart = (oldEmployee?.hireDate || '2024-01-01').substring(0, 7) + '-01';
+            if (initialStart >= dateToUse) {
+                await (prisma as any).employeeSalaryHistory.create({
+                    data: {
+                        employeeId,
+                        baseSalary,
+                        hourlyRate,
+                        startDate: dateToUse,
+                        endDate: null
+                    }
+                });
+            } else {
+                const prevMonthEnd = new Date(new Date(dateToUse).getTime() - 86400000).toISOString().split('T')[0];
+                await (prisma as any).employeeSalaryHistory.create({
+                    data: {
+                        employeeId,
+                        baseSalary: oldEmployee?.baseSalary || 0,
+                        hourlyRate: oldEmployee?.hourlyRate || 0,
+                        startDate: initialStart,
+                        endDate: prevMonthEnd
+                    }
+                });
+                await (prisma as any).employeeSalaryHistory.create({
+                    data: {
+                        employeeId,
+                        baseSalary,
+                        hourlyRate,
+                        startDate: dateToUse,
+                        endDate: null
+                    }
+                });
+            }
+        }
+    }
+}
+
 export async function GET(request: Request) {
     try {
         const managerCount = await prisma.employee.count({
@@ -164,25 +241,46 @@ export async function GET(request: Request) {
                         ]
                     },
                     take: 1
+                } : false,
+                salaryHistory: atDate ? {
+                    where: {
+                        startDate: { lte: atDate },
+                        OR: [
+                            { endDate: null },
+                            { endDate: { gte: atDate } }
+                        ]
+                    },
+                    take: 1
                 } : false
             }
         } as any);
 
         const result = employees.map((emp: any) => {
+            let baseSalary = emp.baseSalary;
+            let hourlyRate = emp.hourlyRate;
+            let role = emp.role;
+            let seniorId = emp.seniorId;
+
             if (atDate && emp.roleHistory?.[0]) {
                 const hist = emp.roleHistory[0];
-                return {
-                    ...emp,
-                    role: hist.role,
-                    seniorId: hist.seniorId,
-                    roleHistory: undefined 
-                };
+                role = hist.role;
+                seniorId = hist.seniorId;
             }
-            if (emp.roleHistory) {
-                const { roleHistory, ...rest } = emp;
-                return rest;
+
+            if (atDate && emp.salaryHistory?.[0]) {
+                const sHist = emp.salaryHistory[0];
+                baseSalary = sHist.baseSalary;
+                hourlyRate = sHist.hourlyRate;
             }
-            return emp;
+
+            const { roleHistory, salaryHistory, ...rest } = emp;
+            return {
+                ...rest,
+                role,
+                seniorId,
+                baseSalary,
+                hourlyRate
+            };
         });
 
         return NextResponse.json(result);
@@ -227,6 +325,16 @@ export async function POST(request: Request) {
             role,
             seniorId: seniorId || null,
             startDate: hireDate || dateToUse,
+            endDate: null
+        }
+    });
+
+    await (prisma as any).employeeSalaryHistory.create({
+        data: {
+            employeeId: employee.id,
+            baseSalary: parseFloat(baseSalary || 0),
+            hourlyRate: parseFloat(hourlyRate || 0),
+            startDate: (hireDate || dateToUse).substring(0, 7) + '-01',
             endDate: null
         }
     });
@@ -301,6 +409,7 @@ export async function PUT(request: Request) {
     const resolvedSeniorId = seniorId !== undefined ? (seniorId || null) : oldEmployee?.seniorId;
 
     await updateEmployeeHistory(id, role, resolvedSeniorId, dateToUse);
+    await updateSalaryHistory(id, parseFloat(baseSalary || 0), parseFloat(hourlyRate || 0), effectiveDate);
 
     const data: any = {
         name,

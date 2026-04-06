@@ -44,8 +44,21 @@ export class ReportService {
         };
         const employees = await prisma.employee.findMany({
             where: empFilter,
-            orderBy: { sortOrder: 'asc' }
-        });
+            orderBy: { sortOrder: 'asc' },
+            include: {
+                salaryHistory: {
+                    where: {
+                        startDate: { lte: format(endDate, 'yyyy-MM-dd') },
+                        OR: [
+                            { endDate: null },
+                            { endDate: { gte: format(startDate, 'yyyy-MM-dd') } }
+                        ]
+                    },
+                    orderBy: { startDate: 'desc' },
+                    take: 1
+                }
+            }
+        } as any);
 
         // If specific employeeId was provided, double check it's not a MANAGER
         if (employeeId && employees.length > 0 && employees[0].role === 'MANAGER') {
@@ -433,7 +446,10 @@ export class ReportService {
                 let closingBonuses = 0;
                 let actingLeadBonus = 0;
                 let traineeBonus = 0;
-                const hourlyBase = emp.baseSalary / monthNorm;
+                
+                // Use historical salary if available
+                const effectiveBaseSalary = (emp as any).salaryHistory?.[0]?.baseSalary ?? emp.baseSalary;
+                const hourlyBase = effectiveBaseSalary / monthNorm;
 
                 empShifts.forEach(s => {
                     if (s.type === 'REGULAR') {
@@ -510,10 +526,9 @@ export class ReportService {
                     : 0;
 
                 let seniorityBonus = 0;
-                const baseSalary = emp.baseSalary || 0;
-                if (seniorityYears >= 3) seniorityBonus = Math.round(baseSalary * 0.10);
-                else if (seniorityYears >= 2) seniorityBonus = Math.round(baseSalary * 0.07);
-                else if (seniorityYears >= 1) seniorityBonus = Math.round(baseSalary * 0.03);
+                if (seniorityYears >= 3) seniorityBonus = Math.round(effectiveBaseSalary * 0.10);
+                else if (seniorityYears >= 2) seniorityBonus = Math.round(effectiveBaseSalary * 0.07);
+                else if (seniorityYears >= 1) seniorityBonus = Math.round(effectiveBaseSalary * 0.03);
 
                 const baseShiftPay = Math.round(hourlyBase * hoursWorked);
                 const bonuses = Math.round(dayOffPayTotal + closingBonuses + actingLeadBonus + traineeBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus);
@@ -523,7 +538,7 @@ export class ReportService {
                 if (salarySheet) {
                     const row = salarySheet.addRow({
                         name: emp.name,
-                        base: emp.baseSalary,
+                        base: effectiveBaseSalary,
                         hours: hoursWorked,
                         shiftPay: Math.round(shiftPay),
                         dayOffPay: Math.round(dayOffPayTotal),

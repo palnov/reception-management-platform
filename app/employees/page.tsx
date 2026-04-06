@@ -23,6 +23,7 @@ export default function EmployeesPage() {
     const [showForm, setShowForm] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
     const [originalRole, setOriginalRole] = useState<string | null>(null);
+    const [originalSalary, setOriginalSalary] = useState<number | null>(null);
 
     const initialForm = {
         name: '',
@@ -75,6 +76,7 @@ export default function EmployeesPage() {
             effectiveDate: new Date().toISOString().split('T')[0]
         });
         setOriginalRole(emp.role);
+        setOriginalSalary(emp.baseSalary);
         setShowForm(true);
     }
 
@@ -172,10 +174,13 @@ export default function EmployeesPage() {
                                 )}
                             </div>
 
-                            {editId && formData.role !== originalRole && (
+                            {editId && (formData.role !== originalRole || parseFloat(formData.baseSalary || '0') !== originalSalary) && (
                                 <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 animate-in slide-in-from-top-2">
-                                    <label className="block text-sm font-bold text-blue-900 mb-1">Дата вступления роли в силу</label>
-                                    <p className="text-xs text-blue-600 mb-2">Изменение роли будет сохранено в истории. В предыдущие месяцы сотрудник сохранит старую роль.</p>
+                                    <label className="block text-sm font-bold text-blue-900 mb-1">Дата вступления изменений в силу</label>
+                                    <p className="text-xs text-blue-600 mb-2">
+                                        {formData.role !== originalRole && "Изменение роли будет сохранено в истории. "}
+                                        {parseFloat(formData.baseSalary || '0') !== originalSalary && "Изменение оклада применится ко ВСЕМУ выбранному месяцу и всем последующим."}
+                                    </p>
                                     <input
                                         type="date"
                                         value={formData.effectiveDate}
