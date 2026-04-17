@@ -192,7 +192,7 @@ export default function DataPage() {
 
             <div className="bg-white rounded-3xl shadow-sm border border-zinc-200 p-8 min-h-[400px]">
                 {activeTab === 'export' ? (
-                    <div className="space-y-8 max-w-2xl">
+                    <div className="space-y-8">
                         <div>
                             <h2 className="text-xl font-bold mb-4">Параметры выгрузки</h2>
                             <div className="grid grid-cols-2 gap-6">
@@ -321,7 +321,7 @@ export default function DataPage() {
                         </div>
                     </div>
                 ) : (
-                    <div className="space-y-8 max-w-2xl">
+                    <div className="space-y-8 max-w-3xl mx-auto">
                         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3 text-amber-800 text-sm">
                             <AlertTriangle className="w-5 h-5 flex-shrink-0" />
                             <div>

@@ -631,355 +631,395 @@ export class ReportService {
 
         const worksheet = workbook.addWorksheet('Расчетный лист');
 
-        // Styles
+        // === STYLES (exactly matching template) ===
         const borderThin = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } } as ExcelJS.Borders;
-        const fontBold = { bold: true };
-        const centerAlignment = { horizontal: 'center', vertical: 'middle' } as ExcelJS.Alignment;
-        const leftAlignment = { horizontal: 'left', vertical: 'middle' } as ExcelJS.Alignment;
+        const fontA8 = { size: 8, name: 'Arial' } as Partial<ExcelJS.Font>;
+        const fontA8b = { bold: true, size: 8, name: 'Arial' } as Partial<ExcelJS.Font>;
+        const fontA9 = { size: 9, name: 'Arial' } as Partial<ExcelJS.Font>;
+        const fontA9b = { bold: true, size: 9, name: 'Arial' } as Partial<ExcelJS.Font>;
+        const fontA10b = { bold: true, size: 10, name: 'Arial' } as Partial<ExcelJS.Font>;
+        const fontA11b = { bold: true, size: 11, name: 'Arial' } as Partial<ExcelJS.Font>;
+        const wrapTop = { vertical: 'top', wrapText: true } as Partial<ExcelJS.Alignment>;
+        const centerMid = { horizontal: 'center', vertical: 'middle' } as Partial<ExcelJS.Alignment>;
+        const centerMidWrap = { horizontal: 'center', vertical: 'middle', wrapText: true } as Partial<ExcelJS.Alignment>;
+        const centerTop = { horizontal: 'center', vertical: 'top' } as Partial<ExcelJS.Alignment>;
+        const centerTopWrap = { horizontal: 'center', vertical: 'top', wrapText: true } as Partial<ExcelJS.Alignment>;
+        const leftTop = { horizontal: 'left', vertical: 'top' } as Partial<ExcelJS.Alignment>;
+        const leftTopWrap = { horizontal: 'left', vertical: 'top', wrapText: true } as Partial<ExcelJS.Alignment>;
+        const rightMid = { horizontal: 'right', vertical: 'middle' } as Partial<ExcelJS.Alignment>;
+        const rightTop = { horizontal: 'right', vertical: 'top' } as Partial<ExcelJS.Alignment>;
 
-        // Column widths exactly matching template
-        worksheet.columns = [
-            { width: 3.5 }, { width: 3.5 }, { width: 3.5 }, { width: 3.5 }, { width: 3.5 },
-            { width: 3.5 }, { width: 7.66 }, { width: 7.16 }, { width: 6.16 }, { width: 4.83 },
-            { width: 5.16 }, { width: 5.83 }, { width: 3.5 }, { width: 3.5 }, { width: 3.5 },
-            { width: 3.5 }, { width: 3.5 }, { width: 3.5 }, { width: 5.66 }, { width: 3.5 }
-        ];
+        // === COLUMN WIDTHS (exact from template) ===
+        const colWidths = [3.5,3.5,3.5,3.5,3.5,3.5,7.66,7.16,6.16,4.83,5.16,5.83,3.5,3.5,3.5,3.5,3.5,3.5,5.66,3.5];
+        worksheet.columns = colWidths.map(w => ({ width: w }));
 
-        // 1. Header
-        worksheet.getRow(1).height = 25;
+        // Helper to style a merged range's master cell
+        const sc = (addr: string, val: any, font: Partial<ExcelJS.Font>, align: Partial<ExcelJS.Alignment>, border = false) => {
+            const c = worksheet.getCell(addr);
+            c.value = val;
+            c.font = font as ExcelJS.Font;
+            c.alignment = align as ExcelJS.Alignment;
+            if (border) c.border = borderThin;
+        };
+
+        // === ROW 1: Organization ===
+        worksheet.getRow(1).height = 24.95;
         worksheet.mergeCells('A1:J1');
-        worksheet.getCell('A1').value = 'Организация: Первый ДМЦ';
-        worksheet.getCell('A1').font = fontBold;
+        sc('A1', 'Организация: Первый ДМЦ', fontA11b, centerTop);
 
+        // === ROW 2: Title ===
         worksheet.getRow(2).height = 12;
         worksheet.mergeCells('A2:K2');
-        const titleCell = worksheet.getCell('A2');
-        titleCell.value = `РАСЧЕТНЫЙ ЛИСТОК ЗА ${monthYearRu} ГОДА`;
-        titleCell.font = { ...fontBold, size: 14 };
-        titleCell.alignment = centerAlignment;
+        sc('A2', `РАСЧЕТНЫЙ ЛИСТОК ЗА ${monthYearRu}`, fontA9, { horizontal: 'center' } as Partial<ExcelJS.Alignment>);
 
-        // 2. Employee Info
+        // === ROW 3: FIO + Pay ===
         worksheet.getRow(3).height = 12;
         worksheet.mergeCells('A3:D3');
-        worksheet.getCell('A3').value = `ФИО __________________________`;
+        sc('A3', 'ФИО ______________________________________________', fontA9b, leftTopWrap);
         worksheet.mergeCells('E3:S3');
-        worksheet.getCell('E3').value = employee.name;
-        
-        // 3. To Pay
+        sc('E3', employee.name, fontA9b, centerTopWrap);
+
+        // === Calculations ===
         const effectiveBaseSalary = (employee as any).salaryHistory?.[0]?.baseSalary ?? employee.baseSalary;
         const hourlyBase = effectiveBaseSalary / monthNorm;
 
-        // Calculations logic (mini-version for header) - will refine below
         let hoursWorked = 0;
+        let daysWorked = 0;
         let shiftPay = 0;
         let intensityTotal = 0;
         let closingBonuses = 0;
+        let closingDays = 0;
         let traineeBonus = 0;
         let archiveBonus = 0;
+        let archiveHours = 0;
 
         shifts.forEach(s => {
             if (s.type === 'REGULAR') {
                 hoursWorked += s.hours;
+                daysWorked++;
                 shiftPay += hourlyBase * s.hours;
                 intensityTotal += hourlyBase * s.hours * (s.coefficient - 1);
             } else if (s.type === 'ARCHIVE_WORK') {
+                archiveHours += s.hours;
                 archiveBonus += (3500 / 11) * s.hours;
             }
+            if (s.cabinetClosed || s.centerClosed) closingDays++;
             if (s.cabinetClosed) closingBonuses += 250;
             if (s.centerClosed) closingBonuses += 500;
             if (s.isTrainee) traineeBonus += 500;
         });
 
         const salesBonus = sales.reduce((sum, s) => sum + s.bonus, 0);
+        const salesTotal = sales.reduce((sum, s) => sum + s.price, 0);
         const cardCreationBonus = (monthlyChecklist?.cardCreation || 0) * 60;
-        const elnBonus = ((monthlyChecklist?.sickLeaveOpening || 0) * 130) + ((monthlyChecklist?.sickLeaveClosing || 0) * 80);
-        
-        // Checklist logic
+        const sickOpening = monthlyChecklist?.sickLeaveOpening || 0;
+        const sickClosing = monthlyChecklist?.sickLeaveClosing || 0;
+        const elnBonus = sickOpening * 130 + sickClosing * 80;
         const avgChecklist = dailyChecklists.length > 0 ? dailyChecklists.reduce((sum, c) => sum + c.totalScore, 0) / dailyChecklists.length : 0;
         let checklistBonus = 0;
         if (avgChecklist >= 90) checklistBonus = 5000;
         else if (avgChecklist >= 76) checklistBonus = 2500;
-
-        // Quality logic
         const avgQuality = regs.length > 0 ? (regs.reduce((sum, r) => sum + r.totalScore, 0) / regs.reduce((sum, r) => sum + (r.count * 3 || 1), 0)) * 100 : 100;
         let qualityBonus = 0;
         if (avgQuality >= 95) qualityBonus = 5000;
         else if (avgQuality >= 85) qualityBonus = 2500;
-
-        // Seniority
         const hireDate = employee.hireDate ? new Date(employee.hireDate) : null;
         const seniorityYears = hireDate ? (Date.now() - hireDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000) : 0;
-        let seniorityBonus = 0;
-        if (seniorityYears >= 3) seniorityBonus = Math.round(effectiveBaseSalary * 0.10);
-        else if (seniorityYears >= 2) seniorityBonus = Math.round(effectiveBaseSalary * 0.07);
-        else if (seniorityYears >= 1) seniorityBonus = Math.round(effectiveBaseSalary * 0.03);
+        let seniorityPct = 0;
+        if (seniorityYears >= 3) seniorityPct = 10;
+        else if (seniorityYears >= 2) seniorityPct = 7;
+        else if (seniorityYears >= 1) seniorityPct = 3;
+        const seniorityBonus = Math.round(effectiveBaseSalary * seniorityPct / 100);
 
         const totalAccrued = Math.round(shiftPay + intensityTotal + checklistBonus + qualityBonus + salesBonus + closingBonuses + archiveBonus + elnBonus + traineeBonus + cardCreationBonus + seniorityBonus);
         const tax = Math.round(totalAccrued * 0.13);
         const toPay = totalAccrued - tax;
 
-        worksheet.getCell('T3').value = `К выплате:`;
-        worksheet.getCell('T3').font = fontBold;
-        worksheet.mergeCells('U3:Z3');
-        worksheet.getCell('U3').value = toPay;
-        worksheet.getCell('U3').font = fontBold;
+        // K vyplate
+        sc('T3', 'К выплате:', fontA9b, { vertical: 'top' } as Partial<ExcelJS.Alignment>);
+        worksheet.mergeCells('AD3:AG3');
+        sc('AD3', toPay, fontA9b, rightTop);
 
+        // === ROW 4: Position ===
         worksheet.getRow(4).height = 11.25;
-        worksheet.mergeCells('A4:D4');
-        worksheet.getCell('A4').value = `Должность:`;
+        sc('A4', 'Должность:', fontA8, { vertical: 'top' } as Partial<ExcelJS.Alignment>);
         worksheet.mergeCells('E4:L4');
-        worksheet.getCell('E4').value = employee.role === 'ADMIN' ? 'Администратор регистратуры' : employee.role;
-        
-        worksheet.getRow(5).height = 15.75;
-        worksheet.mergeCells('A5:D5');
-        worksheet.getCell('A5').value = `Подразделение:`;
-        worksheet.mergeCells('E5:S5');
-        worksheet.getCell('E5').value = employee.branch || '-';
+        sc('E4', employee.role === 'ADMIN' ? 'Администратор регистратуры' : employee.role, fontA8, { vertical: 'top', wrapText: true } as Partial<ExcelJS.Alignment>);
 
+        // === ROW 5: Department ===
+        worksheet.getRow(5).height = 15.75;
+        sc('A5', 'Подразделение:', fontA8, { vertical: 'top' } as Partial<ExcelJS.Alignment>);
+        worksheet.mergeCells('E5:S5');
+        sc('E5', employee.branch || 'Информационно-аналитический отдел поликлиники', fontA8, { vertical: 'top', wrapText: true } as Partial<ExcelJS.Alignment>);
+
+        // === ROW 6: Salary ===
         worksheet.getRow(6).height = 15.75;
         worksheet.mergeCells('A6:D6');
-        worksheet.getCell('A6').value = `Оклад`;
+        sc('A6', 'Оклад', fontA8, leftTop);
         worksheet.mergeCells('E6:G6');
-        worksheet.getCell('E6').value = effectiveBaseSalary;
-        
-        worksheet.getRow(7).height = 15.75;
-        worksheet.getCell('A7').value = 'Состав начислений';
-        worksheet.getCell('A7').font = fontBold;
+        sc('E6', effectiveBaseSalary, fontA8, { ...leftTop, wrapText: true } as Partial<ExcelJS.Alignment>);
 
-        // Section 1 Table
-        const startRowSec1 = 8;
+        // === ROW 7: Section label ===
+        worksheet.getRow(7).height = 15.75;
+        sc('A7', 'Состав начислений', fontA8b, { vertical: 'top' } as Partial<ExcelJS.Alignment>);
+
+        // ==========================
+        // SECTION 1: Accruals Table
+        // ==========================
+        // Row 8-9: Header (2-row high merged)
         worksheet.getRow(8).height = 11.25;
         worksheet.getRow(9).height = 11.25;
-
-        // Manual merges for header (2 rows high)
         worksheet.mergeCells('A8:G9');
-        worksheet.getCell('A8').value = 'Вид';
+        sc('A8', 'Вид', fontA8b, leftTop, true);
         worksheet.mergeCells('H8:J9');
-        worksheet.getCell('H8').value = 'Расчетная база';
+        sc('H8', 'Расчетная база', fontA8b, centerTopWrap, true);
         worksheet.mergeCells('K8:L9');
-        worksheet.getCell('K8').value = 'Начислено (руб.)';
+        sc('K8', 'Начислено (руб.)', fontA8b, centerTopWrap, true);
         worksheet.mergeCells('M8:O9');
-        worksheet.getCell('M8').value = 'Удержано (руб.) 13%';
+        sc('M8', 'Удержано (руб.) 13%', fontA8b, centerTopWrap, true);
         worksheet.mergeCells('P8:S9');
-        worksheet.getCell('P8').value = 'Сумма';
+        sc('P8', 'Сумма', fontA8b, centerTop, true);
 
-        [worksheet.getCell('A8'), worksheet.getCell('H8'), worksheet.getCell('K8'), worksheet.getCell('M8'), worksheet.getCell('P8')].forEach(c => {
-            c.style = { font: fontBold, border: borderThin, alignment: centerAlignment };
-        });
-
-        const addRowSec1 = (idx: number, name: string, base: string, accrued: number) => {
-            const rIdx = startRowSec1 + 1 + idx;
-            const r = worksheet.getRow(rIdx);
-            r.height = 33.75;
-            worksheet.mergeCells(`A${rIdx}:G${rIdx}`);
-            worksheet.mergeCells(`H${rIdx}:J${rIdx}`);
-            worksheet.mergeCells(`K${rIdx}:L${rIdx}`);
-            worksheet.mergeCells(`M${rIdx}:O${rIdx}`);
-            worksheet.mergeCells(`P${rIdx}:S${rIdx}`);
-            
+        // Data rows helper for section 1
+        const addSec1Row = (rowNum: number, label: string, base: string, accrued: number) => {
+            worksheet.getRow(rowNum).height = 33.75;
+            worksheet.mergeCells(`A${rowNum}:G${rowNum}`);
+            worksheet.mergeCells(`H${rowNum}:J${rowNum}`);
+            worksheet.mergeCells(`K${rowNum}:L${rowNum}`);
+            worksheet.mergeCells(`M${rowNum}:O${rowNum}`);
+            worksheet.mergeCells(`P${rowNum}:S${rowNum}`);
             const rowTax = Math.round(accrued * 0.13);
-            r.getCell(1).value = name;
-            r.getCell(8).value = base;
-            r.getCell(11).value = accrued;
-            r.getCell(13).value = rowTax;
-            r.getCell(16).value = accrued - rowTax;
-            
-            [r.getCell(1), r.getCell(8), r.getCell(11), r.getCell(13), r.getCell(16)].forEach(c => {
-                c.border = borderThin;
-                c.alignment = centerAlignment;
-            });
-            r.getCell(1).alignment = leftAlignment;
+            const rowSum = accrued - rowTax;
+            sc(`A${rowNum}`, label, fontA8, wrapTop, true);
+            sc(`H${rowNum}`, base, fontA8, centerMid, true);
+            sc(`K${rowNum}`, accrued, fontA8, centerMid, true);
+            sc(`M${rowNum}`, rowTax, fontA8, centerMid, true);
+            sc(`P${rowNum}`, rowSum, fontA8, rightMid, true);
         };
 
-        addRowSec1(1, 'Оклад по дням', `${hoursWorked} дней`, Math.round(shiftPay)); // Changed to дней
-        addRowSec1(2, 'Доплата за интенсивность работ', `${shifts.filter(s => s.coefficient > 1).length} дней`, Math.round(intensityTotal));
-        addRowSec1(3, 'Чек-лист', `Выполнение ${avgChecklist.toFixed(0)}%`, checklistBonus);
-        addRowSec1(4, 'Качество оформления карт', `Выполнение ${avgQuality.toFixed(0)}%`, qualityBonus);
-        addRowSec1(5, '% от продаж', `${sales.reduce((sum, s) => sum + s.price, 0)}`, salesBonus);
-        addRowSec1(6, 'Открытие/закрытие центра', `7 дней`, closingBonuses);
-        addRowSec1(7, 'Работа в архиве', `${shifts.filter(s => s.type === 'ARCHIVE_WORK').reduce((sum,s)=>sum+s.hours,0)} часов`, Math.round(archiveBonus));
-        addRowSec1(8, 'Оформление ЭЛН', `${monthlyChecklist?.sickLeaveOpening || 0} открытия, ${monthlyChecklist?.sickLeaveClosing || 0} закрытий`, elnBonus);
-        addRowSec1(9, 'Доплата за обучение стажёра', `${shifts.filter(s => s.isTrainee).length} дня`, traineeBonus);
-        addRowSec1(10, 'Доплата за создание новых карт', `${monthlyChecklist?.cardCreation || 0} штуки`, cardCreationBonus);
-        addRowSec1(11, 'Доплата за стаж работы', `3% от оклада`, seniorityBonus);
+        addSec1Row(10, 'Оклад по дням', `${daysWorked} дней`, Math.round(shiftPay));
+        addSec1Row(11, 'Доплата за интенсивность работы', `${daysWorked} дней`, Math.round(intensityTotal));
+        addSec1Row(12, 'Чек-лист', `Выполение ${avgChecklist.toFixed(0)}%`, checklistBonus);
+        addSec1Row(13, 'Качество оформления карт', `Выполнение ${avgQuality.toFixed(0)}%`, qualityBonus);
+        addSec1Row(14, '% от продаж', `${salesTotal}`, salesBonus);
+        addSec1Row(15, 'Открытие/закрытие центра', `${closingDays} дней`, closingBonuses);
+        addSec1Row(16, 'Работа в архиве', `${archiveHours} часов`, Math.round(archiveBonus));
+        addSec1Row(17, 'Оформление ЭЛН', `${sickOpening} открытия, ${sickClosing} закрытий`, elnBonus);
+        addSec1Row(18, 'Доплата за обучение стажёра', `${shifts.filter(s => s.isTrainee).length} дня`, traineeBonus);
+        addSec1Row(19, 'Доплата за создание новых карт пациентов', `${monthlyChecklist?.cardCreation || 0} штуки`, cardCreationBonus);
+        addSec1Row(20, 'Доплата за стаж работы', `${seniorityPct}% от оклада`, seniorityBonus);
 
-        // Total row
-        const totalRowIdx = startRowSec1 + 13;
-        worksheet.getRow(totalRowIdx).height = 15;
-        worksheet.mergeCells(`A${totalRowIdx}:G${totalRowIdx}`);
-        worksheet.getRow(totalRowIdx).getCell(1).value = 'Всего начислено';
-        worksheet.getRow(totalRowIdx).getCell(11).value = totalAccrued;
-        worksheet.getRow(totalRowIdx).getCell(13).value = tax;
-        worksheet.getRow(totalRowIdx).getCell(16).value = toPay;
-        [worksheet.getCell(`A${totalRowIdx}`), worksheet.getCell(`K${totalRowIdx}`), worksheet.getCell(`M${totalRowIdx}`), worksheet.getCell(`P${totalRowIdx}`)].forEach(c => {
-            c.border = borderThin;
-            c.font = fontBold;
+        // Row 21: Totals
+        worksheet.getRow(21).height = 15;
+        worksheet.mergeCells('A21:G21');
+        worksheet.mergeCells('H21:J21');
+        worksheet.mergeCells('K21:L21');
+        worksheet.mergeCells('M21:O21');
+        worksheet.mergeCells('P21:S21');
+        sc('A21', 'Всего начислено', fontA10b, { horizontal: 'left' } as Partial<ExcelJS.Alignment>, true);
+        sc('H21', format(startDate, 'yyyy-MM-dd'), fontA10b, rightTop, true);
+        sc('K21', totalAccrued, fontA10b, rightTop, true);
+        sc('M21', tax, fontA10b, centerTop, true);
+        sc('P21', toPay, fontA10b, rightTop, true);
+
+        // ==========================
+        // SECTION 2: Intensity details
+        // ==========================
+        // Row 23: Title
+        worksheet.mergeCells('A23:S23');
+        sc('A23', '2. Детализация доплаты за интенсивность работы (от выручки)', fontA8b, leftTopWrap);
+
+        // Rows 24-29: Reference table
+        const refData = [[120000, 1], [130000, 1.1], [140000, 1.2], [150000, 1.3], [160000, 1.4], [170000, 1.5]];
+        refData.forEach((rd, i) => {
+            const r = 24 + i;
+            worksheet.mergeCells(`A${r}:G${r}`);
+            sc(`A${r}`, rd[0], fontA8, { horizontal: 'center' } as Partial<ExcelJS.Alignment>, true);
+            sc(`H${r}`, rd[1], fontA8, {} as Partial<ExcelJS.Alignment>, true);
         });
 
-        // Section 2: Intensity Details
-        const startRowSec2 = totalRowIdx + 2;
-        worksheet.mergeCells(`A${startRowSec2}:S${startRowSec2}`);
-        worksheet.getCell(`A${startRowSec2}`).value = '2. Детализация доплаты за интенсивность работы';
-        worksheet.getCell(`A${startRowSec2}`).font = fontBold;
+        // Row 31: daily header
+        worksheet.mergeCells('A31:G31');
+        sc('A31', 'число', fontA8, { horizontal: 'center' } as Partial<ExcelJS.Alignment>, true);
+        sc('H31', 'сумма', fontA8, {} as Partial<ExcelJS.Alignment>, true);
 
-        // Reference table mini
-        const refData = [['120000', '1'], ['130000', '1.1'], ['140000', '1.2'], ['150000', '1.3'], ['160000', '1.4'], ['170000', '1.5']];
-        refData.forEach((row, rIdx) => {
-            worksheet.getCell(startRowSec2 + 1 + rIdx, 1).value = row[0];
-            worksheet.getCell(startRowSec2 + 1 + rIdx, 8).value = row[1];
-            worksheet.getCell(startRowSec2 + 1 + rIdx, 1).border = borderThin;
-            worksheet.getCell(startRowSec2 + 1 + rIdx, 8).border = borderThin;
+        // Daily intensity rows starting at 32
+        let curRow = 32;
+        const intensityShifts = shifts.filter(s => s.type === 'REGULAR' && s.coefficient > 1);
+        intensityShifts.forEach(s => {
+            worksheet.mergeCells(`A${curRow}:G${curRow}`);
+            const d = parseISO(s.date);
+            sc(`A${curRow}`, d, fontA8, { horizontal: 'center' } as Partial<ExcelJS.Alignment>, true);
+            worksheet.getCell(`A${curRow}`).numFmt = 'DD.MM.YYYY';
+            sc(`H${curRow}`, Math.round(hourlyBase * s.hours * (s.coefficient - 1)), fontA8, {} as Partial<ExcelJS.Alignment>, true);
+            curRow++;
         });
 
-        // Daily table
-        const dailyRowStart = startRowSec2 + 8;
-        worksheet.mergeCells(`A${dailyRowStart}:G${dailyRowStart}`);
-        worksheet.getCell(`A${dailyRowStart}`).value = 'число';
-        worksheet.getCell(`H${dailyRowStart}`).value = 'сумма';
-        [worksheet.getCell(`A${dailyRowStart}`), worksheet.getCell(`H${dailyRowStart}`)].forEach(c => { c.border = borderThin; c.font = fontBold; c.alignment = centerAlignment; });
+        // Итого за месяц
+        worksheet.mergeCells(`A${curRow}:G${curRow}`);
+        sc(`A${curRow}`, 'Итого за месяц ', fontA8b, { horizontal: 'center' } as Partial<ExcelJS.Alignment>, true);
+        sc(`H${curRow}`, Math.round(intensityTotal), fontA8b, {} as Partial<ExcelJS.Alignment>, true);
+        curRow++;
 
-        let currentIntensityRow = dailyRowStart + 1;
-        shifts.filter(s => s.coefficient > 1).forEach(s => {
-            worksheet.mergeCells(`A${currentIntensityRow}:G${currentIntensityRow}`);
-            worksheet.getCell(`A${currentIntensityRow}`).value = parseISO(s.date);
-            worksheet.getCell(`A${currentIntensityRow}`).numFmt = 'dd.mm.yy';
-            worksheet.getCell(`H${currentIntensityRow}`).value = Math.round(hourlyBase * s.hours * (s.coefficient - 1));
-            [worksheet.getCell(`A${currentIntensityRow}`), worksheet.getCell(`H${currentIntensityRow}`)].forEach(c => { c.border = borderThin; c.alignment = centerAlignment; });
-            currentIntensityRow++;
-        });
+        // ==========================
+        // SECTION 3: Checklist
+        // ==========================
+        curRow += 1; // blank row
+        worksheet.getRow(curRow).height = 13.5;
+        worksheet.mergeCells(`A${curRow}:S${curRow}`);
+        sc(`A${curRow}`, '3. Детализация доплаты за качество обслуживания (чек-лист)', fontA8b, leftTopWrap);
+        curRow++;
 
-        worksheet.mergeCells(`A${currentIntensityRow}:G${currentIntensityRow}`);
-        worksheet.getCell(`A${currentIntensityRow}`).value = 'Итого за месяц';
-        worksheet.getCell(`H${currentIntensityRow}`).value = Math.round(intensityTotal);
-        [worksheet.getCell(`A${currentIntensityRow}`), worksheet.getCell(`H${currentIntensityRow}`)].forEach(c => { c.border = borderThin; c.font = fontBold; c.alignment = centerAlignment; });
-
-        // Section 3: Checklist
-        const startRowSec3 = currentIntensityRow + 2;
-        worksheet.getRow(startRowSec3).height = 13.5;
-        worksheet.mergeCells(`A${startRowSec3}:S${startRowSec3}`);
-        worksheet.getCell(`A${startRowSec3}`).value = '3. Детализация доплаты за качество обслуживания (чек-лист)';
-        worksheet.getCell(`A${startRowSec3}`).font = fontBold;
-
-        worksheet.getRow(startRowSec3 + 1).height = 23.25;
-        worksheet.mergeCells(`A${startRowSec3 + 1}:G${startRowSec3 + 1}`);
-        worksheet.getCell(`A${startRowSec3 + 1}`).value = 'Критерии чек-листа (KPI)';
-        worksheet.mergeCells(`H${startRowSec3 + 1}:J${startRowSec3 + 1}`);
-        worksheet.getCell(`H${startRowSec3 + 1}`).value = 'Максимально балл';
-        worksheet.mergeCells(`K${startRowSec3 + 1}:O${startRowSec3 + 1}`);
-        worksheet.getCell(`K${startRowSec3 + 1}`).value = 'Фактический балл';
-
-        [worksheet.getCell(`A${startRowSec3 + 1}`), worksheet.getCell(`H${startRowSec3 + 1}`), worksheet.getCell(`K${startRowSec3 + 1}`)].forEach(c => {
-            c.border = borderThin;
-            c.font = fontBold;
-            c.alignment = centerAlignment;
-        });
+        // Header row
+        worksheet.getRow(curRow).height = 23.25;
+        worksheet.mergeCells(`A${curRow}:G${curRow}`);
+        sc(`A${curRow}`, 'Критерии чек-листа (KPI)', fontA8b, centerMid, true);
+        worksheet.mergeCells(`H${curRow}:J${curRow}`);
+        sc(`H${curRow}`, 'Максимально балл', fontA8b, centerMidWrap, true);
+        worksheet.mergeCells(`K${curRow}:O${curRow}`);
+        sc(`K${curRow}`, 'Фактический балл', fontA8b, centerMidWrap, true);
+        worksheet.mergeCells(`P${curRow}:S${curRow}`);
+        curRow++;
 
         const getAvgCrit = (crit: keyof typeof dailyChecklists[0]) => {
-            const count = dailyChecklists.length;
-            if (count === 0) return 0;
-            return dailyChecklists.reduce((sum, c) => sum + (Number(c[crit]) || 0), 0) / count;
+            if (dailyChecklists.length === 0) return 0;
+            return dailyChecklists.reduce((sum, c) => sum + (Number(c[crit]) || 0), 0) / dailyChecklists.length;
         };
 
         const critLabels = [
-            '1. Внешний вид и дисциплина',
-            '2. Приветствие и первичный контакт',
-            '3. Соблюдение алгоритма приема',
-            '4. Стимулирование услуг',
-            '5. Работа с возражениями',
-            '6. Завершение контакта'
+            ['1. Внешний вид и дисциплина', 16.5],
+            ['2. Приветствие и первичный контакт', 21],
+            ['3. Соблюдение алгоритма прием и этапов обслуживания', 24.75],
+            ['4. Стимулирование пользования услугами центра', 22.5],
+            ['5. Работа с возражениями и конфликты', 22.5],
+            ['6. Завершение контакта', 15],
         ];
-        critLabels.forEach((l, i) => {
-            const rIdx = startRowSec3 + 2 + i;
-            worksheet.getRow(rIdx).height = 16.5;
-            worksheet.mergeCells(`A${rIdx}:G${rIdx}`);
-            worksheet.getCell(`A${rIdx}`).value = l;
-            worksheet.mergeCells(`H${rIdx}:J${rIdx}`);
-            worksheet.getCell(`H${rIdx}`).value = 1; // Max
-            worksheet.mergeCells(`K${rIdx}:O${rIdx}`);
-            worksheet.getCell(`K${rIdx}`).value = getAvgCrit(`criterion${i+1}` as any) / 100; // Value
-            [worksheet.getCell(`A${rIdx}`), worksheet.getCell(`H${rIdx}`), worksheet.getCell(`K${rIdx}`)].forEach(c => {
-                c.border = borderThin;
-                c.alignment = centerAlignment;
-            });
-            worksheet.getCell(`A${rIdx}`).alignment = leftAlignment;
+
+        critLabels.forEach((item, i) => {
+            const label = item[0] as string;
+            const h = item[1] as number;
+            worksheet.getRow(curRow).height = h;
+            worksheet.mergeCells(`A${curRow}:G${curRow}`);
+            sc(`A${curRow}`, label, fontA8, wrapTop, true);
+            worksheet.mergeCells(`H${curRow}:J${curRow}`);
+            sc(`H${curRow}`, 1, fontA8, centerMid, true);
+            worksheet.mergeCells(`K${curRow}:O${curRow}`);
+            sc(`K${curRow}`, Math.round(getAvgCrit(`criterion${i+1}` as any)) / 100, fontA8, centerMid, true);
+            worksheet.mergeCells(`P${curRow}:S${curRow}`);
+            curRow++;
         });
 
-        // Section 4: Card Quality
-        const startRowSec4 = startRowSec3 + 9;
-        worksheet.mergeCells(`A${startRowSec4}:S${startRowSec4}`);
-        worksheet.getCell(`A${startRowSec4}`).value = '4. Детализация доплаты за качество оформления карт';
-        worksheet.getCell(`A${startRowSec4}`).font = fontBold;
+        // Итого баллов
+        worksheet.mergeCells(`A${curRow}:G${curRow}`);
+        sc(`A${curRow}`, 'Итого баллов: ', fontA8b, centerMid, true);
+        worksheet.mergeCells(`H${curRow}:J${curRow}`);
+        sc(`H${curRow}`, 1, fontA8b, centerMid, true);
+        worksheet.mergeCells(`K${curRow}:O${curRow}`);
+        const avgCritTotal = critLabels.reduce((sum, _, i) => sum + (Math.round(getAvgCrit(`criterion${i+1}` as any)) / 100), 0) / 6;
+        sc(`K${curRow}`, Math.round(avgCritTotal * 100) / 100, fontA8b, centerMid, true);
+        worksheet.mergeCells(`P${curRow}:S${curRow}`);
+        curRow++;
 
-        worksheet.mergeCells(`A${startRowSec4 + 1}:G${startRowSec4 + 1}`);
-        worksheet.getCell(`A${startRowSec4 + 1}`).value = 'Критерии качества';
-        worksheet.mergeCells(`H${startRowSec4 + 1}:J${startRowSec4 + 1}`);
-        worksheet.getCell(`H${startRowSec4 + 1}`).value = 'Максимально балл';
-        worksheet.mergeCells(`K${startRowSec4 + 1}:O${startRowSec4 + 1}`);
-        worksheet.getCell(`K${startRowSec4 + 1}`).value = 'Фактический балл';
+        // ==========================
+        // SECTION 4: Card quality  
+        // ==========================
+        curRow += 1; // blank row
+        worksheet.mergeCells(`A${curRow}:S${curRow}`);
+        sc(`A${curRow}`, '4. Детализация доплаты за качество оформления карт', fontA8b, leftTopWrap);
+        curRow++;
 
-        [worksheet.getCell(`A${startRowSec4 + 1}`), worksheet.getCell(`H${startRowSec4 + 1}`), worksheet.getCell(`K${startRowSec4 + 1}`)].forEach(c => {
-            c.border = borderThin;
-            c.font = fontBold;
-            c.alignment = centerAlignment;
-        });
+        // Header
+        worksheet.mergeCells(`A${curRow}:G${curRow}`);
+        sc(`A${curRow}`, 'Критерии оценки', fontA8b, centerMid, true);
+        worksheet.mergeCells(`H${curRow}:J${curRow}`);
+        sc(`H${curRow}`, 'Максимально балл', fontA8b, centerMidWrap, true);
+        worksheet.mergeCells(`K${curRow}:O${curRow}`);
+        sc(`K${curRow}`, 'Фактический балл', fontA8b, centerMidWrap, true);
+        worksheet.mergeCells(`P${curRow}:S${curRow}`);
+        curRow++;
 
         const getAvgRegCrit = (crit: keyof typeof regs[0]) => {
-            const count = regs.length;
-            if (count === 0) return 0;
-            return regs.reduce((sum, r) => sum + (Number(r[crit]) || 0), 0) / count;
+            if (regs.length === 0) return 0;
+            return regs.reduce((sum, r) => sum + (Number(r[crit]) || 0), 0) / regs.length;
         };
+
+        const totalRegCount = regs.reduce((s, r) => s + (r.count || 1), 0);
 
         const regLabels = ['1. Правильность заполнения карт', '2. Указана эл.почта', '3. Указано доверенное лицо'];
         regLabels.forEach((l, i) => {
-            const rIdx = startRowSec4 + 2 + i;
-            worksheet.mergeCells(`A${rIdx}:G${rIdx}`);
-            worksheet.getCell(`A${rIdx}`).value = l;
-            worksheet.mergeCells(`H${rIdx}:J${rIdx}`);
-            worksheet.getCell(`H${rIdx}`).value = 1;
-            worksheet.mergeCells(`K${rIdx}:O${rIdx}`);
-            worksheet.getCell(`K${rIdx}`).value = getAvgRegCrit(`criterion${i+1}` as any);
-            [worksheet.getCell(`A${rIdx}`), worksheet.getCell(`H${rIdx}`), worksheet.getCell(`K${rIdx}`)].forEach(c => {
-                c.border = borderThin;
-                c.alignment = centerAlignment;
-            });
-            worksheet.getCell(`A${rIdx}`).alignment = leftAlignment;
+            worksheet.mergeCells(`A${curRow}:G${curRow}`);
+            sc(`A${curRow}`, l, fontA8, wrapTop, true);
+            // H = total checks, I-J = max score per check (1)
+            sc(`H${curRow}`, totalRegCount, fontA8, centerMid, true);
+            worksheet.mergeCells(`I${curRow}:J${curRow}`);
+            sc(`I${curRow}`, 1, fontA8, centerMid, true);
+            worksheet.mergeCells(`K${curRow}:L${curRow}`);
+            const factScore = regs.reduce((s, r) => s + (Number((r as any)[`criterion${i+1}`]) || 0), 0);
+            sc(`K${curRow}`, factScore, fontA8, centerMid, true);
+            worksheet.mergeCells(`M${curRow}:O${curRow}`);
+            const pct = totalRegCount > 0 ? factScore / totalRegCount : 0;
+            sc(`M${curRow}`, Math.round(pct * 10000) / 10000, fontA8, centerMid, true);
+            worksheet.mergeCells(`P${curRow}:S${curRow}`);
+            curRow++;
         });
 
-        // Section 5: Sales
-        const startRowSec5 = startRowSec4 + 6;
-        worksheet.mergeCells(`A${startRowSec5}:S${startRowSec5}`);
-        worksheet.getCell(`A${startRowSec5}`).value = '5. Детализация начислений % от продаж';
-        worksheet.getCell(`A${startRowSec5}`).font = fontBold;
+        // Итого row
+        worksheet.mergeCells(`A${curRow}:G${curRow}`);
+        sc(`A${curRow}`, 'Итого:', fontA8b, centerMid, true);
+        sc(`H${curRow}`, totalRegCount * 3, fontA8b, centerMid, true);
+        worksheet.mergeCells(`K${curRow}:L${curRow}`);
+        const totalRegFactScore = regLabels.reduce((s, _, i) => s + regs.reduce((rs, r) => rs + (Number((r as any)[`criterion${i+1}`]) || 0), 0), 0);
+        sc(`K${curRow}`, totalRegFactScore, fontA8b, centerMid, true);
+        worksheet.mergeCells(`M${curRow}:O${curRow}`);
+        const avgRegPct = regLabels.length > 0 ? regLabels.reduce((s, _, i) => {
+            const fs = regs.reduce((rs, r) => rs + (Number((r as any)[`criterion${i+1}`]) || 0), 0);
+            return s + (totalRegCount > 0 ? fs / totalRegCount : 0);
+        }, 0) / regLabels.length : 0;
+        sc(`M${curRow}`, Math.round(avgRegPct * 10000) / 10000, fontA8b, centerMid, true);
+        worksheet.mergeCells(`P${curRow}:Q${curRow}`);
+        curRow++;
 
-        worksheet.mergeCells(`A${startRowSec5+1}:G${startRowSec5+1}`);
-        worksheet.getCell(`A${startRowSec5+1}`).value = 'Наименование';
-        worksheet.mergeCells(`H${startRowSec5+1}:J${startRowSec5+1}`);
-        worksheet.getCell(`H${startRowSec5+1}`).value = 'Сумма';
-        worksheet.mergeCells(`K${startRowSec5+1}:L${startRowSec5+1}`);
-        worksheet.getCell(`K${startRowSec5+1}`).value = 'Бонус';
+        // ==========================
+        // SECTION 5: Sales
+        // ==========================
+        curRow += 1;
+        worksheet.getRow(curRow).height = 11.25;
+        worksheet.mergeCells(`A${curRow}:S${curRow}`);
+        sc(`A${curRow}`, '5. Детализация начислений % от продаж', fontA8b, leftTopWrap);
+        curRow++;
 
-        [worksheet.getCell(`A${startRowSec5+1}`), worksheet.getCell(`H${startRowSec5+1}`), worksheet.getCell(`K${startRowSec5+1}`)].forEach(c => {
-            c.border = borderThin;
-            c.font = fontBold;
-            c.alignment = centerAlignment;
-        });
+        // Header  
+        worksheet.getRow(curRow).height = 24.75;
+        worksheet.mergeCells(`A${curRow}:G${curRow}`);
+        sc(`A${curRow}`, 'Наименование акции/услуги', fontA8b, centerMidWrap, true);
+        worksheet.mergeCells(`H${curRow}:J${curRow}`);
+        sc(`H${curRow}`, 'Сумма продаж', fontA8b, centerMidWrap, true);
+        worksheet.mergeCells(`K${curRow}:L${curRow}`);
+        sc(`K${curRow}`, '%', fontA8b, centerMid, true);
+        worksheet.mergeCells(`M${curRow}:O${curRow}`);
+        sc(`M${curRow}`, 'Итого ', fontA8b, centerMid, true);
+        curRow++;
 
-        let currentSalesRow = startRowSec5 + 2;
         sales.forEach(s => {
-            worksheet.mergeCells(`A${currentSalesRow}:G${currentSalesRow}`);
-            worksheet.getCell(`A${currentSalesRow}`).value = s.productName;
-            worksheet.mergeCells(`H${currentSalesRow}:J${currentSalesRow}`);
-            worksheet.getCell(`H${currentSalesRow}`).value = s.price;
-            worksheet.mergeCells(`K${currentSalesRow}:L${currentSalesRow}`);
-            worksheet.getCell(`K${currentSalesRow}`).value = s.bonus;
-
-            [worksheet.getCell(`A${currentSalesRow}`), worksheet.getCell(`H${currentSalesRow}`), worksheet.getCell(`K${currentSalesRow}`)].forEach(c => {
-                c.border = borderThin;
-                c.alignment = centerAlignment;
-            });
-            worksheet.getCell(`A${currentSalesRow}`).alignment = leftAlignment;
-            currentSalesRow++;
+            worksheet.mergeCells(`A${curRow}:G${curRow}`);
+            sc(`A${curRow}`, s.productName, fontA8, wrapTop, true);
+            worksheet.mergeCells(`H${curRow}:J${curRow}`);
+            sc(`H${curRow}`, s.price, fontA8, centerMid, true);
+            worksheet.mergeCells(`K${curRow}:L${curRow}`);
+            const pct = s.price > 0 ? s.bonus / s.price : 0;
+            sc(`K${curRow}`, Math.round(pct * 100) / 100, fontA8, centerMid, true);
+            worksheet.mergeCells(`M${curRow}:O${curRow}`);
+            sc(`M${curRow}`, s.bonus, fontA8, centerMid, true);
+            curRow++;
         });
+
+        // Sales итого
+        worksheet.mergeCells(`A${curRow}:G${curRow}`);
+        sc(`A${curRow}`, 'Итого: ', fontA8b, centerMid, true);
+        worksheet.mergeCells(`H${curRow}:J${curRow}`);
+        sc(`H${curRow}`, salesTotal, fontA8b, centerMid, true);
+        worksheet.mergeCells(`M${curRow}:O${curRow}`);
+        sc(`M${curRow}`, salesBonus, fontA8b, centerMid, true);
 
         return workbook;
     }
