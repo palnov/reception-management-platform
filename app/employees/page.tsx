@@ -366,6 +366,7 @@ export default function EmployeesPage() {
                 const activeEmployees = employees.filter(emp => !emp.dismissalDate || emp.dismissalDate > todayStr);
                 const dismissedEmployees = employees.filter(emp => emp.dismissalDate && emp.dismissalDate <= todayStr);
 
+                const renderTable = (list: Employee[], title: string) => (
                     <div className="mb-12">
                         <h2 className="text-xl font-bold text-zinc-800 mb-4 px-2 tracking-tight">{title}</h2>
                         <div className="bg-white sm:rounded-xl shadow-sm border-y sm:border border-zinc-200 overflow-x-auto -mx-3 sm:mx-0 scrollbar-custom">
