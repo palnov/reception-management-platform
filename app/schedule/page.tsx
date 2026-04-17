@@ -7,7 +7,7 @@ import { MonthStatusBadge } from '@/components/MonthStatusBadge';
 import { MonthClosureControls } from '@/components/MonthClosureControls';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, parseISO, subDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, X, DoorOpen, MapPin, GripVertical, User, Crown, BadgeCheck, Clock, Briefcase, CheckSquare, Activity, LayoutList, Timer, Percent, Layers, GraduationCap } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, DoorOpen, MapPin, GripVertical, User, Crown, BadgeCheck, Clock, Briefcase, CheckSquare, Activity, LayoutList, Timer, Percent, Layers, GraduationCap, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
 import { QuickContextMenu } from '@/components/QuickContextMenu';
 import { Tooltip } from '@/components/Tooltip';
@@ -64,6 +64,12 @@ const BRANCH_CODES: Record<string, string> = {
     'Дзержинского 45': 'ДЗ 45',
     'Юбилейный (Менякина 1)': 'ЮБ'
 };
+
+function getInitials(name: string): string {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.substring(0, 2).toUpperCase();
+}
 
 // --- Selection Overlay Component ---
 const SelectionOverlay = memo(function SelectionOverlay({
@@ -140,7 +146,8 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
     isInSelection,
     currentUser,
     isClosed,
-    isManager
+    isManager,
+    isColumnCollapsed
 }: {
     emp: Employee,
     days: Date[],
@@ -156,7 +163,8 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
     isInSelection: (empId: string, dateKey: string) => boolean,
     currentUser: any,
     isClosed: boolean,
-    isManager: boolean
+    isManager: boolean,
+    isColumnCollapsed: boolean
 }) {
     const {
         attributes,
@@ -192,48 +200,68 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
 
     return (
         <tr ref={setNodeRef} style={style} className="hover:bg-zinc-50 group border-b border-zinc-200">
-            <td className="sticky left-0 bg-white group-hover:bg-zinc-50 z-40 p-3 font-medium text-zinc-900 transition-colors" style={{ boxShadow: 'inset -2px 0 0 #d4d4d8, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>
-                <div className="flex items-center gap-2">
-                    <div
-                        {...attributes}
-                        {...(!isClosed && isManager ? listeners : {})}
-                        className={`${isClosed || !isManager ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} p-1 hover:bg-zinc-100 rounded text-zinc-400 group-hover:text-zinc-600 transition-colors`}
-                    >
-                        <GripVertical className="w-4 h-4" />
-                    </div>
-
-                    <div className="flex flex-col gap-0.5 min-w-0">
-                        <div className="flex items-center gap-2">
-                            <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${emp.role === 'MANAGER' ? 'bg-purple-100 text-purple-600' :
-                                emp.role === 'SENIOR' ? 'bg-amber-100 text-amber-600' :
-                                    'bg-zinc-100 text-zinc-500'
-                                }`}>
-                                {emp.role === 'MANAGER' ? (
-                                    <Crown className="w-3 h-3" />
-                                ) : emp.role === 'SENIOR' ? (
-                                    <BadgeCheck className="w-3 h-3" />
-                                ) : (
-                                    <User className="w-3 h-3" />
-                                )}
-                            </div>
-                            <span className="truncate">{emp.name}</span>
+            <td className={`sticky left-0 bg-white group-hover:bg-zinc-50 z-40 font-medium text-zinc-900 transition-all ${isColumnCollapsed ? 'p-1.5' : 'p-3'}`} style={{ boxShadow: 'inset -2px 0 0 #d4d4d8, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>
+                {isColumnCollapsed ? (
+                    /* Collapsed: role icon + initials */
+                    <div className="flex flex-col items-center gap-0.5 w-10">
+                        <div className={`w-6 h-6 flex-shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold ${emp.role === 'MANAGER' ? 'bg-purple-100 text-purple-600' :
+                            emp.role === 'SENIOR' ? 'bg-amber-100 text-amber-600' :
+                                'bg-zinc-100 text-zinc-500'
+                            }`}>
+                            {emp.role === 'MANAGER' ? (
+                                <Crown className="w-3 h-3" />
+                            ) : emp.role === 'SENIOR' ? (
+                                <BadgeCheck className="w-3 h-3" />
+                            ) : (
+                                <User className="w-3 h-3" />
+                            )}
                         </div>
-                        {(emp.branch || emp.dismissalDate) && (
-                            <div className="flex items-center gap-2 pl-7 leading-tight">
-                                {emp.branch && (
-                                    <span className="text-[10px] text-zinc-400">
-                                        {BRANCH_CODES[emp.branch] || emp.branch}
-                                    </span>
-                                )}
-                                {emp.dismissalDate && emp.dismissalDate <= new Date().toISOString().split('T')[0] && (
-                                    <span className="text-[10px] text-red-500 font-bold whitespace-nowrap">
-                                        УВОЛЕНА: {format(parseISO(emp.dismissalDate), 'dd.MM.yy')}
-                                    </span>
-                                )}
-                            </div>
-                        )}
+                        <span className="text-[9px] font-bold text-zinc-500 leading-none">{getInitials(emp.name)}</span>
                     </div>
-                </div>
+                ) : (
+                    /* Expanded: full name, role, branch, drag handle */
+                    <div className="flex items-center gap-2">
+                        <div
+                            {...attributes}
+                            {...(!isClosed && isManager ? listeners : {})}
+                            className={`${isClosed || !isManager ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} p-1 hover:bg-zinc-100 rounded text-zinc-400 group-hover:text-zinc-600 transition-colors`}
+                        >
+                            <GripVertical className="w-4 h-4" />
+                        </div>
+
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                            <div className="flex items-center gap-2">
+                                <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${emp.role === 'MANAGER' ? 'bg-purple-100 text-purple-600' :
+                                    emp.role === 'SENIOR' ? 'bg-amber-100 text-amber-600' :
+                                        'bg-zinc-100 text-zinc-500'
+                                    }`}>
+                                    {emp.role === 'MANAGER' ? (
+                                        <Crown className="w-3 h-3" />
+                                    ) : emp.role === 'SENIOR' ? (
+                                        <BadgeCheck className="w-3 h-3" />
+                                    ) : (
+                                        <User className="w-3 h-3" />
+                                    )}
+                                </div>
+                                <span className="truncate">{emp.name}</span>
+                            </div>
+                            {(emp.branch || emp.dismissalDate) && (
+                                <div className="flex items-center gap-2 pl-7 leading-tight">
+                                    {emp.branch && (
+                                        <span className="text-[10px] text-zinc-400">
+                                            {BRANCH_CODES[emp.branch] || emp.branch}
+                                        </span>
+                                    )}
+                                    {emp.dismissalDate && emp.dismissalDate <= new Date().toISOString().split('T')[0] && (
+                                        <span className="text-[10px] text-red-500 font-bold whitespace-nowrap">
+                                            УВОЛЕНА: {format(parseISO(emp.dismissalDate), 'dd.MM.yy')}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </td>
             {days.map(day => {
                 const dateKey = format(day, 'yyyy-MM-dd');
@@ -413,6 +441,7 @@ export default function SchedulePage() {
     const [userData, setUserData] = useState<any>(null);
     const [prevMonthShifts, setPrevMonthShifts] = useState<Shift[]>([]);
     const [isAutoFilling, setIsAutoFilling] = useState(false);
+    const [isColumnCollapsed, setIsColumnCollapsed] = useState(false);
 
     const isManager = useMemo(() => {
         return userData?.role === 'MANAGER';
@@ -1295,7 +1324,7 @@ export default function SchedulePage() {
 
             <div
                 ref={gridContainerRef}
-                className={`bg-white sm:rounded-2xl shadow-xl border-y sm:border border-zinc-200/60 overflow-auto flex-1 pb-4 relative scrollbar-custom max-h-[calc(100vh-250px)] -mx-6 sm:mx-0 ${(isDragging || isFilling) ? 'select-none' : ''}`}
+                className={`bg-white sm:rounded-2xl shadow-xl border-y sm:border border-zinc-200/60 overflow-auto flex-1 pb-4 relative scrollbar-custom max-h-[calc(100vh-250px)] -mx-3 sm:mx-0 ${(isDragging || isFilling) ? 'select-none' : ''}`}
             >
                 <DndContext
                     sensors={sensors}
@@ -1305,8 +1334,17 @@ export default function SchedulePage() {
                     <table className="w-full text-xs text-left border-separate border-spacing-0 min-w-[1240px]">
                         <thead className="sticky top-0 z-[60]">
                             <tr className="bg-zinc-50/50">
-                                <th className="sticky top-0 left-0 bg-zinc-50 z-[70] p-3 min-w-[240px]" style={{ boxShadow: 'inset 0 -2px 0 #d4d4d8, inset -2px 0 0 #d4d4d8, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>
-                                    <span className="font-semibold text-zinc-500 uppercase tracking-wider text-[10px]">Сотрудник</span>
+                                <th className={`sticky top-0 left-0 bg-zinc-50 z-[70] p-2 sm:p-3 transition-all ${isColumnCollapsed ? 'min-w-[52px] w-[52px]' : 'min-w-[240px]'}`} style={{ boxShadow: 'inset 0 -2px 0 #d4d4d8, inset -2px 0 0 #d4d4d8, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>
+                                    <div className="flex items-center justify-between gap-1">
+                                        {!isColumnCollapsed && <span className="font-semibold text-zinc-500 uppercase tracking-wider text-[10px]">Сотрудник</span>}
+                                        <button
+                                            onClick={() => setIsColumnCollapsed(prev => !prev)}
+                                            className="p-1 rounded-md hover:bg-zinc-200/70 text-zinc-400 hover:text-zinc-600 transition-colors"
+                                            title={isColumnCollapsed ? 'Развернуть' : 'Свернуть'}
+                                        >
+                                            {isColumnCollapsed ? <PanelLeftOpen className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />}
+                                        </button>
+                                    </div>
                                 </th>
                                 {days.map(day => {
                                     const isWeekend = day.getDay() === 0 || day.getDay() === 6;
@@ -1353,6 +1391,7 @@ export default function SchedulePage() {
                                         isInSelection={isInSelection}
                                         isClosed={isClosed}
                                         isManager={isManager}
+                                        isColumnCollapsed={isColumnCollapsed}
                                     />
                                 ))}
                             </SortableContext>
