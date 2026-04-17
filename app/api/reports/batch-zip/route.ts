@@ -27,12 +27,9 @@ export async function POST(request: Request) {
 
         // Generate reports in parallel
         const promises = employees.map(async (emp) => {
-            let workbook;
-            if (type === 'SALARY_SLIP') {
-                workbook = await ReportService.generateSalarySlipWorkbook(date, emp.id);
-            } else {
-                workbook = await ReportService.generateExcel(date, type, emp.id);
-            }
+            const workbook = (type === 'SALARY_SLIP')
+                ? await ReportService.generateSalarySlipWorkbook(date, emp.id)
+                : await ReportService.generateExcel(date, type, emp.id);
             const buffer = await workbook.xlsx.writeBuffer();
             // Sanitize filename
             const safeName = emp.name.replace(/[^a-z0-9а-яё]/gi, '_');
