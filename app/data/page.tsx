@@ -26,7 +26,7 @@ export default function DataPage() {
     const [reportType, setReportType] = useState('SALARY_SLIP'); // Default to Salary Slip
     const [isExportingGeneral, setIsExportingGeneral] = useState(false);
     const [isExportingBatch, setIsExportingBatch] = useState(false);
-    const [employees, setEmployees] = useState<{ id: string, name: string }[]>([]);
+    const [employees, setEmployees] = useState<{ id: string, name: string, role: string }[]>([]);
 
     // Backup State
     const [isRestoring, setIsRestoring] = useState(false);
