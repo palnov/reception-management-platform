@@ -163,14 +163,14 @@ export default function DataPage() {
 
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
-            <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Управление данными</h1>
+        <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10 px-4 sm:px-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 tracking-tight">Управление данными</h1>
 
             {/* Tabs */}
-            <div className="flex gap-4 p-1 bg-zinc-100 rounded-2xl w-fit">
+            <div className="flex gap-2 p-1 bg-zinc-100 rounded-2xl w-full sm:w-fit overflow-x-auto sm:overflow-visible">
                 <button
                     onClick={() => setActiveTab('export')}
-                    className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'export' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+                    className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'export' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
                         }`}
                 >
                     <div className="flex items-center gap-2">
@@ -180,7 +180,7 @@ export default function DataPage() {
                 </button>
                 <button
                     onClick={() => setActiveTab('backup')}
-                    className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'backup' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+                    className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'backup' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
                         }`}
                 >
                     <div className="flex items-center gap-2">
@@ -190,12 +190,12 @@ export default function DataPage() {
                 </button>
             </div>
 
-            <div className="bg-white rounded-3xl shadow-sm border border-zinc-200 p-8 min-h-[400px]">
+            <div className="bg-white rounded-3xl shadow-sm border border-zinc-200 p-5 sm:p-8 min-h-[400px]">
                 {activeTab === 'export' ? (
-                    <div className="space-y-8">
+                    <div className="space-y-6 sm:space-y-8">
                         <div>
-                            <h2 className="text-xl font-bold mb-4">Параметры выгрузки</h2>
-                            <div className="grid grid-cols-2 gap-6">
+                            <h2 className="text-lg sm:text-xl font-bold mb-4">Параметры выгрузки</h2>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                 <div>
                                     <label className="block text-sm font-medium text-zinc-500 mb-2">Отчетный месяц</label>
                                     <input
@@ -230,9 +230,9 @@ export default function DataPage() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {reportType === 'SALARY_SLIP' ? (
-                                    <div className="p-6 border-2 border-zinc-100 rounded-2xl flex flex-col justify-between">
+                                    <div className="p-5 sm:p-6 border-2 border-zinc-100 rounded-2xl flex flex-col justify-between">
                                         <div className="flex items-start gap-4 mb-4 text-blue-600">
-                                            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
+                                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
                                                 <Download className="w-6 h-6" />
                                             </div>
                                             <div>
@@ -292,13 +292,13 @@ export default function DataPage() {
                                     <button
                                         onClick={() => handleExport('GENERAL')}
                                         disabled={isExportingGeneral || isExportingBatch}
-                                        className="p-6 border-2 border-zinc-100 rounded-2xl hover:border-green-200 hover:bg-green-50 transition-all text-left flex flex-col justify-between group"
+                                        className="p-5 sm:p-6 border-2 border-zinc-100 rounded-2xl hover:border-green-200 hover:bg-green-50 transition-all text-left flex flex-col justify-between group"
                                     >
                                         <div>
-                                            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4 text-green-600 group-hover:scale-110 transition-transform">
+                                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4 text-green-600 group-hover:scale-110 transition-transform">
                                                 {isExportingGeneral ? <Loader2 className="w-6 h-6 animate-spin" /> : <FileSpreadsheet className="w-6 h-6" />}
                                             </div>
-                                            <div className="font-bold text-lg text-zinc-900">Общая таблица</div>
+                                            <div className="font-bold text-base sm:text-lg text-zinc-900">Общая таблица</div>
                                             <div className="text-sm text-zinc-500 mt-1">Единый файл со всеми выбранными данными на разных листах</div>
                                         </div>
                                     </button>
@@ -307,13 +307,13 @@ export default function DataPage() {
                                 <button
                                     onClick={() => handleExport('INDIVIDUAL')}
                                     disabled={isExportingGeneral || isExportingBatch}
-                                    className="p-6 border-2 border-zinc-100 rounded-2xl hover:border-blue-200 hover:bg-blue-50 transition-all text-left flex flex-col justify-between group"
+                                    className="p-5 sm:p-6 border-2 border-zinc-100 rounded-2xl hover:border-blue-200 hover:bg-blue-50 transition-all text-left flex flex-col justify-between group"
                                 >
                                     <div>
-                                        <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform">
+                                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform">
                                             {isExportingBatch ? <Loader2 className="w-6 h-6 animate-spin" /> : <Archive className="w-6 h-6" />}
                                         </div>
-                                        <div className="font-bold text-lg text-zinc-900">По всем сотрудникам (ZIP)</div>
+                                        <div className="font-bold text-base sm:text-lg text-zinc-900">По всем сотрудникам (ZIP)</div>
                                         <div className="text-sm text-zinc-500 mt-1">Отдельные файлы индивидуально для каждого сотрудника, упакованные в архив</div>
                                     </div>
                                 </button>
@@ -344,7 +344,7 @@ export default function DataPage() {
                         <div className="pt-4 border-t border-zinc-100">
                             <h2 className="text-xl font-bold mb-4">Восстановление из файла</h2>
                             <div className="space-y-4">
-                                <div className="border-2 border-dashed border-zinc-300 rounded-xl p-8 text-center hover:bg-zinc-50 transition-colors relative">
+                                <div className="border-2 border-dashed border-zinc-300 rounded-xl p-6 sm:p-8 text-center hover:bg-zinc-50 transition-colors relative">
                                     <input
                                         type="file"
                                         accept=".json"
@@ -352,11 +352,11 @@ export default function DataPage() {
                                         className="absolute inset-0 opacity-0 cursor-pointer"
                                     />
                                     <div className="flex flex-col items-center gap-2 pointer-events-none">
-                                        <Upload className={`w-8 h-8 ${backupFile ? 'text-blue-500' : 'text-zinc-400'}`} />
+                                        <Upload className={`w-6 h-6 sm:w-8 sm:h-8 ${backupFile ? 'text-blue-500' : 'text-zinc-400'}`} />
                                         {backupFile ? (
-                                            <span className="font-bold text-blue-600">{backupFile.name}</span>
+                                            <span className="font-bold text-blue-600 text-sm">{backupFile.name}</span>
                                         ) : (
-                                            <span className="text-zinc-500 font-medium">Нажмите или перетащите файл бэкапа сюда</span>
+                                            <span className="text-zinc-500 font-medium text-sm">Нажмите или перетащите файл бэкапа сюда</span>
                                         )}
                                     </div>
                                 </div>

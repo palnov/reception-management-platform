@@ -1251,39 +1251,43 @@ export default function SchedulePage() {
 
     return (
         <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">График смен</h1>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                <div className="w-full sm:w-auto">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 tracking-tight">График смен</h1>
                     <div
                         className={`flex items-center gap-2 mt-2 text-sm text-zinc-500 ${isClosed || !isManager ? 'cursor-default' : 'cursor-pointer hover:text-blue-600'} transition-colors group`}
                         onClick={() => !isClosed && isManager && setShowNormModal(true)}
                     >
-                        <span>Норма часов в этом месяце: </span>
+                        <span>Норма: </span>
                         <span className={`font-bold ${isClosed ? 'text-zinc-500' : 'text-zinc-900 group-hover:text-blue-600'}`}>{monthNorm}</span>
                         {!isClosed && isManager && <div className="px-1.5 py-0.5 rounded bg-zinc-100 text-[10px] font-bold uppercase tracking-wider">Изм.</div>}
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
-                    <MonthStatusBadge isClosed={isClosed} />
+                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                    <div className="flex-1 sm:flex-none">
+                        <MonthStatusBadge isClosed={isClosed} />
+                    </div>
                     {userData?.role === 'MANAGER' && (
-                        <MonthClosureControls
-                            currentMonth={currentMonth}
-                            isClosed={isClosed}
-                            onStatusChange={refreshMonthStatus}
-                        />
+                        <div className="flex-1 sm:flex-none">
+                            <MonthClosureControls
+                                currentMonth={currentMonth}
+                                isClosed={isClosed}
+                                onStatusChange={refreshMonthStatus}
+                            />
+                        </div>
                     )}
-                    <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm border-zinc-200/60 transition-all">
+                    <div className="flex items-center gap-2 sm:gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm transition-all w-full sm:w-auto justify-between sm:justify-start">
                         {isMonthEmpty && prevMonthHasShifts && !isClosed && canEditShifts && (
                             <button
                                 onClick={handleAutoFill}
                                 disabled={isAutoFilling}
-                                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-all shadow-sm font-bold text-sm disabled:opacity-50 animate-in fade-in slide-in-from-right-4"
+                                className="hidden sm:flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-all shadow-sm font-bold text-sm disabled:opacity-50"
                             >
-                                {isAutoFilling ? 'Заполнение...' : 'Заполнить'}
+                                {isAutoFilling ? '...' : 'Заполнить'}
                             </button>
                         )}
                         <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 text-zinc-600" /></button>
-                        <span className="text-lg font-semibold w-40 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
+                        <span className="text-sm sm:text-lg font-semibold min-w-32 sm:w-40 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
                         <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
                     </div>
                 </div>
@@ -1291,14 +1295,14 @@ export default function SchedulePage() {
 
             <div
                 ref={gridContainerRef}
-                className={`bg-white rounded-2xl shadow-xl border border-zinc-200/60 overflow-auto flex-1 pb-4 relative scrollbar-custom max-h-[calc(100vh-250px)] ${(isDragging || isFilling) ? 'select-none' : ''}`}
+                className={`bg-white sm:rounded-2xl shadow-xl border-y sm:border border-zinc-200/60 overflow-auto flex-1 pb-4 relative scrollbar-custom max-h-[calc(100vh-250px)] -mx-6 sm:mx-0 ${(isDragging || isFilling) ? 'select-none' : ''}`}
             >
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
                     onDragEnd={(e) => !isClosed && handleDragEnd(e)}
                 >
-                    <table className="w-full text-xs text-left border-collapse min-w-[1240px]">
+                    <table className="w-full text-xs text-left border-separate border-spacing-0 min-w-[1240px]">
                         <thead className="sticky top-0 z-[60]">
                             <tr className="bg-zinc-50/50">
                                 <th className="sticky top-0 left-0 bg-zinc-50 z-[70] p-3 min-w-[240px]" style={{ boxShadow: 'inset 0 -2px 0 #d4d4d8, inset -2px 0 0 #d4d4d8, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>
