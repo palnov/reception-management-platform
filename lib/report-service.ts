@@ -620,7 +620,14 @@ export class ReportService {
         const sales = await prisma.promotionSale.findMany({ where: { employeeId, date: dateFilter } });
         const regs = await prisma.registrationKpi.findMany({ where: { employeeId, date: dateFilter } });
         const dailyChecklists = await prisma.dailyChecklist.findMany({ where: { employeeId, date: dateFilter } });
-        const monthlyChecklist = await prisma.monthlyChecklist.findUnique({ where: { month: monthStr, employeeId } });
+        const monthlyChecklist = await prisma.monthlyChecklist.findUnique({ 
+            where: { 
+                month_employeeId: {
+                    month: monthStr, 
+                    employeeId 
+                } 
+            } 
+        });
 
         const worksheet = workbook.addWorksheet('Расчетный лист');
 
