@@ -48,7 +48,7 @@ export function Navbar() {
     if (pathname === '/login') return null;
 
     return (
-        <nav className="flex items-center justify-between px-6 py-4 bg-white border-b border-zinc-200 shadow-sm sticky top-0 z-50">
+        <nav className={`flex items-center justify-between px-6 py-4 bg-white border-b border-zinc-200 shadow-sm sticky top-0 ${isMenuOpen ? 'z-[110]' : 'z-[100]'}`}>
             <Link href="/" className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text shrink-0">
                 {APP_NAME}
             </Link>
@@ -117,7 +117,7 @@ export function Navbar() {
 
             {/* Mobile Menu Overlay */}
             {isMenuOpen && (
-                <div className="fixed inset-0 top-[73px] bg-white z-[60] lg:hidden animate-in slide-in-from-right duration-300">
+                <div className="fixed inset-0 top-[73px] bg-white z-[110] lg:hidden animate-in slide-in-from-right duration-300">
                     <div className="flex flex-col p-6 gap-4">
                         {user && (
                             <div className="flex items-center gap-4 p-4 bg-zinc-50 rounded-2xl mb-2">
