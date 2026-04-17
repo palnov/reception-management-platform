@@ -30,6 +30,8 @@ export async function POST(request: Request) {
             const workbook = (type === 'SALARY_SLIP')
                 ? await ReportService.generateSalarySlipWorkbook(date, emp.id)
                 : await ReportService.generateExcel(date, type, emp.id);
+
+            if (!workbook) throw new Error(`Failed to generate workbook for employee ${emp.id}`);
             const buffer = await workbook.xlsx.writeBuffer();
             // Sanitize filename
             const safeName = emp.name.replace(/[^a-z0-9а-яё]/gi, '_');
