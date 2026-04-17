@@ -1,7 +1,8 @@
 import ExcelJS from 'exceljs';
 import { prisma } from '@/lib/prisma';
-import { startOfMonth, endOfMonth, format, parseISO } from 'date-fns';
+import { startOfMonth, endOfMonth, format, parseISO, eachDayOfInterval } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import JSZip from 'jszip';
 
 export class ReportService {
     static async generateExcel(date: string, type: string, employeeId?: string) {
@@ -588,3 +589,315 @@ export class ReportService {
         return workbook;
     }
 }
+
+    static async generateSalarySlipWorkbook(date: string, employeeId: string): Promise<ExcelJS.Workbook> {
+        const workbook = new ExcelJS.Workbook();
+        const dateObj = parseISO(date);
+        const startDate = startOfMonth(dateObj);
+        const endDate = endOfMonth(dateObj);
+        const monthStr = format(startDate, 'yyyy-MM');
+        const monthYearRu = format(startDate, 'LLLL yyyy', { locale: ru }).toUpperCase();
+
+        const employee = await prisma.employee.findUnique({
+            where: { id: employeeId },
+            include: {
+                salaryHistory: {
+                    where: {
+                        startDate: { lte: format(endDate, 'yyyy-MM-dd') },
+                        OR: [{ endDate: null }, { endDate: { gte: format(startDate, 'yyyy-MM-dd') } }]
+                    },
+                    orderBy: { startDate: 'desc' },
+                    take: 1
+                }
+            }
+        });
+
+        if (!employee) throw new Error('Employee not found');
+
+        const normRecord = await prisma.monthlyNorm.findUnique({ where: { month: monthStr } });
+        const monthNorm = normRecord?.hours || 176;
+
+        const dateFilter = { gte: format(startDate, 'yyyy-MM-dd'), lte: format(endDate, 'yyyy-MM-dd') };
+        const shifts = await prisma.shift.findMany({ where: { employeeId, date: dateFilter, isDeleted: false } });
+        const sales = await prisma.promotionSale.findMany({ where: { employeeId, date: dateFilter } });
+        const regs = await prisma.registrationKpi.findMany({ where: { employeeId, date: dateFilter } });
+        const dailyChecklists = await prisma.dailyChecklist.findMany({ where: { employeeId, date: dateFilter } });
+        const monthlyChecklist = await prisma.monthlyChecklist.findUnique({ where: { month: monthStr, employeeId } });
+
+        const worksheet = workbook.addWorksheet('Расчетный лист');
+
+        // Styles
+        const borderThin = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } } as ExcelJS.Borders;
+        const fontBold = { bold: true };
+        const centerAlignment = { horizontal: 'center', vertical: 'middle' } as ExcelJS.Alignment;
+        const leftAlignment = { horizontal: 'left', vertical: 'middle' } as ExcelJS.Alignment;
+
+        // Column widths - setting 15 columns as per template structure
+        worksheet.columns = Array(20).fill(0).map((_, i) => ({ width: i === 0 ? 30 : 12 }));
+
+        // 1. Header
+        worksheet.mergeCells('A1:J1');
+        worksheet.getCell('A1').value = 'Организация: Первый ДМЦ';
+        worksheet.getCell('A1').font = fontBold;
+
+        worksheet.mergeCells('A2:K2');
+        const titleCell = worksheet.getCell('A2');
+        titleCell.value = `РАСЧЕТНЫЙ ЛИСТОК ЗА ${monthYearRu}`;
+        titleCell.font = { ...fontBold, size: 14 };
+        titleCell.alignment = centerAlignment;
+
+        // 2. Employee Info
+        worksheet.mergeCells('A3:D3');
+        worksheet.getCell('A3').value = `ФИО: ${employee.name}`;
+        
+        // 3. To Pay
+        const effectiveBaseSalary = (employee as any).salaryHistory?.[0]?.baseSalary ?? employee.baseSalary;
+        const hourlyBase = effectiveBaseSalary / monthNorm;
+
+        // Calculations logic (mini-version for header) - will refine below
+        let hoursWorked = 0;
+        let shiftPay = 0;
+        let intensityTotal = 0;
+        let closingBonuses = 0;
+        let traineeBonus = 0;
+        let archiveBonus = 0;
+
+        shifts.forEach(s => {
+            if (s.type === 'REGULAR') {
+                hoursWorked += s.hours;
+                shiftPay += hourlyBase * s.hours;
+                intensityTotal += hourlyBase * s.hours * (s.coefficient - 1);
+            } else if (s.type === 'ARCHIVE_WORK') {
+                archiveBonus += (3500 / 11) * s.hours;
+            }
+            if (s.cabinetClosed) closingBonuses += 250;
+            if (s.centerClosed) closingBonuses += 500;
+            if (s.isTrainee) traineeBonus += 500;
+        });
+
+        const salesBonus = sales.reduce((sum, s) => sum + s.bonus, 0);
+        const cardCreationBonus = (monthlyChecklist?.cardCreation || 0) * 60;
+        const elnBonus = ((monthlyChecklist?.sickLeaveOpening || 0) * 130) + ((monthlyChecklist?.sickLeaveClosing || 0) * 80);
+        
+        // Checklist logic
+        const avgChecklist = dailyChecklists.length > 0 ? dailyChecklists.reduce((sum, c) => sum + c.totalScore, 0) / dailyChecklists.length : 0;
+        let checklistBonus = 0;
+        if (avgChecklist >= 90) checklistBonus = 5000;
+        else if (avgChecklist >= 76) checklistBonus = 2500;
+
+        // Quality logic
+        const avgQuality = regs.length > 0 ? (regs.reduce((sum, r) => sum + r.totalScore, 0) / regs.reduce((sum, r) => sum + (r.count * 3 || 1), 0)) * 100 : 100;
+        let qualityBonus = 0;
+        if (avgQuality >= 95) qualityBonus = 5000;
+        else if (avgQuality >= 85) qualityBonus = 2500;
+
+        // Seniority
+        const hireDate = employee.hireDate ? new Date(employee.hireDate) : null;
+        const seniorityYears = hireDate ? (Date.now() - hireDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000) : 0;
+        let seniorityBonus = 0;
+        if (seniorityYears >= 3) seniorityBonus = Math.round(effectiveBaseSalary * 0.10);
+        else if (seniorityYears >= 2) seniorityBonus = Math.round(effectiveBaseSalary * 0.07);
+        else if (seniorityYears >= 1) seniorityBonus = Math.round(effectiveBaseSalary * 0.03);
+
+        const totalAccrued = Math.round(shiftPay + intensityTotal + checklistBonus + qualityBonus + salesBonus + closingBonuses + archiveBonus + elnBonus + traineeBonus + cardCreationBonus + seniorityBonus);
+        const tax = Math.round(totalAccrued * 0.13);
+        const toPay = totalAccrued - tax;
+
+        worksheet.mergeCells('T3:Z3');
+        const payValueCell = worksheet.getCell('T3');
+        payValueCell.value = `К выплате: ${toPay}`;
+        payValueCell.font = fontBold;
+
+        worksheet.mergeCells('A4:D4');
+        worksheet.getCell('A4').value = `Должность: ${employee.role === 'ADMIN' ? 'Администратор регистратуры' : employee.role}`;
+        
+        worksheet.mergeCells('A5:D5');
+        worksheet.getCell('A5').value = `Подразделение: ${employee.branch || '-'}`;
+
+        worksheet.mergeCells('A6:D6');
+        worksheet.getCell('A6').value = `Оклад: ${effectiveBaseSalary}`;
+
+        // Section 1 Table
+        const sec1Headers = ['Вид', '', '', '', '', '', '', 'Расчетная база', '', '', 'Начислено (руб.)', '', 'Удержано (руб.) 13%', '', '', 'Сумма'];
+        const startRowSec1 = 8;
+        const row8 = worksheet.getRow(startRowSec1);
+        sec1Headers.forEach((h, i) => { if(h) { row8.getCell(i+1).value = h; row8.getCell(i+1).style = { font: fontBold, border: borderThin, alignment: centerAlignment }; } });
+        
+        // Manual merges for header
+        worksheet.mergeCells('A8:G8');
+        worksheet.mergeCells('H8:J8');
+        worksheet.mergeCells('K8:L8');
+        worksheet.mergeCells('M8:O8');
+        worksheet.mergeCells('P8:S8');
+
+        const addRowSec1 = (idx: number, name: string, base: string, accrued: number) => {
+            const r = worksheet.getRow(startRowSec1 + idx);
+            worksheet.mergeCells(`A${startRowSec1 + idx}:G${startRowSec1 + idx}`);
+            worksheet.mergeCells(`H${startRowSec1 + idx}:J${startRowSec1 + idx}`);
+            worksheet.mergeCells(`K${startRowSec1 + idx}:L${startRowSec1 + idx}`);
+            worksheet.mergeCells(`M${startRowSec1 + idx}:O${startRowSec1 + idx}`);
+            worksheet.mergeCells(`P${startRowSec1 + idx}:S${startRowSec1 + idx}`);
+            
+            const rowTax = Math.round(accrued * 0.13);
+            r.getCell(1).value = name;
+            r.getCell(8).value = base;
+            r.getCell(11).value = accrued;
+            r.getCell(13).value = rowTax;
+            r.getCell(16).value = accrued - rowTax;
+            r.eachCell((c) => { c.border = borderThin; });
+        };
+
+        addRowSec1(1, 'Оклад по дням', `${hoursWorked} час.`, Math.round(shiftPay));
+        addRowSec1(2, 'Доплата за интенсивность работы', `Коэф.`, Math.round(intensityTotal));
+        addRowSec1(3, 'Чек-лист', `Выполнение ${avgChecklist.toFixed(0)}%`, checklistBonus);
+        addRowSec1(4, 'Качество оформления карт', `Выполнение ${avgQuality.toFixed(0)}%`, qualityBonus);
+        addRowSec1(5, '% от продаж', `${sales.reduce((sum, s) => sum + s.price, 0)}`, salesBonus);
+        addRowSec1(6, 'Открытие/закрытие центра/кабинета', `Бонусы`, closingBonuses);
+        addRowSec1(7, 'Работа в архиве', `${shifts.filter(s => s.type === 'ARCHIVE_WORK').reduce((sum,s)=>sum+s.hours,0)} час.`, Math.round(archiveBonus));
+        addRowSec1(8, 'Оформление ЭЛН', `${(monthlyChecklist?.sickLeaveOpening || 0) + (monthlyChecklist?.sickLeaveClosing || 0)} шт.`, elnBonus);
+        addRowSec1(9, 'Доплата за обучение стажёра', `${shifts.filter(s => s.isTrainee).length} дн.`, traineeBonus);
+        addRowSec1(10, 'Создание новых карт', `${monthlyChecklist?.cardCreation || 0} шт.`, cardCreationBonus);
+        addRowSec1(11, 'Доплата за стаж работы', `${seniorityYears.toFixed(1)} лет`, seniorityBonus);
+
+        // Total row
+        const totalRowIdx = startRowSec1 + 12;
+        worksheet.mergeCells(`A${totalRowIdx}:G${totalRowIdx}`);
+        worksheet.getRow(totalRowIdx).getCell(1).value = 'Всего начислено';
+        worksheet.getRow(totalRowIdx).getCell(11).value = totalAccrued;
+        worksheet.getRow(totalRowIdx).getCell(13).value = tax;
+        worksheet.getRow(totalRowIdx).getCell(16).value = toPay;
+        worksheet.getRow(totalRowIdx).eachCell(c => { c.border = borderThin; c.font = fontBold; });
+
+        // Section 2: Intensity Details
+        const startRowSec2 = totalRowIdx + 2;
+        worksheet.mergeCells(`A${startRowSec2}:S${startRowSec2}`);
+        worksheet.getCell(`A${startRowSec2}`).value = '2. Детализация доплаты за интенсивность работы';
+        worksheet.getCell(`A${startRowSec2}`).font = fontBold;
+
+        // Reference table mini
+        const refData = [['120000', '1'], ['130000', '1.1'], ['140000', '1.2'], ['150000', '1.3'], ['160000', '1.4'], ['170000', '1.5']];
+        refData.forEach((row, rIdx) => {
+            worksheet.getCell(startRowSec2 + 1 + rIdx, 1).value = row[0];
+            worksheet.getCell(startRowSec2 + 1 + rIdx, 8).value = row[1];
+            worksheet.getCell(startRowSec2 + 1 + rIdx, 1).border = borderThin;
+            worksheet.getCell(startRowSec2 + 1 + rIdx, 8).border = borderThin;
+        });
+
+        // Daily table
+        const dailyRowStart = startRowSec2 + 8;
+        worksheet.mergeCells(`A${dailyRowStart}:G${dailyRowStart}`);
+        worksheet.getCell(`A${dailyRowStart}`).value = 'Число';
+        worksheet.getCell(`H${dailyRowStart}`).value = 'Сумма';
+        worksheet.getRow(dailyRowStart).eachCell(c => { c.border = borderThin; c.font = fontBold; });
+
+        let currentIntensityRow = dailyRowStart + 1;
+        shifts.filter(s => s.coefficient > 1).forEach(s => {
+            worksheet.mergeCells(`A${currentIntensityRow}:G${currentIntensityRow}`);
+            worksheet.getCell(`A${currentIntensityRow}`).value = s.date;
+            worksheet.getCell(`H${currentIntensityRow}`).value = Math.round(hourlyBase * s.hours * (s.coefficient - 1));
+            worksheet.getRow(currentIntensityRow).eachCell(c => { c.border = borderThin; });
+            currentIntensityRow++;
+        });
+
+        // Section 3: Checklist
+        const startRowSec3 = currentIntensityRow + 2;
+        worksheet.mergeCells(`A${startRowSec3}:S${startRowSec3}`);
+        worksheet.getCell(`A${startRowSec3}`).value = '3. Детализация доплаты за качество обслуживания (чек-лист)';
+        worksheet.getCell(`A${startRowSec3}`).font = fontBold;
+
+        const getAvgCrit = (crit: keyof typeof dailyChecklists[0]) => {
+            const count = dailyChecklists.length;
+            if (count === 0) return 0;
+            return dailyChecklists.reduce((sum, c) => sum + (Number(c[crit]) || 0), 0) / count;
+        };
+
+        const critLabels = [
+            '1. Внешний вид и дисциплина',
+            '2. Приветствие и первичный контакт',
+            '3. Соблюдение алгоритма приема',
+            '4. Стимулирование услуг',
+            '5. Работа с возражениями',
+            '6. Завершение контакта'
+        ];
+        critLabels.forEach((l, i) => {
+            const rIdx = startRowSec3 + 2 + i;
+            worksheet.mergeCells(`A${rIdx}:G${rIdx}`);
+            worksheet.getCell(`A${rIdx}`).value = l;
+            worksheet.getCell(`H${rIdx}`).value = 1; // Max
+            worksheet.getCell(`K${rIdx}`).value = getAvgCrit(`criterion${i+1}` as any) / 100; // Value
+            worksheet.getRow(rIdx).eachCell(c => c.border = borderThin);
+        });
+
+        // Section 4: Card Quality
+        const startRowSec4 = startRowSec3 + 10;
+        worksheet.mergeCells(`A${startRowSec4}:S${startRowSec4}`);
+        worksheet.getCell(`A${startRowSec4}`).value = '4. Детализация доплаты за качество оформления карт';
+        worksheet.getCell(`A${startRowSec4}`).font = fontBold;
+
+        const getAvgRegCrit = (crit: keyof typeof regs[0]) => {
+            const count = regs.length;
+            if (count === 0) return 0;
+            return regs.reduce((sum, r) => sum + (Number(r[crit]) || 0), 0) / count;
+        };
+
+        const regLabels = ['1. Правильность заполнения карт', '2. Указана эл.почта', '3. Указано доверенное лицо'];
+        regLabels.forEach((l, i) => {
+            const rIdx = startRowSec4 + 2 + i;
+            worksheet.mergeCells(`A${rIdx}:G${rIdx}`);
+            worksheet.getCell(`A${rIdx}`).value = l;
+            worksheet.getCell(`H${rIdx}`).value = 1;
+            worksheet.getCell(`K${rIdx}`).value = getAvgRegCrit(`criterion${i+1}` as any);
+            worksheet.getRow(rIdx).eachCell(c => c.border = borderThin);
+        });
+
+        // Section 5: Sales
+        const startRowSec5 = startRowSec4 + 7;
+        worksheet.mergeCells(`A${startRowSec5}:S${startRowSec5}`);
+        worksheet.getCell(`A${startRowSec5}`).value = '5. Детализация начислений % от продаж';
+        worksheet.getCell(`A${startRowSec5}`).font = fontBold;
+
+        worksheet.mergeCells(`A${startRowSec5+1}:G${startRowSec5+1}`);
+        worksheet.getCell(`A${startRowSec5+1}`).value = 'Наименование';
+        worksheet.getCell(`H${startRowSec5+1}`).value = 'Сумма';
+        worksheet.getCell(`K${startRowSec5+1}`).value = 'Бонус';
+        worksheet.getRow(startRowSec5+1).eachCell(c => { c.border = borderThin; c.font = fontBold; });
+
+        let currentSalesRow = startRowSec5 + 2;
+        sales.forEach(s => {
+            worksheet.mergeCells(`A${currentSalesRow}:G${currentSalesRow}`);
+            worksheet.getCell(`A${currentSalesRow}`).value = s.productName;
+            worksheet.getCell(`H${currentSalesRow}`).value = s.price;
+            worksheet.getCell(`K${currentSalesRow}`).value = s.bonus;
+            worksheet.getRow(currentSalesRow).eachCell(c => c.border = borderThin);
+            currentSalesRow++;
+        });
+
+        return workbook;
+    }
+
+    static async generateAllSalarySlipsZip(date: string): Promise<Buffer> {
+        const dateObj = parseISO(date);
+        const startDate = startOfMonth(dateObj);
+        const endDate = endOfMonth(dateObj);
+        const folderName = format(startDate, 'yyyy-MM');
+
+        const employees = await prisma.employee.findMany({
+            where: {
+                role: { not: 'MANAGER' },
+                AND: [
+                    { OR: [{ dismissalDate: "" }, { dismissalDate: { gte: format(startDate, 'yyyy-MM-dd') } }] },
+                    { OR: [{ hireDate: "" }, { hireDate: { lte: format(endDate, 'yyyy-MM-dd') } }] }
+                ]
+            }
+        });
+
+        const zip = new JSZip();
+        for (const emp of employees) {
+            const workbook = await this.generateSalarySlipWorkbook(date, emp.id);
+            const buffer = await workbook.xlsx.writeBuffer();
+            const fileName = `${emp.name.replace(/\s+/g, '_')}_${folderName}.xlsx`;
+            zip.file(fileName, buffer);
+        }
+
+        return await zip.generateAsync({ type: 'nodebuffer' });
+    }

@@ -7,6 +7,11 @@ export async function POST(request: Request) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const role = session.employee?.role;
+    if (role !== 'MANAGER' && role !== 'SENIOR') {
+        return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
+    }
+
     try {
         const body = await request.json();
         const { operations, deleteIds } = body;

@@ -51,3 +51,6 @@ next-env.d.ts
 test-backup.json
 test-report.xlsx
 *.log
+
+# Commercial Proposals
+/kp

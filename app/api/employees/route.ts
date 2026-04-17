@@ -9,6 +9,11 @@ async function checkManager() {
     return session?.employee?.role === 'MANAGER';
 }
 
+async function checkCanEditSchedule() {
+    const session = await getSession();
+    return session?.employee?.role === 'MANAGER' || session?.employee?.role === 'SENIOR';
+}
+
 async function updateEmployeeHistory(employeeId: string, role: string, seniorId: string | null, effectiveDate?: string) {
     const oldEmployee = await prisma.employee.findUnique({
         where: { id: employeeId },

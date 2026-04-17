@@ -82,6 +82,11 @@ export async function POST(request: Request) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const role = session.employee?.role;
+    if (role !== 'MANAGER' && role !== 'SENIOR') {
+        return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { id, date, employeeId, type, hours, cabinetClosed, centerClosed, isActingLead, isTrainee, coefficient } = body;
 
@@ -212,6 +217,11 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const role = session.employee?.role;
+    if (role !== 'MANAGER' && role !== 'SENIOR') {
+        return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
+    }
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

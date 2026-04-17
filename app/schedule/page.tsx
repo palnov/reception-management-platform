@@ -139,11 +139,12 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
     selection,
     isInSelection,
     currentUser,
-    isClosed
+    isClosed,
+    isManager
 }: {
     emp: Employee,
     days: Date[],
-    empShifts: Record<string, Shift>, // Map of ISO Date String -> Shift
+    empShifts: Record<string, Shift>,
     openModal: (date: Date, empId: string, shift?: Shift) => void,
     onMouseDown: (e: React.MouseEvent, empId: string, dateKey: string) => void,
     onMouseEnter: (empId: string, dateKey: string) => void,
@@ -153,8 +154,9 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
     handleCell: { empId: string, dateKey: string } | null,
     selection: any,
     isInSelection: (empId: string, dateKey: string) => boolean,
-    currentUser: any, // Typed as Employee or similar
-    isClosed: boolean
+    currentUser: any,
+    isClosed: boolean,
+    isManager: boolean
 }) {
     const {
         attributes,
@@ -194,8 +196,8 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                 <div className="flex items-center gap-2">
                     <div
                         {...attributes}
-                        {...(!isClosed ? listeners : {})}
-                        className={`${isClosed ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} p-1 hover:bg-zinc-100 rounded text-zinc-400 group-hover:text-zinc-600 transition-colors`}
+                        {...(!isClosed && isManager ? listeners : {})}
+                        className={`${isClosed || !isManager ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} p-1 hover:bg-zinc-100 rounded text-zinc-400 group-hover:text-zinc-600 transition-colors`}
                     >
                         <GripVertical className="w-4 h-4" />
                     </div>
@@ -414,6 +416,10 @@ export default function SchedulePage() {
 
     const isManager = useMemo(() => {
         return userData?.role === 'MANAGER';
+    }, [userData]);
+
+    const canEditShifts = useMemo(() => {
+        return userData?.role === 'MANAGER' || userData?.role === 'SENIOR';
     }, [userData]);
 
     // Track whether audit icon was clicked to prevent modal
@@ -670,62 +676,12 @@ export default function SchedulePage() {
 
         if (over && active.id !== over.id) {
             setEmployees((items) => {
-                const activeEmp = items.find(i => i.id === active.id);
                 const oldIndex = items.findIndex((item) => item.id === active.id);
-                let newIndex = items.findIndex((item) => item.id === over.id);
+                const newIndex = items.findIndex((item) => item.id === over.id);
 
-                if (!activeEmp) return items;
+                if (oldIndex === -1 || newIndex === -1) return items;
 
-                let newArray = [...items];
-
-                if (activeEmp.role === 'ADMIN' && activeEmp.seniorId) {
-                    // Restrict dragging to within their Senior's group
-                    const groupMembers = items.filter(i => i.id === activeEmp.seniorId || i.seniorId === activeEmp.seniorId);
-                    if (groupMembers.length > 0) {
-                        const groupIndices = groupMembers.map(m => items.findIndex(i => i.id === m.id)).filter(idx => idx !== -1);
-                        const minGroupIdx = Math.min(...groupIndices);
-                        const maxGroupIdx = Math.max(...groupIndices);
-
-                        // Ensure ADMIN doesn't move above the SENIOR (assuming SENIOR is at minGroupIdx)
-                        const seniorIdx = items.findIndex(i => i.id === activeEmp.seniorId);
-                        const lowerBound = seniorIdx !== -1 ? seniorIdx + 1 : minGroupIdx;
-
-                        newIndex = Math.max(lowerBound, Math.min(newIndex, maxGroupIdx));
-                        newArray = arrayMove(items, oldIndex, newIndex);
-                    } else {
-                        newArray = arrayMove(items, oldIndex, newIndex);
-                    }
-                } else if (activeEmp.role === 'SENIOR') {
-                    // Drag the entire group
-                    const subordinates = items.filter(i => i.seniorId === activeEmp.id);
-                    const groupIds = [activeEmp.id, ...subordinates.map(s => s.id)];
-
-                    const itemsWithoutGroup = items.filter(i => !groupIds.includes(i.id));
-                    const overEmp = items[newIndex];
-
-                    let insertIndex = itemsWithoutGroup.findIndex(i => i.id === overEmp.id);
-
-                    if (insertIndex === -1) {
-                        // Dropped inside its own group, just keep structure
-                        return items;
-                    }
-
-                    // If dragged down, place after the overEmp
-                    if (newIndex > oldIndex) {
-                        insertIndex += 1;
-                    }
-
-                    const groupItems = groupIds.map(id => items.find(i => i.id === id)).filter(Boolean) as any[];
-
-                    newArray = [
-                        ...itemsWithoutGroup.slice(0, insertIndex),
-                        ...groupItems,
-                        ...itemsWithoutGroup.slice(insertIndex)
-                    ];
-                } else {
-                    // Independent ADMIN or Manager
-                    newArray = arrayMove(items, oldIndex, newIndex);
-                }
+                const newArray = arrayMove(items, oldIndex, newIndex);
 
                 // Sync with database
                 const updatedEmployees = newArray.map((emp, i) => ({
@@ -1299,12 +1255,12 @@ export default function SchedulePage() {
                 <div>
                     <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">График смен</h1>
                     <div
-                        className={`flex items-center gap-2 mt-2 text-sm text-zinc-500 ${isClosed ? 'cursor-default' : 'cursor-pointer hover:text-blue-600'} transition-colors group`}
-                        onClick={() => !isClosed && setShowNormModal(true)}
+                        className={`flex items-center gap-2 mt-2 text-sm text-zinc-500 ${isClosed || !isManager ? 'cursor-default' : 'cursor-pointer hover:text-blue-600'} transition-colors group`}
+                        onClick={() => !isClosed && isManager && setShowNormModal(true)}
                     >
                         <span>Норма часов в этом месяце: </span>
                         <span className={`font-bold ${isClosed ? 'text-zinc-500' : 'text-zinc-900 group-hover:text-blue-600'}`}>{monthNorm}</span>
-                        {!isClosed && <div className="px-1.5 py-0.5 rounded bg-zinc-100 text-[10px] font-bold uppercase tracking-wider">Изм.</div>}
+                        {!isClosed && isManager && <div className="px-1.5 py-0.5 rounded bg-zinc-100 text-[10px] font-bold uppercase tracking-wider">Изм.</div>}
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
@@ -1317,7 +1273,7 @@ export default function SchedulePage() {
                         />
                     )}
                     <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm border-zinc-200/60 transition-all">
-                        {isMonthEmpty && prevMonthHasShifts && !isClosed && isManager && (
+                        {isMonthEmpty && prevMonthHasShifts && !isClosed && canEditShifts && (
                             <button
                                 onClick={handleAutoFill}
                                 disabled={isAutoFilling}
@@ -1392,6 +1348,7 @@ export default function SchedulePage() {
                                         selection={selection}
                                         isInSelection={isInSelection}
                                         isClosed={isClosed}
+                                        isManager={isManager}
                                     />
                                 ))}
                             </SortableContext>
@@ -1469,8 +1426,8 @@ export default function SchedulePage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2 col-span-2">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Тип смены</label>
-                                    <Tooltip content={!isManager ? "Для изменения графика обратитесь к руководителю" : ""}>
-                                        <div className={`grid grid-cols-2 gap-2 ${!isManager ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                                    <Tooltip content={!canEditShifts ? "Для изменения графика обратитесь к руководителю" : ""}>
+                                        <div className={`grid grid-cols-2 gap-2 ${!canEditShifts ? 'opacity-60 cursor-not-allowed' : ''}`}>
                                             {[
                                                 { id: 'REGULAR', label: 'Рабочая', icon: Briefcase, borderColor: 'border-blue-500', bgColor: 'bg-blue-50', iconBg: 'bg-blue-500', textColor: 'text-blue-900' },
                                                 { id: 'ARCHIVE_WORK', label: 'Работа в архиве', icon: CheckSquare, borderColor: 'border-amber-500', bgColor: 'bg-amber-50', iconBg: 'bg-amber-500', textColor: 'text-amber-900' },
@@ -1479,9 +1436,9 @@ export default function SchedulePage() {
                                             ].map(type => (
                                                 <div
                                                     key={type.id}
-                                                    onClick={() => isManager && setFormData(prev => ({ ...prev, type: type.id as any }))}
+                                                    onClick={() => canEditShifts && setFormData(prev => ({ ...prev, type: type.id as any }))}
                                                     className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all group
-                                                        ${!isManager ? 'pointer-events-none' : 'cursor-pointer'}
+                                                        ${!canEditShifts ? 'pointer-events-none' : 'cursor-pointer'}
                                                         ${formData.type === type.id
                                                             ? `${type.borderColor} ${type.bgColor}`
                                                             : 'border-zinc-100 bg-zinc-50/50 hover:border-zinc-200 hover:bg-zinc-50'}`}
@@ -1499,14 +1456,14 @@ export default function SchedulePage() {
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Часы</label>
-                                    <Tooltip content={!isManager ? "Для изменения графика обратитесь к руководителю" : ""}>
+                                    <Tooltip content={!canEditShifts ? "Для изменения графика обратитесь к руководителю" : ""}>
                                         <div className="relative group">
                                             <input
                                                 type="number"
                                                 value={formData.hours}
-                                                disabled={!isManager}
+                                                disabled={!canEditShifts}
                                                 onChange={e => setFormData(prev => ({ ...prev, hours: e.target.value }))}
-                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${!isManager ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
+                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${!canEditShifts ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
                                             />
                                             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
                                                 <Timer className="w-4 h-4" />
@@ -1590,12 +1547,12 @@ export default function SchedulePage() {
                             </div>
 
                             <div className="flex gap-3 pt-2">
-                                <Tooltip content={!isManager ? "Для изменения графика обратитесь к руководителю" : ""}>
+                                <Tooltip content={!canEditShifts ? "Для изменения графика обратитесь к руководителю" : ""}>
                                     <button
                                         type="button"
                                         onClick={handleDeleteShift}
-                                        disabled={!isManager}
-                                        className={`px-6 py-3 border-2 border-red-50 rounded-xl text-red-500 bg-red-50/50 hover:bg-red-50 hover:border-red-100 transition-all font-bold text-sm ${!isManager ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                        disabled={!canEditShifts}
+                                        className={`px-6 py-3 border-2 border-red-50 rounded-xl text-red-500 bg-red-50/50 hover:bg-red-50 hover:border-red-100 transition-all font-bold text-sm ${!canEditShifts ? 'opacity-60 cursor-not-allowed' : ''}`}
                                     >
                                         Удалить
                                     </button>
@@ -1662,14 +1619,14 @@ export default function SchedulePage() {
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Часы</label>
-                                    <Tooltip content={!isManager ? "Для изменения графика обратитесь к руководителю" : ""}>
+                                    <Tooltip content={!canEditShifts ? "Для изменения графика обратитесь к руководителю" : ""}>
                                         <div className="relative group">
                                             <input
                                                 type="number"
                                                 value={formData.hours}
-                                                disabled={!isManager}
+                                                disabled={!canEditShifts}
                                                 onChange={e => setFormData(prev => ({ ...prev, hours: e.target.value }))}
-                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${!isManager ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
+                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${!canEditShifts ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
                                             />
                                             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
                                                 <Timer className="w-4 h-4" />

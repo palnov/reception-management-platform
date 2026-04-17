@@ -11,7 +11,12 @@ export async function POST(request: Request) {
     const { date, type, employeeId } = await request.json();
 
     try {
-        const workbook = await ReportService.generateExcel(date, type, employeeId);
+        let workbook;
+        if (type === 'SALARY_SLIP' && employeeId) {
+            workbook = await ReportService.generateSalarySlipWorkbook(date, employeeId);
+        } else {
+            workbook = await ReportService.generateExcel(date, type, employeeId);
+        }
 
         const buffer = await workbook.xlsx.writeBuffer();
 

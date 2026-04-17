@@ -219,6 +219,7 @@ export default function DataPage() {
                                         <option value="KPI">KPI и Зарплата</option>
                                         <option value="ACCOUNTANT">Для бухгалтера</option>
                                         <option value="ACCOUNTANT_15">Для бухгалтера (1-15 число)</option>
+                                        <option value="SALARY_SLIP">Расчетный лист (Детальный)</option>
                                     </select>
                                 </div>
                             </div>
@@ -248,9 +249,62 @@ export default function DataPage() {
                                     <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform">
                                         {isExportingBatch ? <Loader2 className="w-6 h-6 animate-spin" /> : <Archive className="w-6 h-6" />}
                                     </div>
-                                    <div className="font-bold text-lg text-zinc-900">По сотрудникам (ZIP)</div>
+                                    <div className="font-bold text-lg text-zinc-900">По всем сотрудникам (ZIP)</div>
                                     <div className="text-sm text-zinc-500 mt-1">Отдельные файлы для каждого сотрудника в архиве</div>
                                 </button>
+                            </div>
+
+                            {/* New Individual Salary Slip Section */}
+                            <div className="mt-8 pt-8 border-t border-zinc-100">
+                                <h2 className="text-xl font-bold mb-4">Индивидуальный расчетный лист</h2>
+                                <div className="flex gap-4 items-end max-w-xl">
+                                    <div className="flex-1">
+                                        <label className="block text-sm font-medium text-zinc-500 mb-2">Выберите сотрудника</label>
+                                        <select 
+                                            id="employee-select"
+                                            className="w-full px-4 py-3 border-2 border-zinc-100 rounded-xl focus:border-blue-500 outline-none font-bold bg-white"
+                                        >
+                                            <option value="">-- Выбрать --</option>
+                                            {employees.map(e => (
+                                                <option key={e.id} value={e.id}>{e.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <button
+                                        onClick={async () => {
+                                            const select = document.getElementById('employee-select') as HTMLSelectElement;
+                                            const empId = select.value;
+                                            if (!empId) { alert('Выберите сотрудника'); return; }
+                                            
+                                            setIsExportingGeneral(true);
+                                            try {
+                                                const date = exportDate + '-01';
+                                                const res = await fetch('/api/reports/excel', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ date, type: 'SALARY_SLIP', employeeId: empId })
+                                                });
+                                                if (!res.ok) throw new Error();
+                                                const blob = await res.blob();
+                                                const url = window.URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                const empName = employees.find(e => e.id === empId)?.name || 'Employee';
+                                                a.download = `Расчетный_лист_${empName}_${exportDate}.xlsx`;
+                                                a.click();
+                                            } catch {
+                                                alert('Ошибка при загрузке');
+                                            } finally {
+                                                setIsExportingGeneral(false);
+                                            }
+                                        }}
+                                        disabled={isExportingGeneral || isExportingBatch}
+                                        className="h-[52px] px-6 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors flex items-center gap-2"
+                                    >
+                                        {isExportingGeneral ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                                        Скачать лист
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
