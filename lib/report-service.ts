@@ -637,23 +637,33 @@ export class ReportService {
         const centerAlignment = { horizontal: 'center', vertical: 'middle' } as ExcelJS.Alignment;
         const leftAlignment = { horizontal: 'left', vertical: 'middle' } as ExcelJS.Alignment;
 
-        // Column widths - setting 15 columns as per template structure
-        worksheet.columns = Array(20).fill(0).map((_, i) => ({ width: i === 0 ? 30 : 12 }));
+        // Column widths exactly matching template
+        worksheet.columns = [
+            { width: 3.5 }, { width: 3.5 }, { width: 3.5 }, { width: 3.5 }, { width: 3.5 },
+            { width: 3.5 }, { width: 7.66 }, { width: 7.16 }, { width: 6.16 }, { width: 4.83 },
+            { width: 5.16 }, { width: 5.83 }, { width: 3.5 }, { width: 3.5 }, { width: 3.5 },
+            { width: 3.5 }, { width: 3.5 }, { width: 3.5 }, { width: 5.66 }, { width: 3.5 }
+        ];
 
         // 1. Header
+        worksheet.getRow(1).height = 25;
         worksheet.mergeCells('A1:J1');
         worksheet.getCell('A1').value = 'Организация: Первый ДМЦ';
         worksheet.getCell('A1').font = fontBold;
 
+        worksheet.getRow(2).height = 12;
         worksheet.mergeCells('A2:K2');
         const titleCell = worksheet.getCell('A2');
-        titleCell.value = `РАСЧЕТНЫЙ ЛИСТОК ЗА ${monthYearRu}`;
+        titleCell.value = `РАСЧЕТНЫЙ ЛИСТОК ЗА ${monthYearRu} ГОДА`;
         titleCell.font = { ...fontBold, size: 14 };
         titleCell.alignment = centerAlignment;
 
         // 2. Employee Info
+        worksheet.getRow(3).height = 12;
         worksheet.mergeCells('A3:D3');
-        worksheet.getCell('A3').value = `ФИО: ${employee.name}`;
+        worksheet.getCell('A3').value = `ФИО __________________________`;
+        worksheet.mergeCells('E3:S3');
+        worksheet.getCell('E3').value = employee.name;
         
         // 3. To Pay
         const effectiveBaseSalary = (employee as any).salaryHistory?.[0]?.baseSalary ?? employee.baseSalary;
@@ -708,40 +718,64 @@ export class ReportService {
         const tax = Math.round(totalAccrued * 0.13);
         const toPay = totalAccrued - tax;
 
-        worksheet.mergeCells('T3:Z3');
-        const payValueCell = worksheet.getCell('T3');
-        payValueCell.value = `К выплате: ${toPay}`;
-        payValueCell.font = fontBold;
+        worksheet.getCell('T3').value = `К выплате:`;
+        worksheet.getCell('T3').font = fontBold;
+        worksheet.mergeCells('U3:Z3');
+        worksheet.getCell('U3').value = toPay;
+        worksheet.getCell('U3').font = fontBold;
 
+        worksheet.getRow(4).height = 11.25;
         worksheet.mergeCells('A4:D4');
-        worksheet.getCell('A4').value = `Должность: ${employee.role === 'ADMIN' ? 'Администратор регистратуры' : employee.role}`;
+        worksheet.getCell('A4').value = `Должность:`;
+        worksheet.mergeCells('E4:L4');
+        worksheet.getCell('E4').value = employee.role === 'ADMIN' ? 'Администратор регистратуры' : employee.role;
         
+        worksheet.getRow(5).height = 15.75;
         worksheet.mergeCells('A5:D5');
-        worksheet.getCell('A5').value = `Подразделение: ${employee.branch || '-'}`;
+        worksheet.getCell('A5').value = `Подразделение:`;
+        worksheet.mergeCells('E5:S5');
+        worksheet.getCell('E5').value = employee.branch || '-';
 
+        worksheet.getRow(6).height = 15.75;
         worksheet.mergeCells('A6:D6');
-        worksheet.getCell('A6').value = `Оклад: ${effectiveBaseSalary}`;
+        worksheet.getCell('A6').value = `Оклад`;
+        worksheet.mergeCells('E6:G6');
+        worksheet.getCell('E6').value = effectiveBaseSalary;
+        
+        worksheet.getRow(7).height = 15.75;
+        worksheet.getCell('A7').value = 'Состав начислений';
+        worksheet.getCell('A7').font = fontBold;
 
         // Section 1 Table
-        const sec1Headers = ['Вид', '', '', '', '', '', '', 'Расчетная база', '', '', 'Начислено (руб.)', '', 'Удержано (руб.) 13%', '', '', 'Сумма'];
         const startRowSec1 = 8;
-        const row8 = worksheet.getRow(startRowSec1);
-        sec1Headers.forEach((h, i) => { if(h) { row8.getCell(i+1).value = h; row8.getCell(i+1).style = { font: fontBold, border: borderThin, alignment: centerAlignment }; } });
-        
-        // Manual merges for header
-        worksheet.mergeCells('A8:G8');
-        worksheet.mergeCells('H8:J8');
-        worksheet.mergeCells('K8:L8');
-        worksheet.mergeCells('M8:O8');
-        worksheet.mergeCells('P8:S8');
+        worksheet.getRow(8).height = 11.25;
+        worksheet.getRow(9).height = 11.25;
+
+        // Manual merges for header (2 rows high)
+        worksheet.mergeCells('A8:G9');
+        worksheet.getCell('A8').value = 'Вид';
+        worksheet.mergeCells('H8:J9');
+        worksheet.getCell('H8').value = 'Расчетная база';
+        worksheet.mergeCells('K8:L9');
+        worksheet.getCell('K8').value = 'Начислено (руб.)';
+        worksheet.mergeCells('M8:O9');
+        worksheet.getCell('M8').value = 'Удержано (руб.) 13%';
+        worksheet.mergeCells('P8:S9');
+        worksheet.getCell('P8').value = 'Сумма';
+
+        [worksheet.getCell('A8'), worksheet.getCell('H8'), worksheet.getCell('K8'), worksheet.getCell('M8'), worksheet.getCell('P8')].forEach(c => {
+            c.style = { font: fontBold, border: borderThin, alignment: centerAlignment };
+        });
 
         const addRowSec1 = (idx: number, name: string, base: string, accrued: number) => {
-            const r = worksheet.getRow(startRowSec1 + idx);
-            worksheet.mergeCells(`A${startRowSec1 + idx}:G${startRowSec1 + idx}`);
-            worksheet.mergeCells(`H${startRowSec1 + idx}:J${startRowSec1 + idx}`);
-            worksheet.mergeCells(`K${startRowSec1 + idx}:L${startRowSec1 + idx}`);
-            worksheet.mergeCells(`M${startRowSec1 + idx}:O${startRowSec1 + idx}`);
-            worksheet.mergeCells(`P${startRowSec1 + idx}:S${startRowSec1 + idx}`);
+            const rIdx = startRowSec1 + 1 + idx;
+            const r = worksheet.getRow(rIdx);
+            r.height = 33.75;
+            worksheet.mergeCells(`A${rIdx}:G${rIdx}`);
+            worksheet.mergeCells(`H${rIdx}:J${rIdx}`);
+            worksheet.mergeCells(`K${rIdx}:L${rIdx}`);
+            worksheet.mergeCells(`M${rIdx}:O${rIdx}`);
+            worksheet.mergeCells(`P${rIdx}:S${rIdx}`);
             
             const rowTax = Math.round(accrued * 0.13);
             r.getCell(1).value = name;
@@ -749,29 +783,38 @@ export class ReportService {
             r.getCell(11).value = accrued;
             r.getCell(13).value = rowTax;
             r.getCell(16).value = accrued - rowTax;
-            r.eachCell((c) => { c.border = borderThin; });
+            
+            [r.getCell(1), r.getCell(8), r.getCell(11), r.getCell(13), r.getCell(16)].forEach(c => {
+                c.border = borderThin;
+                c.alignment = centerAlignment;
+            });
+            r.getCell(1).alignment = leftAlignment;
         };
 
-        addRowSec1(1, 'Оклад по дням', `${hoursWorked} час.`, Math.round(shiftPay));
-        addRowSec1(2, 'Доплата за интенсивность работы', `Коэф.`, Math.round(intensityTotal));
+        addRowSec1(1, 'Оклад по дням', `${hoursWorked} дней`, Math.round(shiftPay)); // Changed to дней
+        addRowSec1(2, 'Доплата за интенсивность работ', `${shifts.filter(s => s.coefficient > 1).length} дней`, Math.round(intensityTotal));
         addRowSec1(3, 'Чек-лист', `Выполнение ${avgChecklist.toFixed(0)}%`, checklistBonus);
         addRowSec1(4, 'Качество оформления карт', `Выполнение ${avgQuality.toFixed(0)}%`, qualityBonus);
         addRowSec1(5, '% от продаж', `${sales.reduce((sum, s) => sum + s.price, 0)}`, salesBonus);
-        addRowSec1(6, 'Открытие/закрытие центра/кабинета', `Бонусы`, closingBonuses);
-        addRowSec1(7, 'Работа в архиве', `${shifts.filter(s => s.type === 'ARCHIVE_WORK').reduce((sum,s)=>sum+s.hours,0)} час.`, Math.round(archiveBonus));
-        addRowSec1(8, 'Оформление ЭЛН', `${(monthlyChecklist?.sickLeaveOpening || 0) + (monthlyChecklist?.sickLeaveClosing || 0)} шт.`, elnBonus);
-        addRowSec1(9, 'Доплата за обучение стажёра', `${shifts.filter(s => s.isTrainee).length} дн.`, traineeBonus);
-        addRowSec1(10, 'Создание новых карт', `${monthlyChecklist?.cardCreation || 0} шт.`, cardCreationBonus);
-        addRowSec1(11, 'Доплата за стаж работы', `${seniorityYears.toFixed(1)} лет`, seniorityBonus);
+        addRowSec1(6, 'Открытие/закрытие центра', `7 дней`, closingBonuses);
+        addRowSec1(7, 'Работа в архиве', `${shifts.filter(s => s.type === 'ARCHIVE_WORK').reduce((sum,s)=>sum+s.hours,0)} часов`, Math.round(archiveBonus));
+        addRowSec1(8, 'Оформление ЭЛН', `${monthlyChecklist?.sickLeaveOpening || 0} открытия, ${monthlyChecklist?.sickLeaveClosing || 0} закрытий`, elnBonus);
+        addRowSec1(9, 'Доплата за обучение стажёра', `${shifts.filter(s => s.isTrainee).length} дня`, traineeBonus);
+        addRowSec1(10, 'Доплата за создание новых карт', `${monthlyChecklist?.cardCreation || 0} штуки`, cardCreationBonus);
+        addRowSec1(11, 'Доплата за стаж работы', `3% от оклада`, seniorityBonus);
 
         // Total row
-        const totalRowIdx = startRowSec1 + 12;
+        const totalRowIdx = startRowSec1 + 13;
+        worksheet.getRow(totalRowIdx).height = 15;
         worksheet.mergeCells(`A${totalRowIdx}:G${totalRowIdx}`);
         worksheet.getRow(totalRowIdx).getCell(1).value = 'Всего начислено';
         worksheet.getRow(totalRowIdx).getCell(11).value = totalAccrued;
         worksheet.getRow(totalRowIdx).getCell(13).value = tax;
         worksheet.getRow(totalRowIdx).getCell(16).value = toPay;
-        worksheet.getRow(totalRowIdx).eachCell(c => { c.border = borderThin; c.font = fontBold; });
+        [worksheet.getCell(`A${totalRowIdx}`), worksheet.getCell(`K${totalRowIdx}`), worksheet.getCell(`M${totalRowIdx}`), worksheet.getCell(`P${totalRowIdx}`)].forEach(c => {
+            c.border = borderThin;
+            c.font = fontBold;
+        });
 
         // Section 2: Intensity Details
         const startRowSec2 = totalRowIdx + 2;
@@ -791,24 +834,45 @@ export class ReportService {
         // Daily table
         const dailyRowStart = startRowSec2 + 8;
         worksheet.mergeCells(`A${dailyRowStart}:G${dailyRowStart}`);
-        worksheet.getCell(`A${dailyRowStart}`).value = 'Число';
-        worksheet.getCell(`H${dailyRowStart}`).value = 'Сумма';
-        worksheet.getRow(dailyRowStart).eachCell(c => { c.border = borderThin; c.font = fontBold; });
+        worksheet.getCell(`A${dailyRowStart}`).value = 'число';
+        worksheet.getCell(`H${dailyRowStart}`).value = 'сумма';
+        [worksheet.getCell(`A${dailyRowStart}`), worksheet.getCell(`H${dailyRowStart}`)].forEach(c => { c.border = borderThin; c.font = fontBold; c.alignment = centerAlignment; });
 
         let currentIntensityRow = dailyRowStart + 1;
         shifts.filter(s => s.coefficient > 1).forEach(s => {
             worksheet.mergeCells(`A${currentIntensityRow}:G${currentIntensityRow}`);
-            worksheet.getCell(`A${currentIntensityRow}`).value = s.date;
+            worksheet.getCell(`A${currentIntensityRow}`).value = parseISO(s.date);
+            worksheet.getCell(`A${currentIntensityRow}`).numFmt = 'dd.mm.yy';
             worksheet.getCell(`H${currentIntensityRow}`).value = Math.round(hourlyBase * s.hours * (s.coefficient - 1));
-            worksheet.getRow(currentIntensityRow).eachCell(c => { c.border = borderThin; });
+            [worksheet.getCell(`A${currentIntensityRow}`), worksheet.getCell(`H${currentIntensityRow}`)].forEach(c => { c.border = borderThin; c.alignment = centerAlignment; });
             currentIntensityRow++;
         });
 
+        worksheet.mergeCells(`A${currentIntensityRow}:G${currentIntensityRow}`);
+        worksheet.getCell(`A${currentIntensityRow}`).value = 'Итого за месяц';
+        worksheet.getCell(`H${currentIntensityRow}`).value = Math.round(intensityTotal);
+        [worksheet.getCell(`A${currentIntensityRow}`), worksheet.getCell(`H${currentIntensityRow}`)].forEach(c => { c.border = borderThin; c.font = fontBold; c.alignment = centerAlignment; });
+
         // Section 3: Checklist
         const startRowSec3 = currentIntensityRow + 2;
+        worksheet.getRow(startRowSec3).height = 13.5;
         worksheet.mergeCells(`A${startRowSec3}:S${startRowSec3}`);
         worksheet.getCell(`A${startRowSec3}`).value = '3. Детализация доплаты за качество обслуживания (чек-лист)';
         worksheet.getCell(`A${startRowSec3}`).font = fontBold;
+
+        worksheet.getRow(startRowSec3 + 1).height = 23.25;
+        worksheet.mergeCells(`A${startRowSec3 + 1}:G${startRowSec3 + 1}`);
+        worksheet.getCell(`A${startRowSec3 + 1}`).value = 'Критерии чек-листа (KPI)';
+        worksheet.mergeCells(`H${startRowSec3 + 1}:J${startRowSec3 + 1}`);
+        worksheet.getCell(`H${startRowSec3 + 1}`).value = 'Максимально балл';
+        worksheet.mergeCells(`K${startRowSec3 + 1}:O${startRowSec3 + 1}`);
+        worksheet.getCell(`K${startRowSec3 + 1}`).value = 'Фактический балл';
+
+        [worksheet.getCell(`A${startRowSec3 + 1}`), worksheet.getCell(`H${startRowSec3 + 1}`), worksheet.getCell(`K${startRowSec3 + 1}`)].forEach(c => {
+            c.border = borderThin;
+            c.font = fontBold;
+            c.alignment = centerAlignment;
+        });
 
         const getAvgCrit = (crit: keyof typeof dailyChecklists[0]) => {
             const count = dailyChecklists.length;
@@ -826,18 +890,38 @@ export class ReportService {
         ];
         critLabels.forEach((l, i) => {
             const rIdx = startRowSec3 + 2 + i;
+            worksheet.getRow(rIdx).height = 16.5;
             worksheet.mergeCells(`A${rIdx}:G${rIdx}`);
             worksheet.getCell(`A${rIdx}`).value = l;
+            worksheet.mergeCells(`H${rIdx}:J${rIdx}`);
             worksheet.getCell(`H${rIdx}`).value = 1; // Max
+            worksheet.mergeCells(`K${rIdx}:O${rIdx}`);
             worksheet.getCell(`K${rIdx}`).value = getAvgCrit(`criterion${i+1}` as any) / 100; // Value
-            worksheet.getRow(rIdx).eachCell(c => c.border = borderThin);
+            [worksheet.getCell(`A${rIdx}`), worksheet.getCell(`H${rIdx}`), worksheet.getCell(`K${rIdx}`)].forEach(c => {
+                c.border = borderThin;
+                c.alignment = centerAlignment;
+            });
+            worksheet.getCell(`A${rIdx}`).alignment = leftAlignment;
         });
 
         // Section 4: Card Quality
-        const startRowSec4 = startRowSec3 + 10;
+        const startRowSec4 = startRowSec3 + 9;
         worksheet.mergeCells(`A${startRowSec4}:S${startRowSec4}`);
         worksheet.getCell(`A${startRowSec4}`).value = '4. Детализация доплаты за качество оформления карт';
         worksheet.getCell(`A${startRowSec4}`).font = fontBold;
+
+        worksheet.mergeCells(`A${startRowSec4 + 1}:G${startRowSec4 + 1}`);
+        worksheet.getCell(`A${startRowSec4 + 1}`).value = 'Критерии качества';
+        worksheet.mergeCells(`H${startRowSec4 + 1}:J${startRowSec4 + 1}`);
+        worksheet.getCell(`H${startRowSec4 + 1}`).value = 'Максимально балл';
+        worksheet.mergeCells(`K${startRowSec4 + 1}:O${startRowSec4 + 1}`);
+        worksheet.getCell(`K${startRowSec4 + 1}`).value = 'Фактический балл';
+
+        [worksheet.getCell(`A${startRowSec4 + 1}`), worksheet.getCell(`H${startRowSec4 + 1}`), worksheet.getCell(`K${startRowSec4 + 1}`)].forEach(c => {
+            c.border = borderThin;
+            c.font = fontBold;
+            c.alignment = centerAlignment;
+        });
 
         const getAvgRegCrit = (crit: keyof typeof regs[0]) => {
             const count = regs.length;
@@ -850,30 +934,50 @@ export class ReportService {
             const rIdx = startRowSec4 + 2 + i;
             worksheet.mergeCells(`A${rIdx}:G${rIdx}`);
             worksheet.getCell(`A${rIdx}`).value = l;
+            worksheet.mergeCells(`H${rIdx}:J${rIdx}`);
             worksheet.getCell(`H${rIdx}`).value = 1;
+            worksheet.mergeCells(`K${rIdx}:O${rIdx}`);
             worksheet.getCell(`K${rIdx}`).value = getAvgRegCrit(`criterion${i+1}` as any);
-            worksheet.getRow(rIdx).eachCell(c => c.border = borderThin);
+            [worksheet.getCell(`A${rIdx}`), worksheet.getCell(`H${rIdx}`), worksheet.getCell(`K${rIdx}`)].forEach(c => {
+                c.border = borderThin;
+                c.alignment = centerAlignment;
+            });
+            worksheet.getCell(`A${rIdx}`).alignment = leftAlignment;
         });
 
         // Section 5: Sales
-        const startRowSec5 = startRowSec4 + 7;
+        const startRowSec5 = startRowSec4 + 6;
         worksheet.mergeCells(`A${startRowSec5}:S${startRowSec5}`);
         worksheet.getCell(`A${startRowSec5}`).value = '5. Детализация начислений % от продаж';
         worksheet.getCell(`A${startRowSec5}`).font = fontBold;
 
         worksheet.mergeCells(`A${startRowSec5+1}:G${startRowSec5+1}`);
         worksheet.getCell(`A${startRowSec5+1}`).value = 'Наименование';
+        worksheet.mergeCells(`H${startRowSec5+1}:J${startRowSec5+1}`);
         worksheet.getCell(`H${startRowSec5+1}`).value = 'Сумма';
+        worksheet.mergeCells(`K${startRowSec5+1}:L${startRowSec5+1}`);
         worksheet.getCell(`K${startRowSec5+1}`).value = 'Бонус';
-        worksheet.getRow(startRowSec5+1).eachCell(c => { c.border = borderThin; c.font = fontBold; });
+
+        [worksheet.getCell(`A${startRowSec5+1}`), worksheet.getCell(`H${startRowSec5+1}`), worksheet.getCell(`K${startRowSec5+1}`)].forEach(c => {
+            c.border = borderThin;
+            c.font = fontBold;
+            c.alignment = centerAlignment;
+        });
 
         let currentSalesRow = startRowSec5 + 2;
         sales.forEach(s => {
             worksheet.mergeCells(`A${currentSalesRow}:G${currentSalesRow}`);
             worksheet.getCell(`A${currentSalesRow}`).value = s.productName;
+            worksheet.mergeCells(`H${currentSalesRow}:J${currentSalesRow}`);
             worksheet.getCell(`H${currentSalesRow}`).value = s.price;
+            worksheet.mergeCells(`K${currentSalesRow}:L${currentSalesRow}`);
             worksheet.getCell(`K${currentSalesRow}`).value = s.bonus;
-            worksheet.getRow(currentSalesRow).eachCell(c => c.border = borderThin);
+
+            [worksheet.getCell(`A${currentSalesRow}`), worksheet.getCell(`H${currentSalesRow}`), worksheet.getCell(`K${currentSalesRow}`)].forEach(c => {
+                c.border = borderThin;
+                c.alignment = centerAlignment;
+            });
+            worksheet.getCell(`A${currentSalesRow}`).alignment = leftAlignment;
             currentSalesRow++;
         });
 
