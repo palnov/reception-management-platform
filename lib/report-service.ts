@@ -586,9 +586,7 @@ export class ReportService {
             if (accountant15Sheet) applyHeader(accountant15Sheet);
         }
 
-        return workbook;
     }
-}
 
     static async generateSalarySlipWorkbook(date: string, employeeId: string): Promise<ExcelJS.Workbook> {
         const workbook = new ExcelJS.Workbook();
@@ -901,3 +899,4 @@ export class ReportService {
 
         return await zip.generateAsync({ type: 'nodebuffer' });
     }
+}
