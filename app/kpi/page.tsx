@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useSharedMonth } from '@/lib/useSharedMonth';
 import { format, startOfMonth, endOfMonth, isSameDay, subMonths, addMonths, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, CheckCircle, X, Pencil, ClipboardCheck, Crown, BadgeCheck, User } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, X, Pencil, ClipboardCheck, Crown, BadgeCheck, User, ChevronsLeft, ChevronsRight, ArrowDown, ArrowUp } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
 import { Tooltip } from '@/components/Tooltip';
 import { useMonthStatus } from '@/lib/useMonthStatus';
@@ -82,6 +82,13 @@ export default function KpiPage() {
     const [monthlyChecklists, setMonthlyChecklists] = useState<any[]>([]);
     const [dailyChecklists, setDailyChecklists] = useState<any[]>([]);
     const [monthNorm, setMonthNorm] = useState<number>(176);
+    const [isColumnCollapsed, setIsColumnCollapsed] = useState(false);
+
+    function getInitials(name: string): string {
+        const parts = name.trim().split(/\s+/);
+        if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+        return name.substring(0, 2).toUpperCase();
+    }
 
     // Entry Form State
     const [showModal, setShowModal] = useState(false);
@@ -104,6 +111,10 @@ export default function KpiPage() {
     useEffect(() => {
         fetchCurrentUser();
         fetchEmployees();
+
+        if (window.innerWidth < 768) {
+            setIsColumnCollapsed(true);
+        }
     }, []);
 
     useEffect(() => {
@@ -411,56 +422,69 @@ export default function KpiPage() {
     }, [employees, shifts, kpiRecords, promotionSales, registrationKpis, monthlyChecklists, dailyChecklists, monthNorm, currentUser, isUserLoading, currentMonth]);
 
     return (
-        <div>
-            <div className="flex items-center justify-between mb-8">
-                <h1 className="text-3xl font-bold">KPI и Зарплата</h1>
-                <div className="flex items-center gap-4">
-                    <MonthStatusBadge isClosed={isClosed} />
-                    {currentUser?.role === 'MANAGER' && (
-                        <MonthClosureControls 
-                            currentMonth={currentMonth} 
-                            isClosed={isClosed} 
-                            onStatusChange={refreshMonthStatus}
-                        />
-                    )}
-                    <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm">
-                        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full"><ChevronLeft className="w-5 h-5" /></button>
-                        <span className="text-lg font-medium w-40 text-center capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
-                        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full"><ChevronRight className="w-5 h-5" /></button>
+            <div className="flex flex-col gap-6 mb-8">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">KPI и Зарплата</h1>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <MonthStatusBadge isClosed={isClosed} />
+                        {currentUser?.role === 'MANAGER' && (
+                            <MonthClosureControls 
+                                currentMonth={currentMonth} 
+                                isClosed={isClosed} 
+                                onStatusChange={refreshMonthStatus}
+                            />
+                        )}
                     </div>
+                </div>
+                
+                <div className="flex items-center gap-2 sm:gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm w-full sm:w-auto self-start sm:self-auto justify-between sm:justify-start">
+                    <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-all"><ChevronLeft className="w-5 h-5 text-zinc-600" /></button>
+                    <span className="text-sm sm:text-lg font-semibold min-w-[120px] sm:w-40 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
+                    <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-all"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-auto max-h-[calc(100vh-200px)] scrollbar-custom">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-zinc-50">
+            <div className="bg-white sm:rounded-xl shadow-xl border-y sm:border border-zinc-200 overflow-auto max-h-[calc(100vh-250px)] scrollbar-custom -mx-3 sm:mx-0">
+                <table className="w-full text-left text-xs sm:text-sm border-separate border-spacing-0">
+                    <thead className="bg-zinc-50 border-b border-zinc-200">
                         <tr>
-                            <th className="sticky top-0 left-0 z-30 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 whitespace-nowrap min-w-[200px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7, inset -1px 0 0 #e4e4e7, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>Сотрудник</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[70px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Часы</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[80px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Оклад</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[80px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Коэф.</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[130px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Работа в арх.</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                            <th className={`sticky top-0 left-0 z-40 bg-zinc-50 px-3 sm:px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] transition-all ${isColumnCollapsed ? 'min-w-[52px] w-[52px]' : 'min-w-[200px]'}`} style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7, inset -2px 0 0 #e4e4e7, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>
+                                <div className="flex items-center justify-between gap-1">
+                                    {!isColumnCollapsed && <span>Сотрудник</span>}
+                                    <button
+                                        onClick={() => setIsColumnCollapsed(prev => !prev)}
+                                        className="p-1 rounded-md hover:bg-zinc-200/70 text-zinc-400 hover:text-zinc-600 transition-colors"
+                                        title={isColumnCollapsed ? 'Развернуть' : 'Свернуть'}
+                                    >
+                                        {isColumnCollapsed ? <ChevronsRight className="w-3.5 h-3.5" /> : <ChevronsLeft className="w-3.5 h-3.5" />}
+                                    </button>
+                                </div>
+                            </th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap min-w-[70px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>Часы</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap min-w-[80px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>Оклад</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap min-w-[80px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>Коэф.</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap min-w-[130px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>Работа в арх.</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за открытие, закрытие центра и за закрытие кабинетов">Откр/Закр.</Tooltip>
                             </th>
                             {currentMonth < new Date('2026-04-01') && (
-                                <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[60px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                                <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap min-w-[60px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>
                                     <Tooltip content="Доплата за исполнение обязанностей старшей смены">ИО</Tooltip>
                                 </th>
                             )}
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[80px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Стажёр</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Продажи</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap min-w-[80px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>Стажёр</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>Продажи</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-center whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за открытие больничных листов">Откр. Б/Л</Tooltip>
                             </th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center whitespace-nowrap min-w-[140px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-center whitespace-nowrap min-w-[140px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за продление и закрытие больничных листов">Закр/Продл Б/Л</Tooltip>
                             </th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-center whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-center whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за создание карточек пациентов">Карточки</Tooltip>
                             </th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>Выслуга</th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>Выслуга</th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>
                                 <Tooltip content={(() => {
                                     const visible = payrollData.filter(c => c.rawHours > 0 || c.dayOffHours > 0 || c.totalPay > 0 || c.seniorityBonus > 0);
                                     if (visible.length === 0) return 'Нет данных';
@@ -468,10 +492,10 @@ export default function KpiPage() {
                                     return `Общий чеклист: ${avg.toFixed(1)}%`;
                                 })()}>Чеклист</Tooltip>
                             </th>
-                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7' }}>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>
                                 <Tooltip content="Качество заполнения карточек первичных пациентов">Качество</Tooltip>
                             </th>
-                            <th className="sticky top-0 right-0 z-30 bg-zinc-50 px-4 py-3 font-medium text-zinc-500 text-right whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -1px 0 #e4e4e7, inset 1px 0 0 #e4e4e7, -2px 0 10px -2px rgba(0,0,0,0.1)' }}>Итого</th>
+                            <th className="sticky top-0 sm:right-0 z-30 bg-zinc-100 sm:bg-zinc-50 px-4 py-3 font-bold text-zinc-900 sm:text-zinc-500 text-right whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7, inset 1px 0 0 #e4e4e7, -2px 0 10px -2px rgba(0,0,0,0.1)' }}>Итого</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100">
@@ -492,7 +516,7 @@ export default function KpiPage() {
                                         key={calc.empId}
                                         className="group hover:bg-zinc-50 transition-colors"
                                     >
-                                        <td className="sticky left-0 z-10 bg-white group-hover:bg-zinc-50 transition-colors px-4 py-3 font-medium text-zinc-900" style={{ boxShadow: 'inset -1px 0 0 #f4f4f5, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>
+                                        <td className="sticky left-0 z-10 bg-white group-hover:bg-zinc-50 transition-all px-3 sm:px-4 py-3 font-bold text-zinc-900" style={{ boxShadow: 'inset -2px 0 0 #f4f4f5, 2px 0 10px -2px rgba(0,0,0,0.1)' }}>
                                             <div className="flex items-center gap-2">
                                                 <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${calc.role === 'MANAGER' ? 'bg-purple-100 text-purple-600' :
                                                     calc.role === 'SENIOR' ? 'bg-amber-100 text-amber-600' :
@@ -506,8 +530,12 @@ export default function KpiPage() {
                                                         <User className="w-3 h-3" />
                                                     )}
                                                 </div>
-                                                <span className="truncate">{calc.name}</span>
-                                                {calc.auditLogs && calc.auditLogs.length > 0 && <InfoTooltip logs={calc.auditLogs} />}
+                                                {!isColumnCollapsed ? (
+                                                    <span className="truncate">{calc.name}</span>
+                                                ) : (
+                                                    <span className="text-[10px] font-black">{getInitials(calc.name)}</span>
+                                                )}
+                                                {!isColumnCollapsed && calc.auditLogs && calc.auditLogs.length > 0 && <InfoTooltip logs={calc.auditLogs} />}
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-right text-zinc-600 font-semibold">{calc.rawHours.toFixed(1)}</td>
@@ -661,7 +689,7 @@ export default function KpiPage() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="sticky right-0 z-10 bg-zinc-50 group-hover:bg-zinc-100 transition-colors px-4 py-3 text-right font-bold text-zinc-900 whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 1px 0 0 #f4f4f5, -2px 0 10px -2px rgba(0,0,0,0.1)' }}>
+                                        <td className="sticky sm:right-0 z-10 bg-zinc-50 group-hover:bg-zinc-100 transition-all px-4 py-3 text-right font-black text-zinc-900 whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 1px 0 0 #f4f4f5, -2px 0 10px -2px rgba(0,0,0,0.1)' }}>
                                             {calc.totalPay.toFixed(0)} ₽
                                         </td>
                                     </tr>

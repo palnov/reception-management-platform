@@ -7,7 +7,7 @@ import { MonthStatusBadge } from '@/components/MonthStatusBadge';
 import { MonthClosureControls } from '@/components/MonthClosureControls';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, parseISO, subDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, X, DoorOpen, MapPin, GripVertical, User, Crown, BadgeCheck, Clock, Briefcase, CheckSquare, Activity, LayoutList, Timer, Percent, Layers, GraduationCap, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, DoorOpen, MapPin, GripVertical, User, Crown, BadgeCheck, Clock, Briefcase, CheckSquare, Activity, LayoutList, Timer, Percent, Layers, GraduationCap, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
 import { QuickContextMenu } from '@/components/QuickContextMenu';
 import { Tooltip } from '@/components/Tooltip';
@@ -482,6 +482,11 @@ export default function SchedulePage() {
             .catch(() => {
                 window.location.href = '/login';
             });
+
+        // Mobile-first: collapse column by default on small screens
+        if (window.innerWidth < 768) {
+            setIsColumnCollapsed(true);
+        }
     }, []);
 
     useEffect(() => {
@@ -1342,7 +1347,7 @@ export default function SchedulePage() {
                                             className="p-1 rounded-md hover:bg-zinc-200/70 text-zinc-400 hover:text-zinc-600 transition-colors"
                                             title={isColumnCollapsed ? 'Развернуть' : 'Свернуть'}
                                         >
-                                            {isColumnCollapsed ? <PanelLeftOpen className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />}
+                                            {isColumnCollapsed ? <ChevronsRight className="w-3.5 h-3.5" /> : <ChevronsLeft className="w-3.5 h-3.5" />}
                                         </button>
                                     </div>
                                 </th>

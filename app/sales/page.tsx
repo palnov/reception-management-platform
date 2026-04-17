@@ -119,59 +119,84 @@ export default function SalesPage() {
 
     return (
         <div className="space-y-8">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Продажи акционных продуктов</h1>
-                    <p className="text-zinc-500 mt-2">Бонус составляет 7% от стоимости</p>
-                </div>
-                <div className="flex items-center gap-4">
-                    <MonthStatusBadge isClosed={isClosed} />
-                    {employees.find(e => e.role === 'MANAGER') && ( // Crude check for manager role in current view (better check auth)
-                        <MonthClosureControls 
-                            currentMonth={currentMonth} 
-                            isClosed={isClosed} 
-                            onStatusChange={refreshMonthStatus}
-                        />
-                    )}
-                    <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm">
-                        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 text-zinc-600" /></button>
-                        <span className="text-lg font-semibold w-40 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
-                        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
+            <div className="flex flex-col gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 tracking-tight">Продажи акционных продуктов</h1>
+                        <p className="text-sm sm:text-base text-zinc-500 mt-2">Бонус составляет 7% от стоимости</p>
                     </div>
+                    <div className="flex items-center gap-3">
+                        <MonthStatusBadge isClosed={isClosed} />
+                        {employees.find(e => e.role === 'MANAGER') && (
+                            <MonthClosureControls 
+                                currentMonth={currentMonth} 
+                                isClosed={isClosed} 
+                                onStatusChange={refreshMonthStatus}
+                            />
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2 sm:gap-4 bg-white p-1 rounded-full border border-zinc-200 shadow-sm w-full sm:w-auto self-start sm:self-auto justify-between sm:justify-start">
+                    <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 text-zinc-600" /></button>
+                    <span className="text-sm sm:text-lg font-semibold min-w-[120px] sm:w-40 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
+                    <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
                 </div>
             </div>
 
-            {/* Employee Tabs */}
-            <div className="flex flex-wrap gap-2 border-b border-zinc-200 pb-px">
-                <button
-                    onClick={() => setActiveEmployeeId('all')}
-                    className={`px-6 py-3 text-sm font-bold transition-all border-b-2 rounded-t-xl ${activeEmployeeId === 'all'
-                        ? 'border-blue-600 text-blue-600 bg-blue-50'
-                        : 'border-transparent text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'
-                        }`}
-                >
-                    Все сотрудники
-                </button>
-                {employees.filter(e => {
-                    if (e.role === 'MANAGER') return false;
-                    // Keep if not dismissed or if they have sales in this month
-                    const hasSales = sales.some(s => s.employeeId === e.id);
-                    if (hasSales) return true;
+            {/* Employee Tabs / Select */}
+            <div>
+                {/* Mobile Select */}
+                <div className="sm:hidden mb-4">
+                    <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2 ml-1">Выберите сотрудника</label>
+                    <select
+                        value={activeEmployeeId}
+                        onChange={(e) => setActiveEmployeeId(e.target.value)}
+                        className="w-full px-4 py-3 bg-white border-2 border-zinc-100 rounded-xl font-bold text-zinc-800 focus:border-blue-500 outline-none"
+                    >
+                        <option value="all">Все сотрудники</option>
+                        {employees.filter(e => {
+                            if (e.role === 'MANAGER') return false;
+                            const hasSales = sales.some(s => s.employeeId === e.id);
+                            if (hasSales) return true;
+                            const today = new Date().toISOString().split('T')[0];
+                            return (!e.dismissalDate || e.dismissalDate > today);
+                        }).map(emp => (
+                            <option key={emp.id} value={emp.id}>{emp.name}</option>
+                        ))}
+                    </select>
+                </div>
 
-                    const today = new Date().toISOString().split('T')[0];
-                    return (!e.dismissalDate || e.dismissalDate > today);
-                }).map(emp => (
+                {/* Desktop Tabs */}
+                <div className="hidden sm:flex flex-wrap gap-2 border-b border-zinc-200 pb-px">
                     <button
-                        key={emp.id}
-                        onClick={() => setActiveEmployeeId(emp.id)}
-                        className={`px-6 py-3 text-sm font-bold transition-all border-b-2 rounded-t-xl flex items-center gap-2 ${activeEmployeeId === emp.id
+                        onClick={() => setActiveEmployeeId('all')}
+                        className={`px-6 py-3 text-sm font-bold transition-all border-b-2 rounded-t-xl ${activeEmployeeId === 'all'
                             ? 'border-blue-600 text-blue-600 bg-blue-50'
                             : 'border-transparent text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'
                             }`}
                     >
-                        {emp.name}
+                        Все сотрудники
                     </button>
-                ))}
+                    {employees.filter(e => {
+                        if (e.role === 'MANAGER') return false;
+                        const hasSales = sales.some(s => s.employeeId === e.id);
+                        if (hasSales) return true;
+                        const today = new Date().toISOString().split('T')[0];
+                        return (!e.dismissalDate || e.dismissalDate > today);
+                    }).map(emp => (
+                        <button
+                            key={emp.id}
+                            onClick={() => setActiveEmployeeId(emp.id)}
+                            className={`px-6 py-3 text-sm font-bold transition-all border-b-2 rounded-t-xl flex items-center gap-2 ${activeEmployeeId === emp.id
+                                ? 'border-blue-600 text-blue-600 bg-blue-50'
+                                : 'border-transparent text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'
+                                }`}
+                        >
+                            {emp.name}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -211,8 +236,8 @@ export default function SalesPage() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-xl border border-zinc-200/60 overflow-hidden">
-                <table className="w-full text-left text-sm">
+            <div className="bg-white sm:rounded-2xl shadow-xl border-y sm:border border-zinc-200/60 overflow-x-auto -mx-3 sm:mx-0 scrollbar-custom">
+                <table className="w-full text-left text-sm min-w-[900px]">
                     <thead className="bg-zinc-50 border-b border-zinc-200">
                         <tr>
                             <th className="px-6 py-4 font-bold text-zinc-500 uppercase tracking-wider text-[10px] cursor-pointer hover:bg-zinc-100 transition-colors"

@@ -116,14 +116,14 @@ export default function EmployeesPage() {
 
     return (
         <div>
-            <div className="flex items-center justify-between mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-zinc-900">Сотрудники</h1>
-                    <p className="text-zinc-500 mt-1">Управление персоналом и филиалами.</p>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+                <div className="w-full">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900">Сотрудники</h1>
+                    <p className="text-sm sm:text-base text-zinc-500 mt-1">Управление персоналом и филиалами.</p>
                 </div>
                 <button
                     onClick={handleAddNew}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
+                    className="flex w-full sm:w-auto items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
                 >
                     <Plus className="w-4 h-4" /> Добавить сотрудника
                 </button>
@@ -366,11 +366,10 @@ export default function EmployeesPage() {
                 const activeEmployees = employees.filter(emp => !emp.dismissalDate || emp.dismissalDate > todayStr);
                 const dismissedEmployees = employees.filter(emp => emp.dismissalDate && emp.dismissalDate <= todayStr);
 
-                const renderTable = (list: Employee[], title: string) => (
                     <div className="mb-12">
-                        <h2 className="text-xl font-bold text-zinc-800 mb-4 px-2">{title}</h2>
-                        <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                            <table className="w-full text-left">
+                        <h2 className="text-xl font-bold text-zinc-800 mb-4 px-2 tracking-tight">{title}</h2>
+                        <div className="bg-white sm:rounded-xl shadow-sm border-y sm:border border-zinc-200 overflow-x-auto -mx-3 sm:mx-0 scrollbar-custom">
+                            <table className="w-full text-left min-w-[800px]">
                                 <thead className="bg-zinc-50 border-b border-zinc-200">
                                     <tr>
                                         <th className="px-6 py-4 font-semibold text-xs uppercase tracking-wider text-zinc-500">Сотрудник</th>

@@ -148,69 +148,91 @@ export default function ChecklistPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <div className="flex items-center gap-4">
-                        <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Ежедневный чеклист</h1>
-                        <button
-                            onClick={() => {
-                                if (isClosed) return;
-                                setFormData({
-                                    ...initialForm,
-                                    employeeId: activeEmployeeId !== 'all' ? activeEmployeeId : (employees.find(e => e.role !== 'MANAGER')?.id || '')
-                                });
-                                setDuplicateError(false);
-                                setShowModal(true);
-                            }}
-                            disabled={isClosed}
-                            className={`bg-zinc-900 text-white px-4 py-2 rounded-xl hover:bg-zinc-800 transition-all shadow-lg flex items-center gap-2 font-bold text-sm ${isClosed ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                            <Plus className="w-4 h-4" /> Добавить аудит
-                        </button>
+            <div className="flex flex-col gap-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="w-full">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 tracking-tight">Ежедневный чеклист</h1>
+                            <button
+                                onClick={() => {
+                                    if (isClosed) return;
+                                    setFormData({
+                                        ...initialForm,
+                                        employeeId: activeEmployeeId !== 'all' ? activeEmployeeId : (employees.find(e => e.role !== 'MANAGER')?.id || '')
+                                    });
+                                    setDuplicateError(false);
+                                    setShowModal(true);
+                                }}
+                                disabled={isClosed}
+                                className={`w-full sm:w-auto justify-center bg-zinc-900 text-white px-4 py-2.5 rounded-xl hover:bg-zinc-800 transition-all shadow-lg flex items-center gap-2 font-bold text-sm ${isClosed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                                <Plus className="w-4 h-4" /> Добавить аудит
+                            </button>
+                        </div>
+                        <p className="text-zinc-500 mt-2 text-sm">Проверка стандартов обслуживания и дисциплины.</p>
                     </div>
-                    <p className="text-zinc-500 mt-1 text-sm">Проверка стандартов обслуживания и дисциплины.</p>
                 </div>
-                <div className="flex items-center gap-4">
+
+                <div className="flex flex-wrap items-center gap-3">
                     <MonthStatusBadge isClosed={isClosed} />
                     <MonthClosureControls 
                         currentMonth={currentMonth} 
                         isClosed={isClosed} 
                         onStatusChange={refreshMonthStatus}
                     />
-                    <div className="flex items-center gap-4 bg-white p-1 rounded-full border border-zinc-200/60 shadow-sm">
+                    <div className="flex items-center gap-2 sm:gap-4 bg-white p-1 rounded-full border border-zinc-200/60 shadow-sm w-full sm:w-auto justify-between sm:justify-start mt-2 sm:mt-0">
                         <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 text-zinc-600" /></button>
-                        <span className="text-sm font-bold w-32 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
+                        <span className="text-sm font-bold w-28 sm:w-32 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
                         <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
                     </div>
                 </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 border-b border-zinc-200 pb-px">
-                <button
-                    onClick={() => setActiveEmployeeId('all')}
-                    className={`px-6 py-3 text-sm font-bold transition-all border-b-2 rounded-t-xl ${activeEmployeeId === 'all'
-                        ? 'border-purple-600 text-purple-600 bg-purple-50'
-                        : 'border-transparent text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'
-                        }`}
-                >
-                    Все сотрудники
-                </button>
-                {employees.filter(e => e.role !== 'MANAGER').map(emp => (
+            {/* Employee Tabs / Select */}
+            <div>
+                {/* Mobile Select */}
+                <div className="sm:hidden mb-4">
+                    <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2 ml-1">Выберите сотрудника</label>
+                    <select
+                        value={activeEmployeeId}
+                        onChange={(e) => setActiveEmployeeId(e.target.value)}
+                        className="w-full px-4 py-3 bg-white border-2 border-zinc-100 rounded-xl font-bold text-zinc-800 focus:border-purple-500 outline-none"
+                    >
+                        <option value="all">Все сотрудники</option>
+                        {employees.filter(e => e.role !== 'MANAGER').map(emp => (
+                            <option key={emp.id} value={emp.id}>{emp.name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Desktop Tabs */}
+                <div className="hidden sm:flex flex-wrap gap-2 border-b border-zinc-200 pb-px">
                     <button
-                        key={emp.id}
-                        onClick={() => setActiveEmployeeId(emp.id)}
-                        className={`px-6 py-3 text-sm font-bold transition-all border-b-2 rounded-t-xl ${activeEmployeeId === emp.id
+                        onClick={() => setActiveEmployeeId('all')}
+                        className={`px-6 py-3 text-sm font-bold transition-all border-b-2 rounded-t-xl ${activeEmployeeId === 'all'
                             ? 'border-purple-600 text-purple-600 bg-purple-50'
                             : 'border-transparent text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'
                             }`}
                     >
-                        {emp.name}
+                        Все сотрудники
                     </button>
-                ))}
+                    {employees.filter(e => e.role !== 'MANAGER').map(emp => (
+                        <button
+                            key={emp.id}
+                            onClick={() => setActiveEmployeeId(emp.id)}
+                            className={`px-6 py-3 text-sm font-bold transition-all border-b-2 rounded-t-xl ${activeEmployeeId === emp.id
+                                ? 'border-purple-600 text-purple-600 bg-purple-50'
+                                : 'border-transparent text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'
+                                }`}
+                        >
+                            {emp.name}
+                        </button>
+                    ))}
+                </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-xl border border-zinc-200/60 overflow-hidden">
-                <table className="w-full text-left text-sm">
+            <div className="bg-white sm:rounded-2xl shadow-xl border-y sm:border border-zinc-200/60 overflow-x-auto -mx-3 sm:mx-0 scrollbar-custom">
+                <table className="w-full text-left text-sm min-w-[600px]">
                     <thead className="bg-zinc-50 border-b border-zinc-200">
                         <tr>
                             <th className="px-6 py-4 font-bold text-zinc-500 uppercase tracking-wider text-[10px] cursor-pointer hover:bg-zinc-100 transition-colors"
