@@ -582,10 +582,11 @@ export class ReportService {
             }
 
             if (salarySheet) applyHeader(salarySheet);
-            if (accountantSheet) applyHeader(accountantSheet);
-            if (accountant15Sheet) applyHeader(accountant15Sheet);
+        if (accountantSheet) applyHeader(accountantSheet);
+        if (accountant15Sheet) applyHeader(accountant15Sheet);
         }
 
+        return workbook;
     }
 
     static async generateSalarySlipWorkbook(date: string, employeeId: string): Promise<ExcelJS.Workbook> {

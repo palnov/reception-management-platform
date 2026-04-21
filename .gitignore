@@ -54,3 +54,7 @@ test-report.xlsx
 
 # Commercial Proposals
 /kp
+
+# AI Agent artifacts
+.agent/
+.agents/
