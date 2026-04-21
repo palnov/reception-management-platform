@@ -447,6 +447,10 @@ export default function SchedulePage() {
         return userData?.role === 'MANAGER';
     }, [userData]);
 
+    const isSenior = useMemo(() => {
+        return userData?.role === 'SENIOR';
+    }, [userData]);
+
     const canEditShifts = useMemo(() => {
         return userData?.role === 'MANAGER' || userData?.role === 'SENIOR';
     }, [userData]);
