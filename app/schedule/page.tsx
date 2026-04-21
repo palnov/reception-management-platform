@@ -968,6 +968,7 @@ export default function SchedulePage() {
     const handleMouseDown = useCallback((e: React.MouseEvent, empId: string, date: string) => {
         e.preventDefault();
         const sourceShift = shiftsByEmployee[empId]?.[date];
+        const isActuallyAdmin = userData?.role === 'ADMIN';
 
         const isRange = selection && (selection.start.empId !== selection.end.empId || selection.start.date !== selection.end.date);
         if (isRange || contextMenu) {
@@ -976,9 +977,17 @@ export default function SchedulePage() {
 
         if (contextMenu) setContextMenu(null);
 
-        // Regular users can only click existing shifts, not drag or select multiple cells
-        if (!isManager && !sourceShift) {
-            // If it's an empty cell, do nothing for non-managers
+        // ADMINs and regular users can only click existing shifts, not drag or select multiple cells
+        if ((!isManager && !isSenior) && !sourceShift) {
+            // If it's an empty cell, do nothing for admins/regular employees
+            return;
+        }
+
+        // ADMINs cannot drag-select or fill
+        if (isActuallyAdmin) {
+            if (sourceShift) {
+                openModal(parseISO(date), empId, sourceShift);
+            }
             return;
         }
 
@@ -989,13 +998,13 @@ export default function SchedulePage() {
         setIsDragging(true);
         setIsFilling(false);
         setHandleCell(null);
-    }, [shiftsByEmployee, selection, contextMenu, isManager]);
+    }, [shiftsByEmployee, selection, contextMenu, isManager, isSenior, userData, openModal]);
 
     const handleMouseEnter = useCallback((empId: string, date: string) => {
         if (!isDragging && !isFilling) return;
-        if (!isManager && isDragging) return; // Prevent extending selection for non-managers
+        if ((!isManager && !isSenior) && isDragging) return; // Prevent extending selection for admins/seniors
         setSelection(prev => prev ? { ...prev, end: { empId, date } } : null);
-    }, [isDragging, isFilling, isManager]);
+    }, [isDragging, isFilling, isManager, isSenior]);
 
     const handleMouseUp = useCallback(async () => {
         if (!isDragging && !isFilling) {
@@ -1139,7 +1148,7 @@ export default function SchedulePage() {
 
     const handleContextMenu = useCallback((e: React.MouseEvent, empId: string, dateKey: string, shift?: Shift) => {
         e.preventDefault();
-        if (!isManager) return; // Non-managers have no context menu
+        if (!isManager && !isSenior) return; // Admins and regular employees have no context menu
 
         const isPointInSelection = isInSelection(empId, dateKey);
         const isRange = selection && (selection.start.empId !== selection.end.empId || selection.start.date !== selection.end.date);
@@ -1256,7 +1265,7 @@ export default function SchedulePage() {
     const handleHandleMouseDown = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
         e.preventDefault();
-        if (!isManager) return; // Non-managers cannot drag-to-fill
+        if (!isManager && !isSenior) return; // Non-managers/seniors cannot drag-to-fill
         if (handleCell && !selection) {
             const bounds = selectionBounds;
             if (bounds) {
@@ -1331,11 +1340,11 @@ export default function SchedulePage() {
                 ref={gridContainerRef}
                 className={`bg-white sm:rounded-2xl shadow-xl border-y sm:border border-zinc-200/60 overflow-auto flex-1 pb-4 relative scrollbar-custom max-h-[calc(100vh-250px)] -mx-3 sm:mx-0 ${(isDragging || isFilling) ? 'select-none' : ''}`}
             >
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={(e) => !isClosed && handleDragEnd(e)}
-                >
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={(e) => !isClosed && isManager && handleDragEnd(e)}
+                    >
                     <table className="w-full text-xs text-left border-separate border-spacing-0 min-w-[1240px]">
                         <thead className="sticky top-0 z-[60]">
                             <tr className="bg-zinc-50/50">
@@ -1474,8 +1483,8 @@ export default function SchedulePage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2 col-span-2">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Тип смены</label>
-                                    <Tooltip content={!canEditShifts ? "Для изменения графика обратитесь к руководителю" : ""}>
-                                        <div className={`grid grid-cols-2 gap-2 ${!canEditShifts ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                                    <Tooltip content={(!isManager && !isSenior) ? "Только менеджер и старший смены могут изменять эти поля" : ""}>
+                                        <div className={`grid grid-cols-2 gap-2 ${(!isManager && !isSenior) ? 'opacity-60 cursor-not-allowed' : ''}`}>
                                             {[
                                                 { id: 'REGULAR', label: 'Рабочая', icon: Briefcase, borderColor: 'border-blue-500', bgColor: 'bg-blue-50', iconBg: 'bg-blue-500', textColor: 'text-blue-900' },
                                                 { id: 'ARCHIVE_WORK', label: 'Работа в архиве', icon: CheckSquare, borderColor: 'border-amber-500', bgColor: 'bg-amber-50', iconBg: 'bg-amber-500', textColor: 'text-amber-900' },
@@ -1484,9 +1493,9 @@ export default function SchedulePage() {
                                             ].map(type => (
                                                 <div
                                                     key={type.id}
-                                                    onClick={() => canEditShifts && setFormData(prev => ({ ...prev, type: type.id as any }))}
+                                                    onClick={() => (isManager || isSenior) && setFormData(prev => ({ ...prev, type: type.id as any }))}
                                                     className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all group
-                                                        ${!canEditShifts ? 'pointer-events-none' : 'cursor-pointer'}
+                                                        ${(!isManager && !isSenior) ? 'pointer-events-none' : 'cursor-pointer'}
                                                         ${formData.type === type.id
                                                             ? `${type.borderColor} ${type.bgColor}`
                                                             : 'border-zinc-100 bg-zinc-50/50 hover:border-zinc-200 hover:bg-zinc-50'}`}
@@ -1504,14 +1513,14 @@ export default function SchedulePage() {
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Часы</label>
-                                    <Tooltip content={!canEditShifts ? "Для изменения графика обратитесь к руководителю" : ""}>
+                                    <Tooltip content={(!isManager && !isSenior) ? "Только менеджер и старший смены могут изменять эти поля" : ""}>
                                         <div className="relative group">
                                             <input
                                                 type="number"
                                                 value={formData.hours}
-                                                disabled={!canEditShifts}
+                                                disabled={!isManager && !isSenior}
                                                 onChange={e => setFormData(prev => ({ ...prev, hours: e.target.value }))}
-                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${!canEditShifts ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
+                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${(!isManager && !isSenior) ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
                                             />
                                             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
                                                 <Timer className="w-4 h-4" />
@@ -1566,8 +1575,9 @@ export default function SchedulePage() {
                                         </label>
                                     </div>
                                 </>
-                                {employees.find(e => e.id === selectedEmployeeId)?.role === 'ADMIN' && selectedDate && selectedDate < new Date('2026-04-01') && (
-                                    <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, isActingLead: !prev.isActingLead }))}>
+                                {selectedDate && selectedDate < new Date('2026-04-01') && (
+                                    <div className={`flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 transition-all ${(!isManager && !isSenior) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-blue-100'}`} 
+                                            onClick={() => (isManager || isSenior) && setFormData(prev => ({ ...prev, isActingLead: !prev.isActingLead }))}>
                                         <input
                                             type="checkbox"
                                             checked={formData.isActingLead}
@@ -1575,7 +1585,7 @@ export default function SchedulePage() {
                                             className="w-5 h-5 text-indigo-600 rounded-lg focus:ring-indigo-500 border-zinc-300 transition-all pointer-events-none"
                                         />
                                         <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
-                                            <span>ИО Старшей смены</span>
+                                            <span>ИО Старшей смены (архив.)</span>
                                             <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-xs font-bold">+250р.</span>
                                         </label>
                                     </div>
@@ -1595,16 +1605,18 @@ export default function SchedulePage() {
                             </div>
 
                             <div className="flex gap-3 pt-2">
-                                <Tooltip content={!canEditShifts ? "Для изменения графика обратитесь к руководителю" : ""}>
-                                    <button
-                                        type="button"
-                                        onClick={handleDeleteShift}
-                                        disabled={!canEditShifts}
-                                        className={`px-6 py-3 border-2 border-red-50 rounded-xl text-red-500 bg-red-50/50 hover:bg-red-50 hover:border-red-100 transition-all font-bold text-sm ${!canEditShifts ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                    >
-                                        Удалить
-                                    </button>
-                                </Tooltip>
+                                { (isManager || isSenior) && (
+                                    <Tooltip content={(!isManager && !isSenior) ? "Только менеджер и старший смены могут изменять эти поля" : ""}>
+                                        <button
+                                            type="button"
+                                            onClick={handleDeleteShift}
+                                            disabled={!canEditShifts}
+                                            className={`px-6 py-3 border-2 border-red-50 rounded-xl text-red-500 bg-red-50/50 hover:bg-red-50 hover:border-red-100 transition-all font-bold text-sm ${!canEditShifts ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                        >
+                                            Удалить
+                                        </button>
+                                    </Tooltip>
+                                )}
                                 <button
                                     type="submit"
                                     className="flex-1 bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-200 font-bold text-sm"
@@ -1667,14 +1679,14 @@ export default function SchedulePage() {
 
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Часы</label>
-                                    <Tooltip content={!canEditShifts ? "Для изменения графика обратитесь к руководителю" : ""}>
+                                    <Tooltip content={(!isManager && !isSenior) ? "Только менеджер и старший смены могут изменять эти поля" : ""}>
                                         <div className="relative group">
                                             <input
                                                 type="number"
                                                 value={formData.hours}
-                                                disabled={!canEditShifts}
+                                                disabled={!isManager && !isSenior}
                                                 onChange={e => setFormData(prev => ({ ...prev, hours: e.target.value }))}
-                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${!canEditShifts ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
+                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${(!isManager && !isSenior) ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
                                             />
                                             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
                                                 <Timer className="w-4 h-4" />

@@ -83,12 +83,12 @@ export async function POST(request: Request) {
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const role = session.employee?.role;
-    if (role !== 'MANAGER' && role !== 'SENIOR') {
+    if (role !== 'MANAGER' && role !== 'SENIOR' && role !== 'ADMIN') {
         return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
     }
 
     const body = await request.json();
-    const { id, date, employeeId, type, hours, cabinetClosed, centerClosed, isActingLead, isTrainee, coefficient } = body;
+    let { id, date, employeeId, type, hours, cabinetClosed, centerClosed, isActingLead, isTrainee, coefficient } = body;
 
     if (await isMonthClosed(date)) {
         return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
@@ -108,25 +108,28 @@ export async function POST(request: Request) {
             const existing = await prisma.shift.findUnique({ where: { id } });
             if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+            // ADMIN role restrictions: Cannot change type, hours, or isActingLead
+            if (role === 'ADMIN') {
+                type = existing.type;
+                hours = existing.hours;
+                isActingLead = existing.isActingLead;
+            }
+
             const newData = {
                 date,
                 employeeId,
                 type,
-                hours: parseFloat(hours),
+                hours: parseFloat(hours.toString()),
                 cabinetClosed: cabinetClosed || false,
                 centerClosed: centerClosed || false,
                 isActingLead: isActingLead || false,
                 isTrainee: isTrainee || false,
-                coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5),
+                coefficient: Math.min(parseFloat((coefficient || 1.0).toString()), 1.5),
                 createdBy: existing.createdBy,
                 isDeleted: false // Restore if it was deleted
             };
 
             const diff = calculateDiff(existing, newData);
-
-            if (!diff && !id) { // If no changes and strictly updating... but here we might just save anyway.
-                // Actually if no diff, we can skip or just log "touched".
-            }
 
             const shift = await prisma.shift.update({
                 where: { id },
@@ -147,14 +150,21 @@ export async function POST(request: Request) {
             });
 
             if (existing) {
+                // ADMIN role restrictions: Cannot change type, hours, or isActingLead
+                if (role === 'ADMIN') {
+                    type = existing.type;
+                    hours = existing.hours;
+                    isActingLead = existing.isActingLead;
+                }
+
                 const newData = {
                     type,
-                    hours: parseFloat(hours),
+                    hours: parseFloat(hours.toString()),
                     cabinetClosed: cabinetClosed || false,
                     centerClosed: centerClosed || false,
                     isActingLead: isActingLead || false,
                     isTrainee: isTrainee || false,
-                    coefficient: Math.min(parseFloat(coefficient || 1.0), 1.5),
+                    coefficient: Math.min(parseFloat((coefficient || 1.0).toString()), 1.5),
                     isDeleted: false // Restore
                 };
                 const diff = calculateDiff(existing, newData);
@@ -178,6 +188,11 @@ export async function POST(request: Request) {
                     // If it was deleted, maybe log a RESTORE event? Or UPDATE covers it (isDeleted changed from true to false).
                 }
                 return NextResponse.json(shift);
+            }
+
+            // If it's a new shift and user is ADMIN, block it
+            if (role === 'ADMIN') {
+                return NextResponse.json({ error: 'Admins cannot create new shifts. Only Manager/Senior can.' }, { status: 403 });
             }
 
             const shift = await prisma.shift.create({
