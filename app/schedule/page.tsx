@@ -1516,98 +1516,103 @@ export default function SchedulePage() {
                                     </Tooltip>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Часы</label>
-                                    <Tooltip content={(!isManager && !isSenior) ? "Только менеджер и старший смены могут изменять эти поля" : ""}>
-                                        <div className="relative group">
-                                            <input
-                                                type="number"
-                                                value={formData.hours}
-                                                disabled={!isManager && !isSenior}
-                                                onChange={e => setFormData(prev => ({ ...prev, hours: e.target.value }))}
-                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${(!isManager && !isSenior) ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
-                                            />
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
-                                                <Timer className="w-4 h-4" />
-                                            </div>
+                                {formData.type !== 'SICK' && formData.type !== 'VACATION' && (
+                                    <>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Часы</label>
+                                            <Tooltip content={(!isManager && !isSenior) ? "Только менеджер и старший смены могут изменять эти поля" : ""}>
+                                                <div className="relative group">
+                                                    <input
+                                                        type="number"
+                                                        value={formData.hours}
+                                                        disabled={!isManager && !isSenior}
+                                                        onChange={e => setFormData(prev => ({ ...prev, hours: e.target.value }))}
+                                                        className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${(!isManager && !isSenior) ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
+                                                    />
+                                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
+                                                        <Timer className="w-4 h-4" />
+                                                    </div>
+                                                </div>
+                                            </Tooltip>
                                         </div>
-                                    </Tooltip>
-                                </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Коэффициент</label>
-                                        <div className="relative group">
-                                            <input
-                                                type="number"
-                                                step="0.1"
-                                                min="0"
-                                                max="1.5"
-                                                value={formData.coefficient}
-                                                onChange={e => setFormData(prev => ({ ...prev, coefficient: e.target.value }))}
-                                                className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"
-                                            />
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
-                                                <Percent className="w-4 h-4" />
-                                            </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Коэффициент</label>
+                                                <div className="relative group">
+                                                    <input
+                                                        type="number"
+                                                        step="0.1"
+                                                        min="0"
+                                                        max="1.5"
+                                                        value={formData.coefficient}
+                                                        onChange={e => setFormData(prev => ({ ...prev, coefficient: e.target.value }))}
+                                                        className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"
+                                                    />
+                                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
+                                                        <Percent className="w-4 h-4" />
+                                                    </div>
+                                                </div>
                                         </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-3">
-                                <>
-                                    <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, cabinetClosed: !prev.cabinetClosed }))}>
-                                        <input
-                                            type="checkbox"
-                                            checked={formData.cabinetClosed}
-                                            readOnly
-                                            className="w-5 h-5 text-blue-600 rounded-lg focus:ring-blue-500 border-zinc-300 transition-all pointer-events-none"
-                                        />
-                                        <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
-                                            <span>Открытие/Закрытие</span>
-                                            <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">+250р.</span>
-                                        </label>
-                                    </div>
-                                    <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, centerClosed: !prev.centerClosed }))}>
-                                        <input
-                                            type="checkbox"
-                                            checked={formData.centerClosed}
-                                            readOnly
-                                            className="w-5 h-5 text-emerald-600 rounded-lg focus:ring-emerald-500 border-zinc-300 transition-all pointer-events-none"
-                                        />
-                                        <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
-                                            <span>Открытие + Закрытие</span>
-                                            <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">+500р.</span>
-                                        </label>
-                                    </div>
-                                </>
-                                {selectedDate && selectedDate < new Date('2026-04-01') && (
-                                    <div className={`flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 transition-all ${(!isManager && !isSenior) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-blue-100'}`} 
-                                            onClick={() => (isManager || isSenior) && setFormData(prev => ({ ...prev, isActingLead: !prev.isActingLead }))}>
-                                        <input
-                                            type="checkbox"
-                                            checked={formData.isActingLead}
-                                            readOnly
-                                            className="w-5 h-5 text-indigo-600 rounded-lg focus:ring-indigo-500 border-zinc-300 transition-all pointer-events-none"
-                                        />
-                                        <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
-                                            <span>ИО Старшей смены (архив.)</span>
-                                            <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-xs font-bold">+250р.</span>
-                                        </label>
-                                    </div>
+                                    </>
                                 )}
-                                <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, isTrainee: !prev.isTrainee }))}>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.isTrainee}
-                                        readOnly
-                                        className="w-5 h-5 text-purple-600 rounded-lg focus:ring-purple-500 border-zinc-300 transition-all pointer-events-none"
-                                    />
-                                    <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
-                                        <span>Обучение стажёра</span>
-                                        <span className="text-purple-600 bg-purple-50 px-2 py-0.5 rounded text-xs font-bold">+500р.</span>
-                                    </label>
+                            {formData.type !== 'SICK' && formData.type !== 'VACATION' && (
+                                <div className="grid grid-cols-1 gap-3">
+                                    <>
+                                        <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, cabinetClosed: !prev.cabinetClosed }))}>
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.cabinetClosed}
+                                                readOnly
+                                                className="w-5 h-5 text-blue-600 rounded-lg focus:ring-blue-500 border-zinc-300 transition-all pointer-events-none"
+                                            />
+                                            <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
+                                                <span>Открытие/Закрытие</span>
+                                                <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">+250р.</span>
+                                            </label>
+                                        </div>
+                                        <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, centerClosed: !prev.centerClosed }))}>
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.centerClosed}
+                                                readOnly
+                                                className="w-5 h-5 text-emerald-600 rounded-lg focus:ring-emerald-500 border-zinc-300 transition-all pointer-events-none"
+                                            />
+                                            <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
+                                                <span>Открытие + Закрытие</span>
+                                                <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">+500р.</span>
+                                            </label>
+                                        </div>
+                                    </>
+                                    {selectedDate && selectedDate < new Date('2026-04-01') && (
+                                        <div className={`flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 transition-all ${(!isManager && !isSenior) ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-blue-100'}`} 
+                                                onClick={() => (isManager || isSenior) && setFormData(prev => ({ ...prev, isActingLead: !prev.isActingLead }))}>
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.isActingLead}
+                                                readOnly
+                                                className="w-5 h-5 text-indigo-600 rounded-lg focus:ring-indigo-500 border-zinc-300 transition-all pointer-events-none"
+                                            />
+                                            <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
+                                                <span>ИО Старшей смены (архив.)</span>
+                                                <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-xs font-bold">+250р.</span>
+                                            </label>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => setFormData(prev => ({ ...prev, isTrainee: !prev.isTrainee }))}>
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.isTrainee}
+                                            readOnly
+                                            className="w-5 h-5 text-purple-600 rounded-lg focus:ring-purple-500 border-zinc-300 transition-all pointer-events-none"
+                                        />
+                                        <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
+                                            <span>Обучение стажёра</span>
+                                            <span className="text-purple-600 bg-purple-50 px-2 py-0.5 rounded text-xs font-bold">+500р.</span>
+                                        </label>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+                        </div>
 
                             <div className="flex gap-3 pt-2">
                                 { (isManager || isSenior) && (
@@ -1682,41 +1687,45 @@ export default function SchedulePage() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Часы</label>
-                                    <Tooltip content={(!isManager && !isSenior) ? "Только менеджер и старший смены могут изменять эти поля" : ""}>
-                                        <div className="relative group">
-                                            <input
-                                                type="number"
-                                                value={formData.hours}
-                                                disabled={!isManager && !isSenior}
-                                                onChange={e => setFormData(prev => ({ ...prev, hours: e.target.value }))}
-                                                className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${(!isManager && !isSenior) ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
-                                            />
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
-                                                <Timer className="w-4 h-4" />
-                                            </div>
+                                {formData.type !== 'SICK' && formData.type !== 'VACATION' && (
+                                    <>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Часы</label>
+                                            <Tooltip content={(!isManager && !isSenior) ? "Только менеджер и старший смены могут изменять эти поля" : ""}>
+                                                <div className="relative group">
+                                                    <input
+                                                        type="number"
+                                                        value={formData.hours}
+                                                        disabled={!isManager && !isSenior}
+                                                        onChange={e => setFormData(prev => ({ ...prev, hours: e.target.value }))}
+                                                        className={`w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all ${(!isManager && !isSenior) ? 'opacity-60 cursor-not-allowed bg-zinc-100' : ''}`}
+                                                    />
+                                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
+                                                        <Timer className="w-4 h-4" />
+                                                    </div>
+                                                </div>
+                                            </Tooltip>
                                         </div>
-                                    </Tooltip>
-                                </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Коэффициент</label>
-                                        <div className="relative group">
-                                            <input
-                                                type="number"
-                                                step="0.1"
-                                                min="0"
-                                                max="1.5"
-                                                value={formData.coefficient}
-                                                onChange={e => setFormData(prev => ({ ...prev, coefficient: e.target.value }))}
-                                                className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"
-                                            />
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
-                                                <Percent className="w-4 h-4" />
-                                            </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Коэффициент</label>
+                                                <div className="relative group">
+                                                    <input
+                                                        type="number"
+                                                        step="0.1"
+                                                        min="0"
+                                                        max="1.5"
+                                                        value={formData.coefficient}
+                                                        onChange={e => setFormData(prev => ({ ...prev, coefficient: e.target.value }))}
+                                                        className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"
+                                                    />
+                                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-blue-500 transition-colors">
+                                                        <Percent className="w-4 h-4" />
+                                                    </div>
+                                                </div>
                                         </div>
-                                </div>
+                                    </>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-1 gap-3">
