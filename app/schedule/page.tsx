@@ -1261,10 +1261,11 @@ export default function SchedulePage() {
     }, [contextMenu, selection, getSelectedRange, shiftsByEmployee, fetchShifts]);
 
     const handleHandleHover = useCallback((empId: string | null, dateKey: string | null) => {
+        if (!isManager && !isSenior) return; // Non-managers/seniors don't see the drag handle
         if (!isDragging && !isFilling) {
             setHandleCell(empId && dateKey ? { empId, dateKey } : null);
         }
-    }, [isDragging, isFilling]);
+    }, [isDragging, isFilling, isManager, isSenior]);
 
     const handleHandleMouseDown = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
