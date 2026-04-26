@@ -20,6 +20,15 @@ function getSecret() {
     return new TextEncoder().encode(value || 'development-only-secret-change-me');
 }
 
+function useSecureCookies() {
+    const value = process.env.COOKIE_SECURE;
+    if (value !== undefined) {
+        return value === 'true' || value === '1';
+    }
+
+    return process.env.NODE_ENV === 'production';
+}
+
 export async function login(employee: { id: string, name: string, role: string }) {
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
     const session = await encrypt({ employee, expiresAt });
@@ -27,7 +36,7 @@ export async function login(employee: { id: string, name: string, role: string }
     const cookieStore = await cookies();
     cookieStore.set('session', session, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: useSecureCookies(),
         expires: expiresAt,
         sameSite: 'lax',
         path: '/',
@@ -78,7 +87,7 @@ export async function updateSession(request: NextRequest) {
         name: 'session',
         value: await encrypt(parsed),
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: useSecureCookies(),
         expires: parsed.expiresAt,
         sameSite: 'lax',
         path: '/',

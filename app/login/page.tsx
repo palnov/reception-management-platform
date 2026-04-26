@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock, User, AlertCircle } from 'lucide-react';
-import { APP_NAME } from '@/lib/constants';
+const DEFAULT_APP_NAME = 'Staff Manager';
 
 interface Employee {
     id: string;
@@ -16,7 +16,12 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [appName, setAppName] = useState(DEFAULT_APP_NAME);
     const router = useRouter();
+
+    useEffect(() => {
+        setAppName(process.env.NEXT_PUBLIC_APP_NAME || DEFAULT_APP_NAME);
+    }, []);
 
     useEffect(() => {
         // Проверка инициализации системы
@@ -73,7 +78,7 @@ export default function LoginPage() {
                             <Lock className="w-8 h-8" />
                         </div>
                         <h1 className="text-2xl font-bold text-zinc-900">Вход в систему</h1>
-                        <p className="text-zinc-500 mt-2">{APP_NAME}</p>
+                        <p className="text-zinc-500 mt-2" suppressHydrationWarning>{appName}</p>
                     </div>
 
                     <form onSubmit={handleLogin} className="space-y-6">
