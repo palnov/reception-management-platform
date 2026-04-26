@@ -28,18 +28,28 @@ function main() {
 
     // 2. Perform db push
     console.log('Synchronizing with Neon (npx prisma db push)...');
-    
+
     // Pass any arguments from the command line (like --accept-data-loss)
     const args = process.argv.slice(2).join(' ');
     execSync(`npx prisma db push ${args}`, { stdio: 'inherit' });
+
+    // 3. Generate a temporary Prisma client for the Neon datasource and
+    // migrate old plaintext passwords there. The login route can upgrade
+    // legacy passwords lazily, but doing it here keeps production data tidy.
+    console.log('Generating temporary Prisma client for Neon...');
+    execSync('npx prisma generate', { stdio: 'inherit' });
+
+    console.log('Migrating legacy plaintext passwords in Neon...');
+    execSync('node scripts/migrate-legacy-passwords.js', { stdio: 'inherit' });
 
     console.log('✅ Synchronization with Neon successful!');
   } catch (err) {
     console.error('❌ Synchronization failed:', err.message);
   } finally {
-    // 3. Restore original schema
+    // 4. Restore original schema and local Prisma client
     console.log('Restoring local schema (sqlite)...');
     fs.writeFileSync(SCHEMA_PATH, originalSchema);
+    execSync('npx prisma generate', { stdio: 'inherit' });
     console.log('--- NEON SYNC END ---');
   }
 }
