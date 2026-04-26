@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { X, ArrowRight, User, Calendar, Trash2, Plus, Edit2, ChevronDown, ChevronUp, History } from 'lucide-react';
+import { X, ArrowRight, Trash2, Plus, Edit2, ChevronDown, ChevronUp, History } from 'lucide-react';
 import { formatFieldName, formatValue } from '@/lib/auditUtils';
 
 interface AuditLog {
@@ -26,34 +26,60 @@ const IGNORED_FIELDS = ['id', 'employeeId', 'date', 'createdAt', 'createdBy', 'i
 
 export function AuditHistoryModal({ logs, onClose }: AuditHistoryModalProps) {
     const [expandedLogs, setExpandedLogs] = useState<Record<string, boolean>>({});
-    const [localLogs, setLocalLogs] = useState<AuditLog[]>(logs);
-    const [isLoading, setIsLoading] = useState(false);
+    const [fetchedLogs, setFetchedLogs] = useState<{ key: string; logs: AuditLog[] } | null>(null);
+    const fetchTarget = useMemo(() => {
+        const needsFetch = logs.some(l => l.details === null || l.details === undefined);
+        const firstLog = logs[0];
+        if (!needsFetch || !firstLog?.entityId) return null;
+
+        const entityType = firstLog.entityType || 'SHIFT';
+        return {
+            key: `${entityType}:${firstLog.entityId}`,
+            entityId: firstLog.entityId,
+            entityType,
+        };
+    }, [logs]);
+
+    const localLogs = fetchTarget && fetchedLogs?.key === fetchTarget.key ? fetchedLogs.logs : logs;
+    const isLoading = !!fetchTarget && fetchedLogs?.key !== fetchTarget.key;
 
     useEffect(() => {
-        // If the first log is missing details, we likely need to fetch all details for this entity
-        const needsFetch = logs.some(l => l.details === null || l.details === undefined);
-        if (needsFetch && logs.length > 0) {
-            setIsLoading(true);
-            // We assume all logs in this modal belong to the same entity
-            // The first log in the list should have entityId/entityType from the optimized API
-            const entityId = logs[0].entityId;
-            const entityType = logs[0].entityType || 'SHIFT';
+        if (!fetchTarget || fetchedLogs?.key === fetchTarget.key) return;
 
-            if (entityId) {
-                fetch(`/api/audit-logs?entityId=${entityId}&entityType=${entityType}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        if (Array.isArray(data)) {
-                            setLocalLogs(data);
-                        }
-                    })
-                    .catch(err => console.error('Failed to fetch audit details:', err))
-                    .finally(() => setIsLoading(false));
+        const controller = new AbortController();
+        const params = new URLSearchParams({
+            entityId: fetchTarget.entityId,
+            entityType: fetchTarget.entityType,
+        });
+
+        fetch(`/api/audit-logs?${params.toString()}`, { signal: controller.signal })
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setFetchedLogs({ key: fetchTarget.key, logs: data });
+                }
+            })
+            .catch(error => {
+                if ((error as Error).name !== 'AbortError') {
+                    console.error('Failed to fetch audit details:', error);
+                }
+            });
+
+        return () => controller.abort();
+    }, [fetchTarget, fetchedLogs?.key]);
+
+    const parseDetails = (details: string | null) => {
+        if (!details) return null;
+        try {
+            const parsed = JSON.parse(details);
+            if (parsed && typeof parsed === 'object') {
+                return parsed as Record<string, unknown>;
             }
-        } else {
-            setLocalLogs(logs);
+        } catch {
+            return null;
         }
-    }, [logs]);
+        return null;
+    };
 
     if (!logs || logs.length === 0) return null;
 
@@ -62,10 +88,7 @@ export function AuditHistoryModal({ logs, onClose }: AuditHistoryModalProps) {
     };
 
     const getActionInfo = (log: AuditLog) => {
-        let details: any = null;
-        try {
-            if (log.details) details = JSON.parse(log.details);
-        } catch (e) { }
+        const details = parseDetails(log.details);
 
         if (log.action === 'CREATE') {
             return {
@@ -87,7 +110,8 @@ export function AuditHistoryModal({ logs, onClose }: AuditHistoryModalProps) {
         }
 
         // Special check for isDeleted: true -> false (re-entry)
-        const isReentry = details && details.isDeleted && details.isDeleted.old === true && details.isDeleted.new === false;
+        const isDeletedDiff = details?.isDeleted as { old?: unknown; new?: unknown } | undefined;
+        const isReentry = isDeletedDiff?.old === true && isDeletedDiff.new === false;
         if (isReentry) {
             return {
                 label: 'Добавила',
@@ -150,10 +174,7 @@ export function AuditHistoryModal({ logs, onClose }: AuditHistoryModalProps) {
                         </div>
                     )}
                     {localLogs.map((log) => {
-                        let details: any = null;
-                        try {
-                            if (log.details) details = JSON.parse(log.details);
-                        } catch (e) { }
+                        const details = parseDetails(log.details);
 
                         const info = getActionInfo(log);
                         const isExpanded = expandedLogs[log.id];
@@ -199,11 +220,11 @@ export function AuditHistoryModal({ logs, onClose }: AuditHistoryModalProps) {
                                 {isExpanded && hasDetails && (
                                     <div className="px-4 pb-4 pt-0 animate-in slide-in-from-top-2 duration-200">
                                         <div className="bg-zinc-50/50 rounded-xl border border-zinc-100 p-3 space-y-2">
-                                            {filteredEntries.map(([key, value]: [string, any]) => (
+                                            {filteredEntries.map(([key, value]) => (
                                                 <div key={key} className="flex flex-col gap-1 border-b border-zinc-100 last:border-0 pb-2 last:pb-0">
                                                     <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tight">{formatFieldName(key)}</span>
                                                     <div className="flex items-center gap-2 text-sm">
-                                                        {log.action === 'UPDATE' ? (
+                                                        {log.action === 'UPDATE' && value && typeof value === 'object' && 'old' in value && 'new' in value ? (
                                                             <>
                                                                 <span className="text-red-400 line-through text-xs">{formatValue(value.old, key)}</span>
                                                                 <ArrowRight className="w-3 h-3 text-zinc-300" />

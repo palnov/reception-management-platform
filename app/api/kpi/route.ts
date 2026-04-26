@@ -3,8 +3,13 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { logAudit, calculateDiff } from '@/lib/audit';
 import { isMonthClosed } from '@/lib/monthStatus';
+import { requireSession } from '@/lib/api-auth';
+import type { AuditLog } from '@prisma/client';
 
 export async function GET(request: Request) {
+    const auth = await requireSession();
+    if (auth.response) return auth.response;
+
     const { searchParams } = new URL(request.url);
     const start = searchParams.get('start');
     const end = searchParams.get('end');
@@ -46,7 +51,7 @@ export async function GET(request: Request) {
             }
         });
 
-        const logsByRecordId = new Map<string, any[]>();
+        const logsByRecordId = new Map<string, AuditLog[]>();
         logs.forEach(log => {
             if (!logsByRecordId.has(log.entityId)) logsByRecordId.set(log.entityId, []);
             logsByRecordId.get(log.entityId)!.push(log);
@@ -59,6 +64,7 @@ export async function GET(request: Request) {
 
         return NextResponse.json(recordsWithLogs);
     } catch (error) {
+        console.error('KPI_GET_ERROR:', error);
         return NextResponse.json({ error: 'Failed to fetch KPI records' }, { status: 500 });
     }
 }
@@ -96,7 +102,7 @@ export async function POST(request: Request) {
                 data: {
                     ...newData,
                     createdBy: session.employee.name
-                } as any
+                }
             });
 
             if (diff) {
@@ -113,7 +119,7 @@ export async function POST(request: Request) {
                     salesBonus: parseFloat(json.salesBonus || 0),
                     checkList: parseFloat(json.checkList || 0),
                     createdBy: session.employee.name
-                } as any,
+                },
             });
             await logAudit('KPI', created.id, 'CREATE', {
                 qualityScore: json.qualityScore, errorsCount: json.errorsCount, salesBonus: json.salesBonus

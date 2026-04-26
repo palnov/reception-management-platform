@@ -7,6 +7,10 @@
     "build": "node scripts/switch-prisma-provider.js && prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke-check.js",
+    "migrate:passwords": "node scripts/migrate-legacy-passwords.js",
+    "check": "npm run lint && npm run typecheck && npm run smoke",
     "sync-neon": "node scripts/sync-to-neon.js"
   },
   "dependencies": {

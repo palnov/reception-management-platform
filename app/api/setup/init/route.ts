@@ -1,37 +1,29 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { hashPassword } from '@/lib/password';
 
 export async function POST(request: Request) {
     try {
         const { name, id, password, pushSchema } = await request.json();
 
-        // 1. Опционально создаем схему (таблицы)
         if (pushSchema) {
-            const { execSync } = require('child_process');
-            const path = require('path');
-            const projectRoot = path.join(process.cwd());
-            
-            console.log('Running prisma db push from Setup Wizard...');
-            execSync('npx --yes prisma db push', { 
-                stdio: 'inherit', 
-                cwd: projectRoot,
-                env: { ...process.env, PRISMA_SKIP_POSTINSTALL_GENERATE: 'true' }
-            });
+            return NextResponse.json({ error: 'Schema changes must be applied from the server CLI' }, { status: 400 });
         }
 
-        // 2. Проверяем, не инициализирована ли уже система
         const count = await prisma.employee.count();
+        if (count > 0) {
+            return NextResponse.json({ error: 'System is already initialized' }, { status: 409 });
+        }
 
         if (!name || !id || !password) {
-            return NextResponse.json({ error: 'Все поля обязательны' }, { status: 400 });
+            return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
         }
 
-        // 2. Создаем первого администратора (MANAGER)
         await prisma.employee.create({
             data: {
                 id,
                 name,
-                password,
+                password: await hashPassword(password),
                 role: 'MANAGER',
                 baseSalary: 0,
                 hourlyRate: 0,
@@ -41,7 +33,6 @@ export async function POST(request: Request) {
             }
         });
 
-        // 3. (Опционально) Создаем базовую норму на текущий месяц
         const currentMonth = new Date().toISOString().slice(0, 7);
         await prisma.monthlyNorm.upsert({
             where: { month: currentMonth },
@@ -53,8 +44,9 @@ export async function POST(request: Request) {
         });
 
         return NextResponse.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('SETUP_INIT_ERROR:', error);
-        return NextResponse.json({ error: 'Ошибка инициализации: ' + error.message }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: 'Setup initialization failed: ' + message }, { status: 500 });
     }
 }

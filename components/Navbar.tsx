@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Users, Calendar, BarChart3, ShoppingCart, FileCheck, BadgeCheck, LogOut, User as UserIcon, Database, Menu, X } from 'lucide-react';
@@ -12,35 +12,16 @@ interface User {
     role: string;
 }
 
-export function Navbar() {
-    const [user, setUser] = useState<User | null>(null);
+export function Navbar({ initialUser }: { initialUser: User | null }) {
+    const [signedOut, setSignedOut] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const router = useRouter();
     const pathname = usePathname();
-
-    useEffect(() => {
-        fetchUser();
-        setIsMenuOpen(false); // Close menu on route change
-    }, [pathname]);
-
-    async function fetchUser() {
-        try {
-            const res = await fetch('/api/auth/me');
-            if (res.ok) {
-                const data = await res.json();
-                setUser(data);
-            } else {
-                setUser(null);
-                if (pathname !== '/login') router.push('/login');
-            }
-        } catch (error) {
-            setUser(null);
-        }
-    }
+    const user = signedOut ? null : initialUser;
 
     async function handleLogout() {
         await fetch('/api/auth/logout', { method: 'POST' });
-        setUser(null);
+        setSignedOut(true);
         router.push('/login');
         router.refresh();
     }
@@ -108,8 +89,11 @@ export function Navbar() {
 
                 {/* Mobile Menu Toggle */}
                 <button
+                    type="button"
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
                     className="lg:hidden p-2 text-zinc-600 hover:bg-zinc-100 rounded-xl transition-colors"
+                    aria-label={isMenuOpen ? 'Закрыть меню' : 'Открыть меню'}
+                    aria-expanded={isMenuOpen}
                 >
                     {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                 </button>

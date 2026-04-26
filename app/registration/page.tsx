@@ -1,20 +1,32 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSharedMonth } from '@/lib/useSharedMonth';
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, Trash2, FileCheck, Star, BadgeCheck, ArrowUp, ArrowDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ClipboardList, Loader2, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
 import { useMonthStatus } from '@/lib/useMonthStatus';
 import { MonthStatusBadge } from '@/components/MonthStatusBadge';
 import { MonthClosureControls } from '@/components/MonthClosureControls';
+import { ConfirmPanel } from '@/components/ConfirmPanel';
+import { EmptyState } from '@/components/EmptyState';
+import { InlineStatus } from '@/components/InlineStatus';
 
 interface Employee {
     id: string;
     name: string;
     role: string;
+}
+
+interface AuditLog {
+    id: string;
+    action: string;
+    changedBy: string;
+    changedByRole: string;
+    timestamp: string;
+    details: string | null;
 }
 
 interface RegistrationKpi {
@@ -26,7 +38,7 @@ interface RegistrationKpi {
     maxScore: number;
     createdBy?: string;
     employee: { name: string };
-    auditLogs?: any[];
+    auditLogs?: AuditLog[];
 }
 
 export default function RegistrationPage() {
@@ -39,6 +51,12 @@ export default function RegistrationPage() {
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const [duplicateError, setDuplicateError] = useState(false);
     const [isShaking, setIsShaking] = useState(false);
+    const [pageError, setPageError] = useState<string | null>(null);
+    const [formError, setFormError] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [pendingDelete, setPendingDelete] = useState<RegistrationKpi | null>(null);
 
     const initialForm = {
         id: '',
@@ -49,69 +67,113 @@ export default function RegistrationPage() {
     };
     const [formData, setFormData] = useState(initialForm);
 
-    const fetchEmployees = async (ignore = { val: false }) => {
-        const monthStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-        const res = await fetch(`/api/employees?activeInDate=${monthStr}`);
-        const data = await res.json();
-        if (!ignore.val) {
-            setEmployees(Array.isArray(data) ? data : []);
+    const fetchEmployees = useCallback(async (ignore = { val: false }) => {
+        try {
+            const monthStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+            const res = await fetch(`/api/employees?activeInDate=${monthStr}`);
+            if (!res.ok) throw new Error('Employees fetch failed');
+            const data = await res.json();
+            if (!ignore.val) {
+                setEmployees(Array.isArray(data) ? data : []);
+            }
+        } catch (error) {
+            console.error('Failed to fetch employees', error);
+            if (!ignore.val) setPageError('Не удалось загрузить сотрудников для оформления.');
         }
-    };
+    }, [currentMonth]);
 
-    const fetchRecords = async (ignore = { val: false }) => {
-        const startStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
-        const endStr = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
-        const res = await fetch(`/api/registration?start=${startStr}&end=${endStr}`);
-        const data = await res.json();
-        if (!ignore.val) {
-            setRecords(Array.isArray(data) ? data : []);
+    const fetchRecords = useCallback(async (ignore = { val: false }) => {
+        try {
+            if (!ignore.val) setIsLoading(true);
+            setPageError(null);
+            const startStr = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+            const endStr = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
+            const res = await fetch(`/api/registration?start=${startStr}&end=${endStr}`);
+            if (!res.ok) throw new Error('Registration fetch failed');
+            const data = await res.json();
+            if (!ignore.val) {
+                setRecords(Array.isArray(data) ? data : []);
+            }
+        } catch (error) {
+            console.error('Failed to fetch registration records', error);
+            if (!ignore.val) setPageError('Не удалось загрузить записи оформления за выбранный месяц.');
+        } finally {
+            if (!ignore.val) setIsLoading(false);
         }
-    };
+    }, [currentMonth]);
 
     useEffect(() => {
         const ignore = { val: false };
-        fetchEmployees(ignore);
-        fetchRecords(ignore);
+        queueMicrotask(() => {
+            void fetchEmployees(ignore);
+            void fetchRecords(ignore);
+        });
         return () => { ignore.val = true; };
-    }, [currentMonth]);
+    }, [fetchEmployees, fetchRecords]);
 
     async function handleSave(e: React.FormEvent) {
         e.preventDefault();
         if (isClosed) return;
+        setFormError(null);
+        setIsSaving(true);
         const method = formData.id ? 'PUT' : 'POST';
         const maxPoints = Number(formData.count) * 3;
         if (Number(formData.totalScore) > maxPoints) {
-            alert(`Ошибка: Фактические баллы (${formData.totalScore}) не могут превышать максимальные (${maxPoints})`);
+            setFormError(`Фактические баллы (${formData.totalScore}) не могут превышать максимальные (${maxPoints}).`);
+            setIsSaving(false);
             return;
         }
 
-        const res = await fetch('/api/registration', {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(formData),
-        });
+        try {
+            const res = await fetch('/api/registration', {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData),
+            });
 
-        if (!res.ok) {
-            const data = await res.json();
-            if (res.status === 409) {
-                setDuplicateError(true);
-                setIsShaking(true);
-                setTimeout(() => setIsShaking(false), 500);
+            if (!res.ok) {
+                const data = await res.json().catch(() => null);
+                if (res.status === 409) {
+                    setDuplicateError(true);
+                    setIsShaking(true);
+                    setTimeout(() => setIsShaking(false), 500);
+                    setFormError('На эту дату уже есть запись для выбранного сотрудника.');
+                    return;
+                }
+                setFormError(data?.error || 'Не удалось сохранить запись оформления.');
                 return;
             }
-            alert(`Ошибка при сохранении: ${data.error || 'Неизвестная ошибка'}`);
-            return;
-        }
 
-        fetchRecords();
-        setShowModal(false);
+            fetchRecords();
+            setShowModal(false);
+        } catch (error) {
+            console.error('Failed to save registration record', error);
+            setFormError('Не удалось связаться с сервером. Запись не сохранена.');
+        } finally {
+            setIsSaving(false);
+        }
     }
 
-    async function handleDelete(id: string) {
+    async function handleDelete() {
         if (isClosed) return;
-        if (!confirm('Удалить запись об оформлении?')) return;
-        await fetch(`/api/registration?id=${id}`, { method: 'DELETE' });
-        fetchRecords();
+        if (!pendingDelete) return;
+        setIsDeleting(true);
+        setPageError(null);
+        try {
+            const res = await fetch(`/api/registration?id=${pendingDelete.id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const data = await res.json().catch(() => null);
+                setPageError(data?.error || 'Не удалось удалить запись оформления.');
+                return;
+            }
+            setPendingDelete(null);
+            fetchRecords();
+        } catch (error) {
+            console.error('Failed to delete registration record', error);
+            setPageError('Не удалось связаться с сервером. Запись не удалена.');
+        } finally {
+            setIsDeleting(false);
+        }
     }
 
     const filteredRecords = useMemo(() => {
@@ -128,50 +190,81 @@ export default function RegistrationPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col gap-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="w-full">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                            <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 tracking-tight">Качество оформления</h1>
-                            <button
-                                onClick={() => {
-                                    if (isClosed) return;
-                                    setFormData({
-                                        ...initialForm,
-                                        employeeId: activeEmployeeId !== 'all' ? activeEmployeeId : (employees.find(e => e.role !== 'MANAGER')?.id || '')
-                                    });
-                                    setDuplicateError(false);
-                                    setShowModal(true);
-                                }}
-                                disabled={isClosed}
-                                className={`w-full sm:w-auto justify-center bg-zinc-900 text-white px-4 py-2.5 rounded-xl hover:bg-zinc-800 transition-all shadow-lg flex items-center gap-2 font-bold text-sm ${isClosed ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                                <Plus className="w-4 h-4" /> Добавить запись
-                            </button>
+            <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-950">Качество оформления</h1>
+                        <p className="mt-2 text-sm text-zinc-500">Ежедневный аудит качества заполнения карт.</p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-start gap-3 lg:justify-end">
+                        <MonthStatusBadge isClosed={isClosed} />
+                        {employees.find(e => e.role === 'MANAGER') && (
+                            <MonthClosureControls
+                                currentMonth={currentMonth}
+                                isClosed={isClosed}
+                                onStatusChange={refreshMonthStatus}
+                            />
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (isClosed) return;
+                                setFormData({
+                                    ...initialForm,
+                                    employeeId: activeEmployeeId !== 'all' ? activeEmployeeId : (employees.find(e => e.role !== 'MANAGER')?.id || '')
+                                });
+                                setDuplicateError(false);
+                                setFormError(null);
+                                setShowModal(true);
+                            }}
+                            disabled={isClosed}
+                            className={`w-full sm:w-auto justify-center bg-slate-950 text-white px-4 py-3 rounded-2xl hover:bg-slate-800 transition-colors shadow-lg shadow-slate-950/10 flex items-center gap-2 font-bold text-sm ${isClosed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                            <Plus className="w-4 h-4" /> Добавить запись
+                        </button>
+                        <div className="flex items-center gap-2 bg-white/95 p-1 rounded-full border border-zinc-200 shadow-sm shadow-zinc-950/5 w-full sm:w-auto justify-between sm:justify-start">
+                            <button type="button" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors" aria-label="Предыдущий месяц"><ChevronLeft className="w-5 h-5 text-zinc-600" /></button>
+                            <span className="text-sm sm:text-base font-semibold min-w-[120px] sm:w-40 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
+                            <button type="button" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors" aria-label="Следующий месяц"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
                         </div>
-                        <p className="text-zinc-500 mt-2 text-sm">Ежедневный аудит качества заполнения карт.</p>
                     </div>
                 </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                    <MonthStatusBadge isClosed={isClosed} />
-                    {employees.find(e => e.role === 'MANAGER') && (
-                        <MonthClosureControls 
-                            currentMonth={currentMonth} 
-                            isClosed={isClosed} 
-                            onStatusChange={refreshMonthStatus}
-                        />
-                    )}
-                    <div className="flex items-center gap-2 sm:gap-4 bg-white p-1 rounded-full border border-zinc-200/60 shadow-sm w-full sm:w-auto justify-between sm:justify-start mt-2 sm:mt-0">
-                        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronLeft className="w-5 h-5 text-zinc-600" /></button>
-                        <span className="text-sm font-bold w-28 sm:w-32 text-center text-zinc-800 capitalize">{format(currentMonth, 'LLLL yyyy', { locale: ru })}</span>
-                        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-100 rounded-full transition-colors"><ChevronRight className="w-5 h-5 text-zinc-600" /></button>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-zinc-200 bg-white/95 p-4 shadow-sm shadow-zinc-950/5">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Записей в выборке</div>
+                        <div className="mt-1 text-2xl font-black text-zinc-950">{filteredRecords.length}</div>
+                    </div>
+                    <div className="rounded-2xl border border-blue-200 bg-blue-50/80 p-4 shadow-sm shadow-blue-950/5">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Среднее качество</div>
+                        <div className="mt-1 text-2xl font-black text-blue-700">
+                            {(() => {
+                                const totalScore = filteredRecords.reduce((sum, r) => sum + (r.totalScore ?? 0), 0);
+                                const totalMax = filteredRecords.reduce((sum, r) => sum + (r.maxScore ?? 0), 0);
+                                return totalMax > 0 ? `${((totalScore / totalMax) * 100).toFixed(1)}%` : '—';
+                            })()}
+                        </div>
                     </div>
                 </div>
             </div>
 
+            {pageError && (
+                <InlineStatus type="error" message={pageError} className="px-4 py-3" />
+            )}
+
+            {pendingDelete && (
+                <ConfirmPanel
+                    title="Удалить запись оформления?"
+                    description={<>Запись от {format(new Date(pendingDelete.date), 'dd.MM.yyyy')} для {pendingDelete.employee.name} будет удалена.</>}
+                    confirmLabel={isDeleting ? 'Удаление...' : 'Удалить'}
+                    cancelLabel="Оставить"
+                    onConfirm={handleDelete}
+                    onCancel={() => setPendingDelete(null)}
+                    isBusy={isDeleting}
+                />
+            )}
+
             {/* Employee Tabs / Select */}
-            <div>
+            <div className="rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-sm">
                 {/* Mobile Select */}
                 <div className="sm:hidden mb-4">
                     <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2 ml-1">Выберите сотрудника</label>
@@ -188,12 +281,12 @@ export default function RegistrationPage() {
                 </div>
 
                 {/* Desktop Tabs */}
-                <div className="hidden sm:flex flex-wrap gap-2 border-b border-zinc-200 pb-px">
+                <div className="hidden sm:flex flex-wrap gap-2">
                     <button
                         onClick={() => setActiveEmployeeId('all')}
-                        className={`px-6 py-3 text-sm font-bold transition-all border-b-2 rounded-t-xl ${activeEmployeeId === 'all'
-                            ? 'border-blue-600 text-blue-600 bg-blue-50'
-                            : 'border-transparent text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'
+                        className={`px-4 py-2.5 text-sm font-semibold transition-colors rounded-xl ${activeEmployeeId === 'all'
+                            ? 'bg-slate-950 text-white shadow-sm'
+                            : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
                             }`}
                     >
                         Все сотрудники
@@ -202,9 +295,9 @@ export default function RegistrationPage() {
                         <button
                             key={emp.id}
                             onClick={() => setActiveEmployeeId(emp.id)}
-                            className={`px-6 py-3 text-sm font-bold transition-all border-b-2 rounded-t-xl ${activeEmployeeId === emp.id
-                                ? 'border-blue-600 text-blue-600 bg-blue-50'
-                                : 'border-transparent text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'
+                            className={`px-4 py-2.5 text-sm font-semibold transition-colors rounded-xl ${activeEmployeeId === emp.id
+                                ? 'bg-slate-950 text-white shadow-sm'
+                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
                                 }`}
                         >
                             {emp.name}
@@ -233,7 +326,17 @@ export default function RegistrationPage() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100 font-medium">
-                        {filteredRecords.map(r => (
+                        {isLoading ? (
+                            Array.from({ length: 5 }).map((_, index) => (
+                                <tr key={index}>
+                                    {Array.from({ length: 6 }).map((__, cellIndex) => (
+                                        <td key={cellIndex} className="px-6 py-4">
+                                            <div className="h-4 rounded bg-zinc-100 animate-pulse" />
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))
+                        ) : filteredRecords.map(r => (
                             <tr
                                 key={r.id}
                                 className={`hover:bg-zinc-50 transition-colors ${isClosed ? 'cursor-default' : 'cursor-pointer'} group`}
@@ -248,6 +351,7 @@ export default function RegistrationPage() {
                                         totalScore: (r.totalScore ?? 0).toString()
                                     });
                                     setDuplicateError(false);
+                                    setFormError(null);
                                     setShowModal(true);
                                 }}
                             >
@@ -270,9 +374,11 @@ export default function RegistrationPage() {
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            handleDelete(r.id);
+                                            setPendingDelete(r);
                                         }}
-                                        className="p-2 text-zinc-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                        disabled={isClosed || isDeleting}
+                                        className="p-2 text-zinc-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
+                                        aria-label="Удалить запись оформления"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>
@@ -280,7 +386,7 @@ export default function RegistrationPage() {
                             </tr>
                         ))}
                     </tbody>
-                    {filteredRecords.length > 0 && (
+                    {!isLoading && filteredRecords.length > 0 && (
                         <tfoot className="bg-zinc-100 border-t-2 border-zinc-200">
                             <tr className="font-bold text-zinc-900">
                                 <td colSpan={2} className="px-6 py-4 text-right uppercase tracking-wider text-[10px]">Итого по выборке:</td>
@@ -305,18 +411,22 @@ export default function RegistrationPage() {
                         </tfoot>
                     )}
                 </table>
+                {!isLoading && filteredRecords.length === 0 && (
+                    <EmptyState
+                        icon={ClipboardList}
+                        title="Записей оформления пока нет"
+                        description={activeEmployeeId !== 'all' ? 'У выбранного сотрудника нет записей оформления за этот месяц.' : 'Добавленные аудиты оформления появятся здесь с итоговыми баллами и процентом качества.'}
+                    />
+                )}
             </div>
-
-            {filteredRecords.length === 0 && (
-                <div className="p-20 text-center text-zinc-400 font-medium whitespace-pre-wrap">
-                    Нет записей об аудите за этот месяц{activeEmployeeId !== 'all' ? ` для выбранного сотрудника` : ''}
-                </div>
-            )}
 
             {showModal && (
                 <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-md flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300">
                     <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-lg">
                         <h2 className="text-2xl font-bold text-zinc-900 mb-6">{formData.id ? 'Редактировать запись' : 'Новый аудит'}</h2>
+                        {formError && (
+                            <InlineStatus type="error" message={formError} className="mb-4 px-4 py-3" />
+                        )}
                         <form onSubmit={handleSave} className="space-y-6">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -398,8 +508,11 @@ export default function RegistrationPage() {
                             </div>
 
                             <div className="flex gap-4">
-                                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-4 border-2 border-zinc-100 rounded-2xl font-bold hover:bg-zinc-50 transition-colors text-sm">Отмена</button>
-                                <button type="submit" className="flex-1 bg-zinc-900 text-white py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-colors shadow-xl text-sm">Сохранить</button>
+                                <button type="button" onClick={() => { setShowModal(false); setFormError(null); }} disabled={isSaving} className="flex-1 py-4 border-2 border-zinc-100 rounded-2xl font-bold hover:bg-zinc-50 transition-colors text-sm disabled:cursor-not-allowed disabled:opacity-60">Отмена</button>
+                                <button type="submit" disabled={isSaving} className="flex-1 bg-zinc-900 text-white py-4 rounded-2xl font-bold hover:bg-zinc-800 transition-colors shadow-xl text-sm disabled:cursor-not-allowed disabled:bg-zinc-500 flex items-center justify-center gap-2">
+                                    {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                                    Сохранить
+                                </button>
                             </div>
                         </form>
                     </div>

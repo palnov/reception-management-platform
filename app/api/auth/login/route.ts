@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { login } from '@/lib/auth';
+import { hashPassword, isHashedPassword, verifyPassword } from '@/lib/password';
 
 export async function POST(request: Request) {
     try {
@@ -14,14 +15,20 @@ export async function POST(request: Request) {
             where: { id: employeeId }
         });
 
-        if (!employee || employee.password !== password) {
+        if (!employee || !await verifyPassword(password, employee.password)) {
             return NextResponse.json({ error: 'Неверный ID или пароль' }, { status: 401 });
         }
 
         // Block login if dismissed
-        const empRecord = employee as any;
-        if (empRecord.dismissalDate && empRecord.dismissalDate <= new Date().toISOString().split('T')[0]) {
+        if (employee.dismissalDate && employee.dismissalDate <= new Date().toISOString().split('T')[0]) {
             return NextResponse.json({ error: 'Доступ заблокирован (сотрудник уволен)' }, { status: 403 });
+        }
+
+        if (!isHashedPassword(employee.password)) {
+            await prisma.employee.update({
+                where: { id: employee.id },
+                data: { password: await hashPassword(password) }
+            });
         }
 
         await login({
@@ -31,7 +38,7 @@ export async function POST(request: Request) {
         });
 
         return NextResponse.json({ success: true, role: employee.role });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('AUTH_LOGIN_ERROR:', error);
         return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });
     }

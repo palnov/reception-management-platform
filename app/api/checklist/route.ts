@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isMonthClosed } from '@/lib/monthStatus';
+import { requireSession } from '@/lib/api-auth';
+import type { Prisma } from '@prisma/client';
 
 export async function GET(req: NextRequest) {
+    const auth = await requireSession();
+    if (auth.response) return auth.response;
+
     const { searchParams } = new URL(req.url);
     const month = searchParams.get('month');
     const employeeId = searchParams.get('employeeId');
@@ -12,7 +17,7 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const where: any = { month };
+        const where: Prisma.MonthlyChecklistWhereInput = { month };
         if (employeeId) {
             where.employeeId = employeeId;
         }

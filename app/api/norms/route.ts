@@ -2,9 +2,13 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isMonthClosed } from '@/lib/monthStatus';
 import { getSession } from '@/lib/auth';
+import { requireSession } from '@/lib/api-auth';
 
 export async function GET(request: Request) {
     try {
+        const auth = await requireSession();
+        if (auth.response) return auth.response;
+
         const { searchParams } = new URL(request.url);
         const month = searchParams.get('month');
 
@@ -17,8 +21,8 @@ export async function GET(request: Request) {
 
         const norms = await prisma.monthlyNorm.findMany();
         return NextResponse.json(norms);
-    } catch (error: any) {
-        console.error('API_NORMS_GET_ERROR:', error.message);
+    } catch (error) {
+        console.error('API_NORMS_GET_ERROR:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

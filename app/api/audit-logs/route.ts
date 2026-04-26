@@ -1,12 +1,15 @@
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireSession } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
     try {
+        const auth = await requireSession();
+        if (auth.response) return auth.response;
+
         const { searchParams } = new URL(request.url);
         const entityId = searchParams.get('entityId');
         const entityType = searchParams.get('entityType');
@@ -24,7 +27,7 @@ export async function GET(request: Request) {
         });
 
         return NextResponse.json(logs);
-    } catch (error: any) {
+    } catch (error) {
         console.error('API_AUDIT_LOGS_GET_ERROR:', error);
         return NextResponse.json({ error: 'Internal Error' }, { status: 500 });
     }

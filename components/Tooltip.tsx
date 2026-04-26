@@ -1,8 +1,9 @@
 
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useIsClient } from '@/lib/useIsClient';
 
 interface TooltipProps {
     content: string;
@@ -13,11 +14,7 @@ interface TooltipProps {
 export function Tooltip({ content, children, className = '' }: TooltipProps) {
     const [isVisible, setIsVisible] = useState(false);
     const [position, setPosition] = useState({ x: 0, y: 0 });
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
+    const isClient = useIsClient();
 
     const handleMouseMove = (e: React.MouseEvent) => {
         if (!content) return;
@@ -44,7 +41,7 @@ export function Tooltip({ content, children, className = '' }: TooltipProps) {
             onMouseMove={handleMouseMove}
         >
             {children}
-            {mounted && isVisible && content && createPortal(
+            {isClient && isVisible && content && createPortal(
                 <div
                     className="fixed z-[9999] pointer-events-none"
                     style={{

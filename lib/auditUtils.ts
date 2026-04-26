@@ -38,7 +38,7 @@ export function formatFieldName(key: string): string {
     return FIELD_NAMES[key] || key;
 }
 
-export function formatValue(value: any, key?: string): string {
+export function formatValue(value: unknown, key?: string): string {
     if (value === null || value === undefined) return '-';
     if (typeof value === 'boolean') return value ? 'Да' : 'Нет';
 
@@ -49,7 +49,8 @@ export function formatValue(value: any, key?: string): string {
             'SICK': 'Больничный',
             'VACATION': 'Отпуск'
         };
-        return types[value] || value;
+        const typeValue = String(value);
+        return types[typeValue] || typeValue;
     }
 
     return String(value);

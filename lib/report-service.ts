@@ -1,8 +1,19 @@
 import ExcelJS from 'exceljs';
 import { prisma } from '@/lib/prisma';
-import { startOfMonth, endOfMonth, format, parseISO, eachDayOfInterval } from 'date-fns';
+import { startOfMonth, endOfMonth, format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import JSZip from 'jszip';
+import type { Prisma, RegistrationKpi } from '@prisma/client';
+
+type EmployeeWithSalaryHistory = Prisma.EmployeeGetPayload<{
+    include: { salaryHistory: true };
+}>;
+
+type RegistrationCriterionKey = 'criterion1' | 'criterion2' | 'criterion3';
+
+function getRegistrationCriterion(record: RegistrationKpi, key: RegistrationCriterionKey) {
+    return Number(record[key]) || 0;
+}
 
 export class ReportService {
     static async generateExcel(date: string, type: string, employeeId?: string) {
@@ -26,7 +37,7 @@ export class ReportService {
         };
         const monthStr = format(startDate, 'yyyy-MM'); // e.g. "2026-02"
 
-        const empFilter = employeeId ? { id: employeeId } : {
+        const empFilter: Prisma.EmployeeWhereInput = employeeId ? { id: employeeId } : {
             role: { not: 'MANAGER' },
             AND: [
                 {
@@ -59,7 +70,7 @@ export class ReportService {
                     take: 1
                 }
             }
-        } as any);
+        });
 
         // If specific employeeId was provided, double check it's not a MANAGER
         if (employeeId && employees.length > 0 && employees[0].role === 'MANAGER') {
@@ -407,38 +418,16 @@ export class ReportService {
             const allKpi = await prisma.kpiRecord.findMany({ where: { date: dateFilter } });
             const allRegs = await prisma.registrationKpi.findMany({ where: { date: dateFilter } });
 
-            // We also need ALL active employees for finding subordinates
-            const allActiveEmployees = await prisma.employee.findMany({
-                where: {
-                    role: { not: 'MANAGER' },
-                    AND: [
-                        {
-                            OR: [
-                                { dismissalDate: "" },
-                                { dismissalDate: { gte: format(startDate, 'yyyy-MM-dd') } }
-                            ]
-                        },
-                        {
-                            OR: [
-                                { hireDate: "" },
-                                { hireDate: { lte: format(endDate, 'yyyy-MM-dd') } }
-                            ]
-                        }
-                    ]
-                }
-            });
-
             // Fetch monthly checklists
             const allChecklists = await prisma.monthlyChecklist.findMany({
                 where: { month: monthStr }
             });
 
-            for (const emp of employees) {
+            for (const emp of employees as EmployeeWithSalaryHistory[]) {
                 if (emp.role === 'MANAGER') continue;
 
                 const empShifts = allShifts.filter(s => s.employeeId === emp.id);
                 const empSales = allSales.filter(s => s.employeeId === emp.id);
-                const empRegs = allRegs.filter(r => r.employeeId === emp.id);
                 const empLegacyKpi = allKpi.filter(k => k.employeeId === emp.id);
 
                 let hoursWorked = 0;
@@ -449,7 +438,7 @@ export class ReportService {
                 let traineeBonus = 0;
                 
                 // Use historical salary if available
-                const effectiveBaseSalary = (emp as any).salaryHistory?.[0]?.baseSalary ?? emp.baseSalary;
+                const effectiveBaseSalary = emp.salaryHistory?.[0]?.baseSalary ?? emp.baseSalary;
                 const hourlyBase = effectiveBaseSalary / monthNorm;
 
                 empShifts.forEach(s => {
@@ -469,7 +458,7 @@ export class ReportService {
                     empSales.reduce((sum, s) => sum + s.bonus, 0);
 
                 // New quality calculation logic for report service
-                const getIndividualQuality = (e: any) => {
+                const getIndividualQuality = (e: EmployeeWithSalaryHistory) => {
                     const empRegs = allRegs.filter(r => r.employeeId === e.id);
                     const empLegacyKpi = allKpi.filter(k => k.employeeId === e.id);
 
@@ -485,18 +474,16 @@ export class ReportService {
                 };
 
                 const ownQuality = getIndividualQuality(emp);
-                let finalQuality = ownQuality;
+                const finalQuality = ownQuality;
 
                 // Restore missing checklist/manual bonus variables
-                const empChecklist = allChecklists.find(c => c.employeeId === emp.id) as any;
+                const empChecklist = allChecklists.find(c => c.employeeId === emp.id);
                 const ownChecklist = empChecklist ? empChecklist.percentage / 100 : 0;
                 const sickLeaveOpening = empChecklist ? (empChecklist.sickLeaveOpening || 0) : 0;
                 const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
                 const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
-                const manualClosingBonus = empChecklist ? (empChecklist.closingBonus || 0) : 0;
-
                 // Use checklist percentage
-                let calcChecklist = ownChecklist;
+                const calcChecklist = ownChecklist;
 
                 const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
                 const cardBonus = cardCreation * 60;
@@ -510,9 +497,9 @@ export class ReportService {
                 else if (calcChecklist >= 0.76) checklistBonus = 2500;
 
                 // Seniority (Выслуга)
-                const hireDateStr = (emp as any).hireDate;
+                const hireDateStr = emp.hireDate;
                 const hireDateParsed = hireDateStr ? new Date(hireDateStr) : null;
-                const dismissalDateStr = (emp as any).dismissalDate;
+                const dismissalDateStr = emp.dismissalDate;
                 const dismissalDateParsed = dismissalDateStr ? new Date(dismissalDateStr) : null;
 
                 const isHireDateValid = hireDateParsed && !isNaN(hireDateParsed.getTime());
@@ -655,7 +642,7 @@ export class ReportService {
         worksheet.columns = colWidths.map(w => ({ width: w }));
 
         // Helper to style a merged range's master cell
-        const sc = (addr: string, val: any, font: Partial<ExcelJS.Font>, align: Partial<ExcelJS.Alignment>, border = false) => {
+        const sc = (addr: string, val: ExcelJS.CellValue, font: Partial<ExcelJS.Font>, align: Partial<ExcelJS.Alignment>, border = false) => {
             const c = worksheet.getCell(addr);
             c.value = val;
             c.font = font as ExcelJS.Font;
@@ -681,10 +668,9 @@ export class ReportService {
         sc('E3', employee.name, fontA9b, centerTopWrap);
 
         // === Calculations ===
-        const effectiveBaseSalary = (employee as any).salaryHistory?.[0]?.baseSalary ?? employee.baseSalary;
+        const effectiveBaseSalary = (employee as EmployeeWithSalaryHistory).salaryHistory?.[0]?.baseSalary ?? employee.baseSalary;
         const hourlyBase = effectiveBaseSalary / monthNorm;
 
-        let hoursWorked = 0;
         let daysWorked = 0;
         let shiftPay = 0;
         let intensityTotal = 0;
@@ -696,7 +682,6 @@ export class ReportService {
 
         shifts.forEach(s => {
             if (s.type === 'REGULAR') {
-                hoursWorked += s.hours;
                 daysWorked++;
                 shiftPay += hourlyBase * s.hours;
                 intensityTotal += hourlyBase * s.hours * (s.coefficient - 1);
@@ -905,7 +890,7 @@ export class ReportService {
             worksheet.mergeCells(`H${curRow}:J${curRow}`);
             sc(`H${curRow}`, 1, fontA8, centerMid, true);
             worksheet.mergeCells(`K${curRow}:O${curRow}`);
-            sc(`K${curRow}`, Math.round(getAvgCrit(`criterion${i+1}` as any)) / 100, fontA8, centerMid, true);
+            sc(`K${curRow}`, Math.round(getAvgCrit(`criterion${i + 1}` as RegistrationCriterionKey)) / 100, fontA8, centerMid, true);
             worksheet.mergeCells(`P${curRow}:S${curRow}`);
             curRow++;
         });
@@ -916,7 +901,7 @@ export class ReportService {
         worksheet.mergeCells(`H${curRow}:J${curRow}`);
         sc(`H${curRow}`, 1, fontA8b, centerMid, true);
         worksheet.mergeCells(`K${curRow}:O${curRow}`);
-        const avgCritTotal = critLabels.reduce((sum, _, i) => sum + (Math.round(getAvgCrit(`criterion${i+1}` as any)) / 100), 0) / 6;
+        const avgCritTotal = critLabels.reduce((sum, _, i) => sum + (Math.round(getAvgCrit(`criterion${i + 1}` as RegistrationCriterionKey)) / 100), 0) / 6;
         sc(`K${curRow}`, Math.round(avgCritTotal * 100) / 100, fontA8b, centerMid, true);
         worksheet.mergeCells(`P${curRow}:S${curRow}`);
         curRow++;
@@ -939,11 +924,6 @@ export class ReportService {
         worksheet.mergeCells(`P${curRow}:S${curRow}`);
         curRow++;
 
-        const getAvgRegCrit = (crit: keyof typeof regs[0]) => {
-            if (regs.length === 0) return 0;
-            return regs.reduce((sum, r) => sum + (Number(r[crit]) || 0), 0) / regs.length;
-        };
-
         const totalRegCount = regs.reduce((s, r) => s + (r.count || 1), 0);
 
         const regLabels = ['1. Правильность заполнения карт', '2. Указана эл.почта', '3. Указано доверенное лицо'];
@@ -955,7 +935,8 @@ export class ReportService {
             worksheet.mergeCells(`I${curRow}:J${curRow}`);
             sc(`I${curRow}`, 1, fontA8, centerMid, true);
             worksheet.mergeCells(`K${curRow}:L${curRow}`);
-            const factScore = regs.reduce((s, r) => s + (Number((r as any)[`criterion${i+1}`]) || 0), 0);
+            const key = `criterion${i + 1}` as RegistrationCriterionKey;
+            const factScore = regs.reduce((s, r) => s + getRegistrationCriterion(r, key), 0);
             sc(`K${curRow}`, factScore, fontA8, centerMid, true);
             worksheet.mergeCells(`M${curRow}:O${curRow}`);
             const pct = totalRegCount > 0 ? factScore / totalRegCount : 0;
@@ -969,11 +950,15 @@ export class ReportService {
         sc(`A${curRow}`, 'Итого:', fontA8b, centerMid, true);
         sc(`H${curRow}`, totalRegCount * 3, fontA8b, centerMid, true);
         worksheet.mergeCells(`K${curRow}:L${curRow}`);
-        const totalRegFactScore = regLabels.reduce((s, _, i) => s + regs.reduce((rs, r) => rs + (Number((r as any)[`criterion${i+1}`]) || 0), 0), 0);
+        const totalRegFactScore = regLabels.reduce((s, _, i) => {
+            const key = `criterion${i + 1}` as RegistrationCriterionKey;
+            return s + regs.reduce((rs, r) => rs + getRegistrationCriterion(r, key), 0);
+        }, 0);
         sc(`K${curRow}`, totalRegFactScore, fontA8b, centerMid, true);
         worksheet.mergeCells(`M${curRow}:O${curRow}`);
         const avgRegPct = regLabels.length > 0 ? regLabels.reduce((s, _, i) => {
-            const fs = regs.reduce((rs, r) => rs + (Number((r as any)[`criterion${i+1}`]) || 0), 0);
+            const key = `criterion${i + 1}` as RegistrationCriterionKey;
+            const fs = regs.reduce((rs, r) => rs + getRegistrationCriterion(r, key), 0);
             return s + (totalRegCount > 0 ? fs / totalRegCount : 0);
         }, 0) / regLabels.length : 0;
         sc(`M${curRow}`, Math.round(avgRegPct * 10000) / 10000, fontA8b, centerMid, true);

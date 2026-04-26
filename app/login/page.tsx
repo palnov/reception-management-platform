@@ -57,7 +57,7 @@ export default function LoginPage() {
                 const data = await res.json();
                 setError(data.error || 'Ошибка входа');
             }
-        } catch (err) {
+        } catch {
             setError('Ошибка подключения к серверу');
         } finally {
             setLoading(false);

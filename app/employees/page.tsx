@@ -2,8 +2,10 @@
 'use client';
 
 import { useState, useEffect, FormEvent } from 'react';
-import { Plus, User, MapPin, BadgeCheck, Trash2, Crown } from 'lucide-react';
+import { CalendarX, KeyRound, Loader2, Plus, RefreshCw, User, MapPin, BadgeCheck, Trash2, Crown, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { InlineStatus } from '@/components/InlineStatus';
+import { Tooltip } from '@/components/Tooltip';
 
 interface Employee {
     id: string;
@@ -24,6 +26,14 @@ export default function EmployeesPage() {
     const [editId, setEditId] = useState<string | null>(null);
     const [originalRole, setOriginalRole] = useState<string | null>(null);
     const [originalSalary, setOriginalSalary] = useState<number | null>(null);
+    const [formError, setFormError] = useState<string | null>(null);
+    const [listError, setListError] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [showPasswordEditor, setShowPasswordEditor] = useState(false);
+    const [showDismissalEditor, setShowDismissalEditor] = useState(false);
+    const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+    const [pendingDelete, setPendingDelete] = useState<Employee | null>(null);
 
     const initialForm = {
         name: '',
@@ -45,29 +55,31 @@ export default function EmployeesPage() {
     }, []);
 
     async function fetchEmployees() {
+        setListError(null);
         try {
             const res = await fetch('/api/employees');
             if (res.status === 401 || res.status === 403) {
                 window.location.href = '/login';
                 return;
             }
-            if (!res.ok) throw new Error('Unauthorized or error');
+            if (!res.ok) throw new Error('Employees fetch failed');
             const data = await res.json();
             setEmployees(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Failed to fetch', error);
+            setListError('Не удалось загрузить сотрудников. Проверьте сервер и попробуйте еще раз.');
         } finally {
             setIsLoading(false);
         }
     }
 
-    function handleEdit(emp: any) {
+    function handleEdit(emp: Employee) {
         setEditId(emp.id);
         const subIds = employees.filter(e => e.seniorId === emp.id).map(e => e.id);
         setFormData({
             name: emp.name,
             role: emp.role,
-            password: emp.password || '',
+            password: '',
             baseSalary: emp.baseSalary.toString(),
             branch: emp.branch || 'Дзержинского 26',
             hireDate: emp.hireDate || '',
@@ -77,6 +89,11 @@ export default function EmployeesPage() {
         });
         setOriginalRole(emp.role);
         setOriginalSalary(emp.baseSalary);
+        setFormError(null);
+        setPendingDelete(null);
+        setDeleteConfirmationText('');
+        setShowPasswordEditor(false);
+        setShowDismissalEditor(false);
         setShowForm(true);
     }
 
@@ -84,34 +101,79 @@ export default function EmployeesPage() {
         e.stopPropagation();
         setEditId(null);
         setFormData(initialForm);
+        setFormError(null);
+        setPendingDelete(null);
+        setDeleteConfirmationText('');
+        setShowPasswordEditor(true);
+        setShowDismissalEditor(true);
         setShowForm(true);
+    }
+
+    async function handleDeleteEmployee() {
+        if (!pendingDelete) return;
+
+        setFormError(null);
+        setIsDeleting(true);
+
+        try {
+            const res = await fetch(`/api/employees?id=${pendingDelete.id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const data = await res.json().catch(() => null);
+                setFormError(data?.error || 'Не удалось удалить сотрудника. Попробуйте еще раз.');
+                return;
+            }
+
+            setShowForm(false);
+            setEditId(null);
+            setPendingDelete(null);
+            setDeleteConfirmationText('');
+            fetchEmployees();
+            router.refresh();
+        } catch (error) {
+            console.error('Failed to delete employee', error);
+            setFormError('Не удалось связаться с сервером. Сотрудник не удален.');
+        } finally {
+            setIsDeleting(false);
+        }
     }
 
     async function handleSubmit(e: FormEvent) {
         e.preventDefault();
+        setFormError(null);
+        setIsSaving(true);
 
         const payload = {
             ...formData,
             hourlyRate: '0'
         };
 
-        if (editId) {
-            await fetch('/api/employees', {
-                method: 'PUT',
-                body: JSON.stringify({ id: editId, ...payload }),
+        try {
+            const res = await fetch('/api/employees', {
+                method: editId ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editId ? { id: editId, ...payload } : payload),
             });
-        } else {
-            await fetch('/api/employees', {
-                method: 'POST',
-                body: JSON.stringify(payload),
-            });
-        }
 
-        setShowForm(false);
-        setEditId(null);
-        setFormData(initialForm);
-        fetchEmployees();
-        router.refresh();
+            if (!res.ok) {
+                const data = await res.json().catch(() => null);
+                setFormError(data?.error || 'Не удалось сохранить сотрудника. Попробуйте еще раз.');
+                return;
+            }
+
+            setShowForm(false);
+            setEditId(null);
+            setFormData(initialForm);
+            setShowPasswordEditor(false);
+            setShowDismissalEditor(false);
+            setDeleteConfirmationText('');
+            fetchEmployees();
+            router.refresh();
+        } catch (error) {
+            console.error('Failed to save employee', error);
+            setFormError('Не удалось связаться с сервером. Проверьте подключение и попробуйте еще раз.');
+        } finally {
+            setIsSaving(false);
+        }
     }
 
     return (
@@ -129,10 +191,27 @@ export default function EmployeesPage() {
                 </button>
             </div>
 
+            {listError && (
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <InlineStatus type="error" message={listError} className="flex-1 p-4" />
+                    <button
+                        type="button"
+                        onClick={fetchEmployees}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 font-medium text-red-700 hover:bg-red-50"
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                        Повторить
+                    </button>
+                </div>
+            )}
+
             {showForm && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in overflow-y-auto">
                     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-2xl border border-zinc-200 w-full max-w-lg my-8 animate-in zoom-in-95">
                         <h2 className="text-xl font-bold mb-4">{editId ? 'Редактировать сотрудника' : 'Новый сотрудник'}</h2>
+                        {formError && (
+                            <InlineStatus type="error" message={formError} className="mb-4 px-3 py-2" />
+                        )}
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-zinc-700 mb-1">ФИО</label>
@@ -273,18 +352,44 @@ export default function EmployeesPage() {
                             )}
 
                             <div className="grid grid-cols-2 gap-4">
-                                <div className={formData.role === 'MANAGER' ? 'col-span-2' : ''}>
-                                    <label className="block text-sm font-medium text-zinc-700 mb-1">Пароль для входа</label>
-                                    <input
-                                        type="text"
-                                        value={formData.password}
-                                        onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                        className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                        placeholder="1234"
-                                    />
-                                </div>
-                                {formData.role !== 'MANAGER' && (
+                                <div className="space-y-4">
                                     <div>
+                                        <label className="block text-sm font-medium text-zinc-700 mb-1">Дата приёма</label>
+                                        <input
+                                            type="date"
+                                            value={formData.hireDate}
+                                            onChange={e => setFormData({ ...formData, hireDate: e.target.value })}
+                                            className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-zinc-700 mb-1">Дата увольнения</label>
+                                        {editId && formData.dismissalDate && !showDismissalEditor ? (
+                                            <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm font-bold text-zinc-700">
+                                                {new Date(formData.dismissalDate).toLocaleDateString('ru-RU')}
+                                            </div>
+                                        ) : showDismissalEditor ? (
+                                            <input
+                                                type="date"
+                                                value={formData.dismissalDate}
+                                                onChange={e => setFormData({ ...formData, dismissalDate: e.target.value })}
+                                                className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                            />
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowDismissalEditor(true)}
+                                                className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm font-bold text-zinc-600 hover:bg-zinc-100"
+                                            >
+                                                <CalendarX className="h-4 w-4" />
+                                                Указать
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    {formData.role !== 'MANAGER' && (
+                                        <div>
                                         <label className="block text-sm font-medium text-zinc-700 mb-1">Оклад (мес)</label>
                                         <div className="relative">
                                             <span className="absolute left-3 top-2.5 text-zinc-500 font-bold">₽</span>
@@ -296,66 +401,137 @@ export default function EmployeesPage() {
                                                 placeholder="0"
                                             />
                                         </div>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <label className="block text-sm font-medium text-zinc-700 mb-1">Пароль для входа</label>
+                                        {showPasswordEditor ? (
+                                            <div className="space-y-2">
+                                                <input
+                                                    type="text"
+                                                    value={formData.password}
+                                                    onChange={e => setFormData({ ...formData, password: e.target.value })}
+                                                    className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                                    placeholder={editId ? 'Введите новый пароль' : 'Задайте пароль'}
+                                                    autoComplete="new-password"
+                                                    required={!editId}
+                                                />
+                                                {editId && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setFormData({ ...formData, password: '' });
+                                                            setShowPasswordEditor(false);
+                                                        }}
+                                                        className="text-xs font-bold text-zinc-500 hover:text-zinc-800"
+                                                    >
+                                                        Не менять пароль
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <Tooltip content={editId ? 'Текущий пароль не отображается. Новый пароль будет сохранен только если заполнить это поле.' : 'Пароль будет сохранен в защищенном виде.'}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowPasswordEditor(true)}
+                                                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-100"
+                                                >
+                                                    <KeyRound className="h-4 w-4" />
+                                                    Сменить пароль
+                                                </button>
+                                            </Tooltip>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-zinc-700 mb-1">Дата приёма</label>
-                                    <input
-                                        type="date"
-                                        value={formData.hireDate}
-                                        onChange={e => setFormData({ ...formData, hireDate: e.target.value })}
-                                        className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-zinc-700 mb-1">Дата увольнения</label>
-                                    <input
-                                        type="date"
-                                        value={formData.dismissalDate}
-                                        onChange={e => setFormData({ ...formData, dismissalDate: e.target.value })}
-                                        className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                                    />
                                 </div>
                             </div>
 
                         </div>
 
-                        <div className="flex gap-3 pt-4">
+                        <div className="flex items-center gap-3 pt-4">
+                            {editId && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPendingDelete(employees.find(emp => emp.id === editId) ?? null);
+                                        setDeleteConfirmationText('');
+                                    }}
+                                    disabled={isSaving || isDeleting}
+                                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-300 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                    aria-label="Удалить сотрудника"
+                                    title="Удалить сотрудника"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                            )}
                             <button
                                 type="button"
-                                onClick={() => { setShowForm(false); setEditId(null); }}
-                                className="flex-1 px-4 py-2 border border-zinc-300 rounded-lg text-zinc-700 hover:bg-zinc-50 transition-colors"
+                                onClick={() => {
+                                    setShowForm(false);
+                                    setEditId(null);
+                                    setFormError(null);
+                                    setPendingDelete(null);
+                                    setDeleteConfirmationText('');
+                                    setShowPasswordEditor(false);
+                                    setShowDismissalEditor(false);
+                                }}
+                                disabled={isSaving || isDeleting}
+                                className="flex-1 px-4 py-2 border border-zinc-300 rounded-lg text-zinc-700 hover:bg-zinc-50 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 Отмена
                             </button>
                             <button
                                 type="submit"
-                                className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                                disabled={isSaving || isDeleting}
+                                className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:cursor-not-allowed disabled:bg-blue-400 flex items-center justify-center gap-2"
                             >
+                                {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
                                 Сохранить
                             </button>
                         </div>
-                        {editId && (
-                            <button
-                                type="button"
-                                onClick={async () => {
-                                    if (confirm('Вы уверены, что хотите удалить этого сотрудника? Все связанные с ним данные (смены, KPI) также будут удалены.')) {
-                                        const res = await fetch(`/api/employees?id=${editId}`, { method: 'DELETE' });
-                                        if (res.ok) {
-                                            setShowForm(false);
-                                            setEditId(null);
-                                            fetchEmployees();
-                                            router.refresh();
-                                        }
-                                    }
-                                }}
-                                className="w-full mt-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm font-medium flex items-center justify-center gap-2"
-                            >
-                                <Trash2 className="w-4 h-4" /> Удалить сотрудника
-                            </button>
+                        {pendingDelete && (
+                            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alertdialog" aria-label="Подтверждение удаления сотрудника">
+                                <div className="flex gap-3">
+                                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                                    <div>
+                                        <div className="font-black text-red-900">Вы точно хотите удалить сотрудника?</div>
+                                        <p className="mt-1 leading-5">
+                                            Это действие нельзя отменить. После удаления сотрудника предыдущие графики и связанные данные могут попортиться. Удаляйте только если сотрудник был добавлен по ошибке.
+                                        </p>
+                                    </div>
+                                </div>
+                                <label className="mt-4 block text-xs font-black uppercase tracking-wider text-red-700">
+                                    Введите слово “удалить”
+                                </label>
+                                <input
+                                    type="text"
+                                    value={deleteConfirmationText}
+                                    onChange={(event) => setDeleteConfirmationText(event.target.value)}
+                                    className="mt-2 w-full rounded-lg border border-red-200 bg-white px-3 py-2 font-bold text-red-900 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                                    placeholder="удалить"
+                                />
+                                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPendingDelete(null);
+                                            setDeleteConfirmationText('');
+                                        }}
+                                        disabled={isDeleting}
+                                        className="flex-1 rounded-lg border border-red-200 bg-white px-3 py-2 font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        Отмена
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleDeleteEmployee}
+                                        disabled={isDeleting || deleteConfirmationText.trim().toLowerCase() !== 'удалить'}
+                                        className="flex-1 rounded-lg bg-red-600 px-3 py-2 font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300 flex items-center justify-center gap-2"
+                                    >
+                                        {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />}
+                                        Удалить сотрудника
+                                    </button>
+                                </div>
+                            </div>
                         )}
                     </form>
                 </div>
@@ -365,6 +541,28 @@ export default function EmployeesPage() {
                 const todayStr = new Date().toISOString().split('T')[0];
                 const activeEmployees = employees.filter(emp => !emp.dismissalDate || emp.dismissalDate > todayStr);
                 const dismissedEmployees = employees.filter(emp => emp.dismissalDate && emp.dismissalDate <= todayStr);
+
+                const renderSkeleton = () => (
+                    <div className="rounded-xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
+                        <div className="border-b border-zinc-100 bg-zinc-50 px-6 py-4">
+                            <div className="h-4 w-48 animate-pulse rounded bg-zinc-200" />
+                        </div>
+                        <div className="divide-y divide-zinc-100 overflow-x-auto">
+                            {Array.from({ length: 6 }).map((_, index) => (
+                                <div key={index} className="grid min-w-[800px] grid-cols-[2fr_1.2fr_1.5fr_1fr_1fr] gap-4 px-6 py-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-8 w-8 animate-pulse rounded-full bg-zinc-200" />
+                                        <div className="h-4 w-36 animate-pulse rounded bg-zinc-200" />
+                                    </div>
+                                    <div className="h-4 w-24 animate-pulse rounded bg-zinc-200" />
+                                    <div className="h-4 w-32 animate-pulse rounded bg-zinc-200" />
+                                    <div className="h-4 w-20 animate-pulse rounded bg-zinc-200" />
+                                    <div className="h-4 w-20 animate-pulse rounded bg-zinc-200 justify-self-end" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
 
                 const renderTable = (list: Employee[], title: string) => (
                     <div className="mb-12">
@@ -455,7 +653,7 @@ export default function EmployeesPage() {
                     </div>
                 );
 
-                if (isLoading) return <div className="text-center py-12 text-zinc-500 font-medium">Загрузка данных...</div>;
+                if (isLoading) return renderSkeleton();
 
                 return (
                     <>

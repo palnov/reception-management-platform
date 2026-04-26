@@ -2,9 +2,23 @@ import { jwtVerify, SignJWT } from 'jose';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-const secret = new TextEncoder().encode(
-    process.env.JWT_SECRET || 'fallback-secret-for-dmc-platform-12345'
-);
+export type SessionPayload = {
+    employee: {
+        id: string;
+        name: string;
+        role: string;
+    };
+    expiresAt: Date | string;
+};
+
+function getSecret() {
+    const value = process.env.JWT_SECRET;
+    if (!value && process.env.NODE_ENV === 'production') {
+        throw new Error('JWT_SECRET is required in production');
+    }
+
+    return new TextEncoder().encode(value || 'development-only-secret-change-me');
+}
 
 export async function login(employee: { id: string, name: string, role: string }) {
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -13,7 +27,7 @@ export async function login(employee: { id: string, name: string, role: string }
     const cookieStore = await cookies();
     cookieStore.set('session', session, {
         httpOnly: true,
-        secure: false, // Changed from process.env.NODE_ENV === 'production' to allow HTTP
+        secure: process.env.NODE_ENV === 'production',
         expires: expiresAt,
         sameSite: 'lax',
         path: '/',
@@ -32,21 +46,21 @@ export async function getSession() {
     return await decrypt(session);
 }
 
-export async function encrypt(payload: any) {
+export async function encrypt(payload: SessionPayload) {
     return await new SignJWT(payload)
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()
         .setExpirationTime('7d')
-        .sign(secret);
+        .sign(getSecret());
 }
 
-export async function decrypt(input: string): Promise<any> {
+export async function decrypt(input: string): Promise<SessionPayload | null> {
     try {
-        const { payload } = await jwtVerify(input, secret, {
+        const { payload } = await jwtVerify(input, getSecret(), {
             algorithms: ['HS256'],
         });
-        return payload;
-    } catch (error) {
+        return payload as SessionPayload;
+    } catch {
         return null;
     }
 }
@@ -57,13 +71,14 @@ export async function updateSession(request: NextRequest) {
 
     // Refresh the session so it doesn't expire
     const parsed = await decrypt(session);
+    if (!parsed) return;
     parsed.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const res = NextResponse.next();
     res.cookies.set({
         name: 'session',
         value: await encrypt(parsed),
         httpOnly: true,
-        secure: false, // Changed from process.env.NODE_ENV === 'production' to allow HTTP
+        secure: process.env.NODE_ENV === 'production',
         expires: parsed.expiresAt,
         sameSite: 'lax',
         path: '/',

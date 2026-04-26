@@ -1,13 +1,16 @@
 
 import { prisma } from './prisma';
 import { getSession } from './auth';
+import type { SessionPayload } from './auth';
+
+type AuditDetails = Record<string, unknown> | null;
 
 export async function logAudit(
     entityType: 'SHIFT' | 'KPI' | 'SALE' | 'REGISTRATION' | 'DAILY_CHECKLIST',
     entityId: string,
     action: 'CREATE' | 'UPDATE' | 'DELETE',
-    details?: any,
-    sessionOverride?: any
+    details?: AuditDetails,
+    sessionOverride?: SessionPayload | null
 ) {
     try {
         const session = sessionOverride || await getSession();
@@ -34,16 +37,18 @@ export async function logAudit(
     }
 }
 
-export function calculateDiff(oldData: any, newData: any, fieldsToIgnore: string[] = ['id', 'createdAt', 'createdBy', 'updatedAt', 'auditLogs', 'employee']) {
-    const changes: Record<string, { old: any, new: any }> = {};
+export function calculateDiff(oldData: object, newData: object, fieldsToIgnore: string[] = ['id', 'createdAt', 'createdBy', 'updatedAt', 'auditLogs', 'employee']) {
+    const changes: Record<string, { old: unknown, new: unknown }> = {};
+    const oldRecord = oldData as Record<string, unknown>;
+    const newRecord = newData as Record<string, unknown>;
 
-    const allKeys = new Set([...Object.keys(oldData), ...Object.keys(newData)]);
+    const allKeys = new Set([...Object.keys(oldRecord), ...Object.keys(newRecord)]);
 
     allKeys.forEach(key => {
         if (fieldsToIgnore.includes(key)) return;
 
-        const oldValue = oldData[key];
-        const newValue = newData[key];
+        const oldValue = oldRecord[key];
+        const newValue = newRecord[key];
 
         // Simple comparison for primitives. For objects/arrays, JSON stringify might be needed for deep comparison if structure is complex,
         // but for our flat models, strict equality or simple type checks usually suffice.

@@ -1,7 +1,29 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-import { logAudit, calculateDiff } from '@/lib/audit';
+
+type BatchShiftOperation = {
+    id?: string;
+    date: string;
+    employeeId: string;
+    type: string;
+    hours: string | number;
+    cabinetClosed?: boolean;
+    centerClosed?: boolean;
+    isActingLead?: boolean;
+    isTrainee?: boolean;
+    coefficient?: string | number;
+};
+
+type BatchShiftResults = {
+    deleted?: { count: number };
+    upserted?: Awaited<ReturnType<typeof prisma.shift.findMany>>;
+};
+
+function toNumber(value: string | number | undefined, fallback = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
 
 export async function POST(request: Request) {
     const session = await getSession();
@@ -13,10 +35,10 @@ export async function POST(request: Request) {
     }
 
     try {
-        const body = await request.json();
+        const body = await request.json() as { operations?: BatchShiftOperation[]; deleteIds?: string[] };
         const { operations, deleteIds } = body;
 
-        const results: any = {};
+        const results: BatchShiftResults = {};
 
         // 1. Handle Deletions (Soft Delete with Audit)
         if (Array.isArray(deleteIds) && deleteIds.length > 0) {
@@ -60,20 +82,21 @@ export async function POST(request: Request) {
                 }
             });
 
-            const existingMap = new Map();
+            const existingMap = new Map<string, (typeof existingShifts)[number]>();
             existingShifts.forEach(s => existingMap.set(`${s.employeeId}_${s.date}`, s));
 
             // Fetch dismissal dates for all involved employees
             const involvedEmpIds = [...new Set(operations.map(op => op.employeeId))];
             const involvedEmps = await prisma.employee.findMany({
                 where: { id: { in: involvedEmpIds } },
-                select: { id: true, dismissalDate: true } as any
-            }) as any[];
-            const dismissalMap = new Map(involvedEmps.map((e: any) => [e.id, e.dismissalDate]));
+                select: { id: true, hireDate: true, dismissalDate: true }
+            });
+            const employeeDateMap = new Map(involvedEmps.map(e => [e.id, e]));
 
             const validOperations = operations.filter(op => {
-                const dDate = dismissalMap.get(op.employeeId);
-                const hDate = involvedEmps.find(e => e.id === op.employeeId)?.hireDate;
+                const employeeDates = employeeDateMap.get(op.employeeId);
+                const dDate = employeeDates?.dismissalDate;
+                const hDate = employeeDates?.hireDate;
                 
                 if (dDate && op.date >= dDate) return false;
                 if (hDate && op.date < hDate) return false;
@@ -92,12 +115,12 @@ export async function POST(request: Request) {
 
                     const data = {
                         type: op.type,
-                        hours: parseFloat(op.hours),
+                        hours: toNumber(op.hours),
                         cabinetClosed: !!op.cabinetClosed,
                         centerClosed: !!op.centerClosed,
                         isActingLead: !!op.isActingLead,
                         isTrainee: !!op.isTrainee,
-                        coefficient: Math.min(parseFloat(op.coefficient || 1.0), 1.5),
+                        coefficient: Math.min(toNumber(op.coefficient, 1), 1.5),
                         isDeleted: false
                     };
 
@@ -121,8 +144,8 @@ export async function POST(request: Request) {
         }
 
         return NextResponse.json({ success: true, results });
-    } catch (error: any) {
+    } catch (error) {
         console.error('BATCH_SHIFT_ERROR:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

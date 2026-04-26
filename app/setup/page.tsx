@@ -63,7 +63,7 @@ export default function SetupPage() {
             } else {
                 setError(data.error || 'Ошибка инициализации');
             }
-        } catch (e) {
+        } catch {
             setError('Ошибка сети или сервера');
         } finally {
             setIsSubmitting(false);

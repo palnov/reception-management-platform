@@ -1,9 +1,10 @@
-
 'use client';
 
-import { useEffect, useState, useLayoutEffect, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
+import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Stethoscope, Palmtree, Trash2, Layers } from 'lucide-react';
+import { Layers, Palmtree, Stethoscope, Trash2 } from 'lucide-react';
+import { useIsClient } from '@/lib/useIsClient';
 
 interface QuickContextMenuProps {
     x: number;
@@ -14,16 +15,12 @@ interface QuickContextMenuProps {
 }
 
 export function QuickContextMenu({ x, y, onClose, onAction, showBatchOption }: QuickContextMenuProps) {
-    const [mounted, setMounted] = useState(false);
-    const [pos, setPos] = useState({ x, y });
-    const [isVisible, setIsVisible] = useState(false);
-    const menuRef = useRef<HTMLDivElement>(null);
+    const isClient = useIsClient();
 
     useEffect(() => {
-        setMounted(true);
         const handleClick = () => onClose();
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') onClose();
         };
 
         window.addEventListener('click', handleClick);
@@ -34,104 +31,105 @@ export function QuickContextMenu({ x, y, onClose, onAction, showBatchOption }: Q
         };
     }, [onClose]);
 
-    useLayoutEffect(() => {
-        if (mounted && menuRef.current) {
-            const rect = menuRef.current.getBoundingClientRect();
-            const padding = 8;
-            let nextX = x;
-            let nextY = y;
+    const pos = useMemo(() => {
+        if (!isClient) return { x, y };
 
-            // Check right overflow
-            if (nextX + rect.width > window.innerWidth - padding) {
-                nextX = window.innerWidth - rect.width - padding;
-            }
-            // Check bottom overflow
-            if (nextY + rect.height > window.innerHeight - padding) {
-                nextY = window.innerHeight - rect.height - padding;
-            }
-            // Check top/left (unlikely but good for robustness)
-            if (nextX < padding) nextX = padding;
-            if (nextY < padding) nextY = padding;
+        const padding = 8;
+        const menuWidth = 192;
+        const estimatedHeight = showBatchOption ? 250 : 190;
 
-            setPos({ x: nextX, y: nextY });
-            setIsVisible(true);
-        }
-    }, [mounted, x, y, showBatchOption]);
+        return {
+            x: Math.min(Math.max(x, padding), window.innerWidth - menuWidth - padding),
+            y: Math.min(Math.max(y, padding), window.innerHeight - estimatedHeight - padding)
+        };
+    }, [isClient, showBatchOption, x, y]);
 
-    if (!mounted) return null;
+    if (!isClient) return null;
 
     return createPortal(
         <div
-            ref={menuRef}
             className="fixed z-[999999] bg-zinc-900 text-white rounded-xl shadow-2xl border border-zinc-700 py-1.5 w-48 animate-in fade-in zoom-in-95 duration-100"
             style={{
                 left: pos.x,
                 top: pos.y,
                 filter: 'drop-shadow(0 10px 15px rgba(0,0,0,0.3))',
-                opacity: isVisible ? 1 : 0,
-                pointerEvents: isVisible ? 'auto' : 'none'
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
         >
             {showBatchOption && (
                 <>
-                    <button
+                    <MenuButton
+                        icon={<Layers className="w-4 h-4" />}
+                        label="Изменить"
+                        hint="Выбранные ячейки"
+                        tone="blue"
                         onClick={() => onAction('BATCH_EDIT')}
-                        className="w-full px-4 py-2 text-left hover:bg-zinc-800 flex items-center gap-3 transition-colors text-sm group text-blue-400"
-                    >
-                        <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:bg-blue-500/30 transition-colors">
-                            <Layers className="w-4 h-4" />
-                        </div>
-                        <div>
-                            <div className="font-semibold">Изменить</div>
-                            <div className="text-[10px] text-zinc-500">Выбранные ячейки</div>
-                        </div>
-                    </button>
+                    />
                     <div className="my-1 border-t border-zinc-800/50" />
                 </>
             )}
 
-            <button
+            <MenuButton
+                icon={<Stethoscope className="w-4 h-4" />}
+                label="Больничный"
+                hint='Поставить "Б"'
+                tone="red"
                 onClick={() => onAction('SICK')}
-                className="w-full px-4 py-2 text-left hover:bg-zinc-800 flex items-center gap-3 transition-colors text-sm group"
-            >
-                <div className="w-8 h-8 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center group-hover:bg-red-500/30 transition-colors">
-                    <Stethoscope className="w-4 h-4" />
-                </div>
-                <div>
-                    <div className="font-semibold">Больничный</div>
-                    <div className="text-[10px] text-zinc-500">Поставить "Б"</div>
-                </div>
-            </button>
-
-            <button
+            />
+            <MenuButton
+                icon={<Palmtree className="w-4 h-4" />}
+                label="Отпуск"
+                hint='Поставить "О"'
+                tone="green"
                 onClick={() => onAction('VACATION')}
-                className="w-full px-4 py-2 text-left hover:bg-zinc-800 flex items-center gap-3 transition-colors text-sm group"
-            >
-                <div className="w-8 h-8 rounded-lg bg-green-500/20 text-green-400 flex items-center justify-center group-hover:bg-green-500/30 transition-colors">
-                    <Palmtree className="w-4 h-4" />
-                </div>
-                <div>
-                    <div className="font-semibold">Отпуск</div>
-                    <div className="text-[10px] text-zinc-500">Поставить "О"</div>
-                </div>
-            </button>
+            />
 
             <div className="my-1 border-t border-zinc-800/50" />
 
-            <button
+            <MenuButton
+                icon={<Trash2 className="w-4 h-4" />}
+                label="Очистить"
+                hint="Удалить смену"
+                tone="zinc"
                 onClick={() => onAction('DELETE')}
-                className="w-full px-4 py-2 text-left hover:bg-zinc-800 flex items-center gap-3 transition-colors text-sm group text-zinc-400 hover:text-red-400"
-            >
-                <div className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-500 flex items-center justify-center group-hover:bg-red-500/20 group-hover:text-red-400 transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                </div>
-                <div>
-                    <div className="font-semibold">Очистить</div>
-                    <div className="text-[10px] text-zinc-500">Удалить смену</div>
-                </div>
-            </button>
+            />
         </div>,
         document.body
+    );
+}
+
+function MenuButton({
+    icon,
+    label,
+    hint,
+    tone,
+    onClick,
+}: {
+    icon: ReactNode;
+    label: string;
+    hint: string;
+    tone: 'blue' | 'red' | 'green' | 'zinc';
+    onClick: () => void;
+}) {
+    const toneClasses = {
+        blue: 'text-blue-400 bg-blue-500/20 group-hover:bg-blue-500/30',
+        red: 'text-red-400 bg-red-500/20 group-hover:bg-red-500/30',
+        green: 'text-green-400 bg-green-500/20 group-hover:bg-green-500/30',
+        zinc: 'text-zinc-500 bg-zinc-800 group-hover:bg-red-500/20 group-hover:text-red-400',
+    }[tone];
+
+    return (
+        <button
+            onClick={onClick}
+            className={`w-full px-4 py-2 text-left hover:bg-zinc-800 flex items-center gap-3 transition-colors text-sm group ${tone === 'zinc' ? 'text-zinc-400 hover:text-red-400' : ''}`}
+        >
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${toneClasses}`}>
+                {icon}
+            </div>
+            <div>
+                <div className="font-semibold">{label}</div>
+                <div className="text-[10px] text-zinc-500">{hint}</div>
+            </div>
+        </button>
     );
 }

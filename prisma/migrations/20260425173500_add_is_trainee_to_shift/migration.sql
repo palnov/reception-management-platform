@@ -1,0 +1,1 @@
+ALTER TABLE "Shift" ADD COLUMN "isTrainee" BOOLEAN NOT NULL DEFAULT false;

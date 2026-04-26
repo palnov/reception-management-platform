@@ -4,9 +4,10 @@
 import { Info, Clock, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AuditHistoryModal } from './AuditHistoryModal';
+import { useIsClient } from '@/lib/useIsClient';
 
 interface AuditLog {
     id: string;
@@ -32,26 +33,23 @@ interface InfoTooltipProps {
     createdBy?: string;
 }
 
-export function InfoTooltip({ logs, className = "", onAuditClick, currentUser, createdBy }: InfoTooltipProps) {
+export function InfoTooltip({ logs, className = "", onAuditClick, currentUser }: InfoTooltipProps) {
     const [isVisible, setIsVisible] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
-    const [mounted, setMounted] = useState(false);
     const [position, setPosition] = useState({ top: 0, left: 0 });
     const iconRef = useRef<HTMLDivElement>(null);
+    const isClient = useIsClient();
 
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
-    useEffect(() => {
-        if (isVisible && iconRef.current) {
+    const showTooltip = () => {
+        if (iconRef.current) {
             const rect = iconRef.current.getBoundingClientRect();
             setPosition({
                 top: rect.top + window.scrollY,
                 left: rect.left + window.scrollX + rect.width / 2
             });
         }
-    }, [isVisible]);
+        setIsVisible(true);
+    };
 
     // Visibility Logic: "Superseded Editor" rule
     let shouldShow = false;
@@ -82,7 +80,7 @@ export function InfoTooltip({ logs, className = "", onAuditClick, currentUser, c
 
     const lastLog = logs[0];
 
-    const tooltipContent = isVisible && mounted && !showHistory ? (
+    const tooltipContent = isVisible && isClient && !showHistory ? (
         <div
             className="fixed pointer-events-none"
             style={{
@@ -143,7 +141,7 @@ export function InfoTooltip({ logs, className = "", onAuditClick, currentUser, c
                 ref={iconRef}
                 className={`absolute top-0.5 right-0.5 z-[30] audit-tooltip-trigger cursor-pointer ${className}`}
                 data-audit-ignore="true"
-                onMouseEnter={() => setIsVisible(true)}
+                onMouseEnter={showTooltip}
                 onMouseLeave={() => setIsVisible(false)}
                 // Capture phase guards
                 onMouseDownCapture={stop}
@@ -164,8 +162,8 @@ export function InfoTooltip({ logs, className = "", onAuditClick, currentUser, c
                     <Info className="w-2.5 h-2.5" />
                 </div>
             </div>
-            {mounted && tooltipContent && createPortal(tooltipContent, document.body)}
-            {showHistory && createPortal(
+            {isClient && tooltipContent && createPortal(tooltipContent, document.body)}
+            {isClient && showHistory && createPortal(
                 <AuditHistoryModal logs={logs} onClose={() => setShowHistory(false)} />,
                 document.body
             )}

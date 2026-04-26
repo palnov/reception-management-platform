@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #f7f8fb;
   --foreground: #171717;
+  --focus-ring: #2563eb;
 }
 
 @theme inline {
@@ -27,7 +28,23 @@ html, body {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-variant-numeric: tabular-nums;
+  text-rendering: geometricPrecision;
+}
+
+/* Fullscreen overlays must not inherit Tailwind space-y margins from page stacks. */
+.fixed.inset-0 {
+  margin-block-end: 0 !important;
+}
+
+::selection {
+  background: #bfdbfe;
+  color: #0f172a;
+}
+
+:where(a, button, input, select, textarea, [role="button"]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* Hide number input spinners */
@@ -73,4 +90,65 @@ input[type=number] {
 
 .shake {
   animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes ui-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ui-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--ui-zoom-start, 0.98)) translate3d(0, var(--ui-slide-y, 0), 0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+}
+
+@keyframes ui-slide-in {
+  from {
+    opacity: 0;
+    transform: translate3d(var(--ui-slide-x, 0), var(--ui-slide-y, 0), 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-in {
+  animation-duration: 220ms;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(.2,.8,.2,1);
+}
+
+.fade-in { animation-name: ui-fade-in; }
+.zoom-in,
+.zoom-in-95 { --ui-zoom-start: .95; animation-name: ui-zoom-in; }
+.slide-in-from-top-1 { --ui-slide-y: -0.25rem; animation-name: ui-slide-in; }
+.slide-in-from-top-2 { --ui-slide-y: -0.5rem; animation-name: ui-slide-in; }
+.slide-in-from-bottom-4 { --ui-slide-y: 1rem; animation-name: ui-slide-in; }
+.slide-in-from-bottom-8 { --ui-slide-y: 2rem; animation-name: ui-slide-in; }
+.slide-in-from-right { --ui-slide-x: 1.5rem; animation-name: ui-slide-in; }
+.fade-in.zoom-in,
+.fade-in.zoom-in-95 {
+  animation-name: ui-zoom-in;
+}
+
+.duration-100.animate-in { animation-duration: 100ms; }
+.duration-150.animate-in { animation-duration: 150ms; }
+.duration-200.animate-in { animation-duration: 200ms; }
+.duration-300.animate-in { animation-duration: 300ms; }
+.duration-500.animate-in { animation-duration: 500ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

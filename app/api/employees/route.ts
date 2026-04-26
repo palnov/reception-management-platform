@@ -2,16 +2,18 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-import { logAudit } from '@/lib/audit';
+import { hashPassword } from '@/lib/password';
+import type { Employee, EmployeeRoleHistory, EmployeeSalaryHistory, Prisma } from '@prisma/client';
+
+type EmployeeListItem = Pick<Employee, 'id' | 'name' | 'role' | 'baseSalary' | 'hourlyRate' | 'hireDate' | 'branch' | 'dismissalDate' | 'seniorId'> & {
+    sortOrder?: number;
+    roleHistory?: EmployeeRoleHistory[];
+    salaryHistory?: EmployeeSalaryHistory[];
+};
 
 async function checkManager() {
     const session = await getSession();
     return session?.employee?.role === 'MANAGER';
-}
-
-async function checkCanEditSchedule() {
-    const session = await getSession();
-    return session?.employee?.role === 'MANAGER' || session?.employee?.role === 'SENIOR';
 }
 
 async function updateEmployeeHistory(employeeId: string, role: string, seniorId: string | null, effectiveDate?: string) {
@@ -27,23 +29,23 @@ async function updateEmployeeHistory(employeeId: string, role: string, seniorId:
         const dateToUse = effectiveDate || new Date().toISOString().split('T')[0];
 
         // 1. Close current history record (one with endDate: null)
-        const currentHist = await (prisma as any).employeeRoleHistory.findFirst({
+        const currentHist = await prisma.employeeRoleHistory.findFirst({
             where: { employeeId, endDate: null }
         });
 
         if (currentHist) {
             if (currentHist.startDate === dateToUse) {
                 // If it starts today, just update it instead of closing/reopening
-                await (prisma as any).employeeRoleHistory.update({
+                await prisma.employeeRoleHistory.update({
                     where: { id: currentHist.id },
                     data: { role, seniorId: seniorId || null }
                 });
             } else {
-                await (prisma as any).employeeRoleHistory.update({
+                await prisma.employeeRoleHistory.update({
                     where: { id: currentHist.id },
                     data: { endDate: new Date(new Date(dateToUse).getTime() - 86400000).toISOString().split('T')[0] }
                 });
-                await (prisma as any).employeeRoleHistory.create({
+                await prisma.employeeRoleHistory.create({
                     data: {
                         employeeId,
                         role,
@@ -58,7 +60,7 @@ async function updateEmployeeHistory(employeeId: string, role: string, seniorId:
             const initialStart = oldEmployee?.hireDate || '2000-01-01';
 
             if (initialStart >= dateToUse) {
-                await (prisma as any).employeeRoleHistory.create({
+                await prisma.employeeRoleHistory.create({
                     data: {
                         employeeId,
                         role,
@@ -68,7 +70,7 @@ async function updateEmployeeHistory(employeeId: string, role: string, seniorId:
                     }
                 });
             } else {
-                await (prisma as any).employeeRoleHistory.create({
+                await prisma.employeeRoleHistory.create({
                     data: {
                         employeeId,
                         role: oldEmployee?.role || 'ADMIN',
@@ -77,7 +79,7 @@ async function updateEmployeeHistory(employeeId: string, role: string, seniorId:
                         endDate: new Date(new Date(dateToUse).getTime() - 86400000).toISOString().split('T')[0]
                     }
                 });
-                await (prisma as any).employeeRoleHistory.create({
+                await prisma.employeeRoleHistory.create({
                     data: {
                         employeeId,
                         role,
@@ -105,23 +107,23 @@ async function updateSalaryHistory(employeeId: string, baseSalary: number, hourl
             ? (effectiveDate.substring(0, 7) + '-01') 
             : (new Date().toISOString().substring(0, 7) + '-01');
 
-        const currentHist = await (prisma as any).employeeSalaryHistory.findFirst({
+        const currentHist = await prisma.employeeSalaryHistory.findFirst({
             where: { employeeId, endDate: null }
         });
 
         if (currentHist) {
             if (currentHist.startDate === dateToUse) {
-                await (prisma as any).employeeSalaryHistory.update({
+                await prisma.employeeSalaryHistory.update({
                     where: { id: currentHist.id },
                     data: { baseSalary, hourlyRate }
                 });
             } else {
                 const prevMonthEnd = new Date(new Date(dateToUse).getTime() - 86400000).toISOString().split('T')[0];
-                await (prisma as any).employeeSalaryHistory.update({
+                await prisma.employeeSalaryHistory.update({
                     where: { id: currentHist.id },
                     data: { endDate: prevMonthEnd }
                 });
-                await (prisma as any).employeeSalaryHistory.create({
+                await prisma.employeeSalaryHistory.create({
                     data: {
                         employeeId,
                         baseSalary,
@@ -134,7 +136,7 @@ async function updateSalaryHistory(employeeId: string, baseSalary: number, hourl
         } else {
             const initialStart = (oldEmployee?.hireDate || '2024-01-01').substring(0, 7) + '-01';
             if (initialStart >= dateToUse) {
-                await (prisma as any).employeeSalaryHistory.create({
+                await prisma.employeeSalaryHistory.create({
                     data: {
                         employeeId,
                         baseSalary,
@@ -145,7 +147,7 @@ async function updateSalaryHistory(employeeId: string, baseSalary: number, hourl
                 });
             } else {
                 const prevMonthEnd = new Date(new Date(dateToUse).getTime() - 86400000).toISOString().split('T')[0];
-                await (prisma as any).employeeSalaryHistory.create({
+                await prisma.employeeSalaryHistory.create({
                     data: {
                         employeeId,
                         baseSalary: oldEmployee?.baseSalary || 0,
@@ -154,7 +156,7 @@ async function updateSalaryHistory(employeeId: string, baseSalary: number, hourl
                         endDate: prevMonthEnd
                     }
                 });
-                await (prisma as any).employeeSalaryHistory.create({
+                await prisma.employeeSalaryHistory.create({
                     data: {
                         employeeId,
                         baseSalary,
@@ -170,30 +172,18 @@ async function updateSalaryHistory(employeeId: string, baseSalary: number, hourl
 
 export async function GET(request: Request) {
     try {
-        const managerCount = await prisma.employee.count({
-            where: { role: 'MANAGER' }
-        });
-
-        if (managerCount === 0) {
-            await prisma.employee.create({
-                data: {
-                    name: 'Руководитель',
-                    role: 'MANAGER',
-                    password: 'admin',
-                    baseSalary: 0,
-                    hourlyRate: 0,
-                    sortOrder: -1
-                }
-            });
-        }
-
-        const isManager = await checkManager();
+        const session = await getSession();
+        const isManager = session?.employee?.role === 'MANAGER';
         const { searchParams } = new URL(request.url);
         const activeOnly = searchParams.get('activeOnly') === 'true';
         const activeInDate = searchParams.get('activeInDate'); 
         const atDate = searchParams.get('atDate'); 
 
-        const where: any = {};
+        if (!session?.employee && !activeOnly) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const where: Prisma.EmployeeWhereInput = {};
         if (activeOnly) {
             const today = new Date().toISOString().split('T')[0];
             where.OR = [
@@ -231,11 +221,11 @@ export async function GET(request: Request) {
                 name: true,
                 role: true,
                 baseSalary: true,
+                hourlyRate: true,
                 hireDate: true,
                 branch: true,
                 dismissalDate: true,
                 seniorId: true,
-                password: isManager,
                 sortOrder: isManager,
                 roleHistory: atDate ? {
                     where: {
@@ -258,9 +248,17 @@ export async function GET(request: Request) {
                     take: 1
                 } : false
             }
-        } as any);
+        }) as EmployeeListItem[];
 
-        const result = employees.map((emp: any) => {
+        if (!session?.employee) {
+            return NextResponse.json(employees.map((emp) => ({
+                id: emp.id,
+                name: emp.name,
+                role: emp.role
+            })));
+        }
+
+        const result = employees.map((emp) => {
             let baseSalary = emp.baseSalary;
             let hourlyRate = emp.hourlyRate;
             let role = emp.role;
@@ -278,9 +276,13 @@ export async function GET(request: Request) {
                 hourlyRate = sHist.hourlyRate;
             }
 
-            const { roleHistory, salaryHistory, ...rest } = emp;
             return {
-                ...rest,
+                id: emp.id,
+                name: emp.name,
+                hireDate: emp.hireDate,
+                branch: emp.branch,
+                dismissalDate: emp.dismissalDate,
+                ...(isManager ? { sortOrder: emp.sortOrder } : {}),
                 role,
                 seniorId,
                 baseSalary,
@@ -289,7 +291,7 @@ export async function GET(request: Request) {
         });
 
         return NextResponse.json(result);
-    } catch (error: any) {
+    } catch (error) {
         console.error('API_EMPLOYEES_GET_ERROR:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
@@ -302,6 +304,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { name, role, baseSalary, hourlyRate, branch, password, hireDate, dismissalDate, seniorId, subordinateIds } = body;
 
+    if (!password) {
+        return NextResponse.json({ error: 'Password is required' }, { status: 400 });
+    }
+
     const lastEmployee = await prisma.employee.findFirst({
         orderBy: { sortOrder: 'desc' },
         select: { sortOrder: true }
@@ -312,7 +318,7 @@ export async function POST(request: Request) {
         data: {
             name,
             role,
-            password: password || '1234',
+            password: await hashPassword(password),
             baseSalary: parseFloat(baseSalary || 0),
             hourlyRate: parseFloat(hourlyRate || 0),
             branch,
@@ -320,11 +326,11 @@ export async function POST(request: Request) {
             dismissalDate: dismissalDate || '',
             sortOrder: nextOrder,
             seniorId: seniorId || null
-        } as any
+        }
     });
 
     const dateToUse = new Date().toISOString().split('T')[0];
-    await (prisma as any).employeeRoleHistory.create({
+    await prisma.employeeRoleHistory.create({
         data: {
             employeeId: employee.id,
             role,
@@ -334,7 +340,7 @@ export async function POST(request: Request) {
         }
     });
 
-    await (prisma as any).employeeSalaryHistory.create({
+    await prisma.employeeSalaryHistory.create({
         data: {
             employeeId: employee.id,
             baseSalary: parseFloat(baseSalary || 0),
@@ -416,7 +422,7 @@ export async function PUT(request: Request) {
     await updateEmployeeHistory(id, role, resolvedSeniorId, dateToUse);
     await updateSalaryHistory(id, parseFloat(baseSalary || 0), parseFloat(hourlyRate || 0), effectiveDate);
 
-    const data: any = {
+    const data: Prisma.EmployeeUncheckedUpdateInput = {
         name,
         role,
         baseSalary: parseFloat(baseSalary || 0),
@@ -427,7 +433,7 @@ export async function PUT(request: Request) {
         seniorId: resolvedSeniorId
     };
 
-    if (password !== undefined) data.password = password;
+    if (password !== undefined && password !== '') data.password = await hashPassword(password);
     if (sortOrder !== undefined) data.sortOrder = sortOrder;
 
     const employee = await prisma.employee.update({
@@ -519,8 +525,8 @@ export async function DELETE(request: Request) {
             where: { id }
         });
         return NextResponse.json({ success: true });
-    } catch (error: any) {
-        console.error('API_EMPLOYEES_DELETE_ERROR:', error.message);
+    } catch (error) {
+        console.error('API_EMPLOYEES_DELETE_ERROR:', error);
         return NextResponse.json({ error: 'Failed to delete employee' }, { status: 500 });
     }
 }

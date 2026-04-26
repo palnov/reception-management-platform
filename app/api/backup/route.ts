@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-import fs from 'fs';
-import path from 'path';
 
 export async function GET() {
     const session = await getSession();
@@ -11,17 +9,49 @@ export async function GET() {
     }
 
     try {
+        const [
+            employees,
+            shifts,
+            kpiRecords,
+            monthlyNorms,
+            promotionSales,
+            registrationKpis,
+            monthlyChecklists,
+            dailyChecklists,
+            closedMonths,
+            employeeRoleHistories,
+            employeeSalaryHistories,
+            auditLogs,
+        ] = await Promise.all([
+            prisma.employee.findMany(),
+            prisma.shift.findMany(),
+            prisma.kpiRecord.findMany(),
+            prisma.monthlyNorm.findMany(),
+            prisma.promotionSale.findMany(),
+            prisma.registrationKpi.findMany(),
+            prisma.monthlyChecklist.findMany(),
+            prisma.dailyChecklist.findMany(),
+            prisma.closedMonth.findMany(),
+            prisma.employeeRoleHistory.findMany(),
+            prisma.employeeSalaryHistory.findMany(),
+            prisma.auditLog.findMany(),
+        ]);
+
         const data = {
             version: '1.0',
             timestamp: new Date().toISOString(),
-            employees: await prisma.employee.findMany(),
-            shifts: await prisma.shift.findMany(),
-            kpiRecords: await prisma.kpiRecord.findMany(),
-            monthlyNorms: await prisma.monthlyNorm.findMany(),
-            promotionSales: await prisma.promotionSale.findMany(),
-            registrationKpis: await prisma.registrationKpi.findMany(),
-            monthlyChecklists: await prisma.monthlyChecklist.findMany(),
-            auditLogs: await prisma.auditLog.findMany()
+            employees,
+            shifts,
+            kpiRecords,
+            monthlyNorms,
+            promotionSales,
+            registrationKpis,
+            monthlyChecklists,
+            dailyChecklists,
+            closedMonths,
+            employeeRoleHistories,
+            employeeSalaryHistories,
+            auditLogs
         };
 
         return new NextResponse(JSON.stringify(data, null, 2), {
@@ -49,26 +79,20 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid backup format' }, { status: 400 });
         }
 
-
-        // Helper to chunk array
-        const chunkArray = (arr: any[], size: number) => {
-            const chunks = [];
-            for (let i = 0; i < arr.length; i += size) {
-                chunks.push(arr.slice(i, i + size));
-            }
-            return chunks;
-        };
-
         // Transactional Restore (timeout 60s for stability)
         await prisma.$transaction(async (tx) => {
             // 1. Clear all tables in correct order
             await tx.auditLog.deleteMany();
+            await tx.dailyChecklist.deleteMany();
             await tx.registrationKpi.deleteMany();
             await tx.promotionSale.deleteMany();
             await tx.kpiRecord.deleteMany();
             await tx.monthlyChecklist.deleteMany();
             await tx.shift.deleteMany();
             await tx.monthlyNorm.deleteMany();
+            await tx.closedMonth.deleteMany();
+            await tx.employeeSalaryHistory.deleteMany();
+            await tx.employeeRoleHistory.deleteMany();
             await tx.employee.deleteMany();
 
             // 2. Restore Employees
@@ -128,6 +152,7 @@ export async function POST(request: Request) {
                             cabinetClosed: Boolean(s.cabinetClosed),
                             centerClosed: Boolean(s.centerClosed),
                             isActingLead: Boolean(s.isActingLead),
+                            isTrainee: Boolean(s.isTrainee),
                             coefficient: Number(s.coefficient ?? 1.0),
                             comment: s.comment || '',
                             createdAt: s.createdAt || '',
@@ -218,6 +243,74 @@ export async function POST(request: Request) {
                     });
                 }
             }
+
+            // 8.1 Restore DailyChecklists
+            if (backup.dailyChecklists && backup.dailyChecklists.length > 0) {
+                for (const d of backup.dailyChecklists) {
+                    await tx.dailyChecklist.create({
+                        data: {
+                            id: d.id,
+                            date: d.date,
+                            employeeId: d.employeeId,
+                            criterion1: Number(d.criterion1 ?? 0),
+                            criterion2: Number(d.criterion2 ?? 0),
+                            criterion3: Number(d.criterion3 ?? 0),
+                            criterion4: Number(d.criterion4 ?? 0),
+                            criterion5: Number(d.criterion5 ?? 0),
+                            criterion6: Number(d.criterion6 ?? 0),
+                            totalScore: Number(d.totalScore ?? 0),
+                            maxScore: Number(d.maxScore ?? 100),
+                            createdAt: d.createdAt || '',
+                            createdBy: d.createdBy || ''
+                        }
+                    });
+                }
+            }
+
+            // 8.2 Restore ClosedMonths
+            if (backup.closedMonths && backup.closedMonths.length > 0) {
+                for (const c of backup.closedMonths) {
+                    await tx.closedMonth.create({
+                        data: {
+                            month: c.month,
+                            isClosed: Boolean(c.isClosed),
+                            createdAt: c.createdAt || '',
+                            updatedAt: c.updatedAt || ''
+                        }
+                    });
+                }
+            }
+
+            // 8.3 Restore Employee History
+            if (backup.employeeRoleHistories && backup.employeeRoleHistories.length > 0) {
+                for (const h of backup.employeeRoleHistories) {
+                    await tx.employeeRoleHistory.create({
+                        data: {
+                            id: h.id,
+                            employeeId: h.employeeId,
+                            role: h.role || 'ADMIN',
+                            seniorId: h.seniorId || null,
+                            startDate: h.startDate,
+                            endDate: h.endDate || null
+                        }
+                    });
+                }
+            }
+
+            if (backup.employeeSalaryHistories && backup.employeeSalaryHistories.length > 0) {
+                for (const h of backup.employeeSalaryHistories) {
+                    await tx.employeeSalaryHistory.create({
+                        data: {
+                            id: h.id,
+                            employeeId: h.employeeId,
+                            baseSalary: Number(h.baseSalary ?? 0),
+                            hourlyRate: Number(h.hourlyRate ?? 0),
+                            startDate: h.startDate,
+                            endDate: h.endDate || null
+                        }
+                    });
+                }
+            }
         }, { timeout: 60000 });
 
         // 9. Restore AuditLogs outside main transaction (Extreme Scalability: Mini-Transactions)
@@ -248,8 +341,9 @@ export async function POST(request: Request) {
         }
 
         return NextResponse.json({ success: true, message: 'Database restored successfully' });
-    } catch (error: any) {
+    } catch (error) {
         console.error('Restore Error:', error);
-        return NextResponse.json({ error: 'Restore failed: ' + error.message }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return NextResponse.json({ error: 'Restore failed: ' + message }, { status: 500 });
     }
 }

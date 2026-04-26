@@ -3,8 +3,13 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { logAudit, calculateDiff } from '@/lib/audit';
 import { isMonthClosed } from '@/lib/monthStatus';
+import { requireSession } from '@/lib/api-auth';
+import type { AuditLog } from '@prisma/client';
 
 export async function GET(request: Request) {
+    const auth = await requireSession();
+    if (auth.response) return auth.response;
+
     const { searchParams } = new URL(request.url);
     const start = searchParams.get('start');
     const end = searchParams.get('end');
@@ -45,7 +50,7 @@ export async function GET(request: Request) {
             }
         });
 
-        const logsBySaleId = new Map<string, any[]>();
+        const logsBySaleId = new Map<string, AuditLog[]>();
         logs.forEach(log => {
             if (!logsBySaleId.has(log.entityId)) logsBySaleId.set(log.entityId, []);
             logsBySaleId.get(log.entityId)!.push(log);
@@ -57,8 +62,9 @@ export async function GET(request: Request) {
         }));
 
         return NextResponse.json(salesWithLogs);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        console.error('SALES_GET_ERROR:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
 
@@ -93,15 +99,16 @@ export async function PUT(request: Request) {
 
         const sale = await prisma.promotionSale.update({
             where: { id },
-            data: newData as any
+            data: newData
         });
 
         if (diff) {
             await logAudit('SALE', id, 'UPDATE', diff, session);
         }
         return NextResponse.json(sale);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        console.error('SALES_PUT_ERROR:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
 
@@ -128,13 +135,14 @@ export async function POST(request: Request) {
                 price: Number(price) || 0,
                 bonus: bonus,
                 createdBy: session.employee.name
-            } as any
+            }
         });
 
         await logAudit('SALE', sale.id, 'CREATE', { productName, price, patientId }, session);
         return NextResponse.json(sale);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        console.error('SALES_POST_ERROR:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
 
@@ -160,7 +168,8 @@ export async function DELETE(request: Request) {
             await prisma.promotionSale.delete({ where: { id } });
         }
         return NextResponse.json({ success: true });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        console.error('SALES_DELETE_ERROR:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

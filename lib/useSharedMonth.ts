@@ -26,15 +26,10 @@ function storeMonth(date: Date) {
 export function useSharedMonth(): [Date, (date: Date) => void] {
     // Start with current date normalized to start of month to avoid hydration mismatch
     // and time-of-day issues.
-    const [currentMonth, setCurrentMonthState] = useState<Date>(() => startOfMonth(new Date()));
+    const [currentMonth, setCurrentMonthState] = useState<Date>(() => startOfMonth(getStoredMonth()));
 
     // Sync with localStorage on mount and listen for changes
     useEffect(() => {
-        const stored = getStoredMonth();
-        // Since getStoredMonth() returns new Date() when empty, only update if it's different
-        // or just always update to be sure we have the latest from storage
-        setCurrentMonthState(stored);
-
         const handleStorage = (e: StorageEvent) => {
             if (e.key === STORAGE_KEY && e.newValue) {
                 const parsed = new Date(e.newValue);

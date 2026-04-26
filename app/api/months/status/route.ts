@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { requireManager, requireSession } from '@/lib/api-auth';
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireSession();
+    if (auth.response) return auth.response;
+
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month'); // Expecting YYYY-MM
 
@@ -19,17 +22,16 @@ export async function GET(request: Request) {
       month, 
       isClosed: !!closedMonth?.isClosed 
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    console.error('MONTH_STATUS_GET_ERROR:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const session = await getSession();
-    if (!session || session.employee.role !== 'MANAGER') {
-      return NextResponse.json({ error: 'Only managers can change month status' }, { status: 403 });
-    }
+    const auth = await requireManager();
+    if (auth.response) return auth.response;
 
     const body = await request.json();
     const { month, isClosed } = body;
@@ -54,7 +56,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    console.error('MONTH_STATUS_POST_ERROR:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

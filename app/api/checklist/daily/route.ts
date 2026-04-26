@@ -3,8 +3,13 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { logAudit, calculateDiff } from '@/lib/audit';
 import { isMonthClosed } from '@/lib/monthStatus';
+import { requireSession } from '@/lib/api-auth';
+import type { AuditLog } from '@prisma/client';
 
 export async function GET(request: Request) {
+    const auth = await requireSession();
+    if (auth.response) return auth.response;
+
     const { searchParams } = new URL(request.url);
     const start = searchParams.get('start');
     const end = searchParams.get('end');
@@ -45,7 +50,7 @@ export async function GET(request: Request) {
             }
         });
 
-        const logsByRecordId = new Map<string, any[]>();
+        const logsByRecordId = new Map<string, AuditLog[]>();
         logs.forEach(log => {
             if (!logsByRecordId.has(log.entityId)) logsByRecordId.set(log.entityId, []);
             logsByRecordId.get(log.entityId)!.push(log);
@@ -57,8 +62,9 @@ export async function GET(request: Request) {
         }));
 
         return NextResponse.json(recordsWithLogs);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        console.error('DAILY_CHECKLIST_GET_ERROR:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
 
@@ -116,8 +122,9 @@ export async function POST(request: Request) {
         }, session);
 
         return NextResponse.json(record);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        console.error('DAILY_CHECKLIST_POST_ERROR:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
 
@@ -185,8 +192,9 @@ export async function PUT(request: Request) {
         }
 
         return NextResponse.json(record);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        console.error('DAILY_CHECKLIST_PUT_ERROR:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
 
@@ -211,7 +219,8 @@ export async function DELETE(request: Request) {
         await prisma.dailyChecklist.delete({ where: { id } });
 
         return NextResponse.json({ success: true });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        console.error('DAILY_CHECKLIST_DELETE_ERROR:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
