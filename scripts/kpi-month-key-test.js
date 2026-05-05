@@ -37,4 +37,10 @@ assert.deepEqual(
   'Month changes must not skip loading just because the selected month later matches initialData'
 );
 
+assert.equal(
+  source.includes('await fetchData();'),
+  false,
+  'Saving KPI manual checklist values must update local state instead of reloading the whole table'
+);
+
 console.log('KPI month-key regression checks passed');

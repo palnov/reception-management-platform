@@ -233,7 +233,20 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                 throw new Error(data?.error || 'Failed to save checklist');
             }
 
-            await fetchData();
+            const savedChecklist = await res.json() as MonthlyChecklist;
+            setMonthlyChecklists(previous => {
+                const existingIndex = previous.findIndex(item =>
+                    item.month === savedChecklist.month && item.employeeId === savedChecklist.employeeId
+                );
+
+                if (existingIndex === -1) {
+                    return [...previous, savedChecklist];
+                }
+
+                return previous.map((item, index) =>
+                    index === existingIndex ? savedChecklist : item
+                );
+            });
             setEditingCell(null);
         } catch (e) {
             console.error('Failed to save checklist:', e);
