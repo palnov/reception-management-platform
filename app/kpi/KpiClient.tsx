@@ -106,7 +106,7 @@ function formatSeniority(years: number): string {
 export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
     const [currentMonth, setCurrentMonth] = useSharedMonth();
     const initialDataMatchesMonth = !!initialData && initialMonth === format(currentMonth, 'yyyy-MM');
-    const initialDataConsumedRef = useRef(false);
+    const shouldSkipInitialFetchRef = useRef(initialDataMatchesMonth);
     const [currentUser, setCurrentUser] = useState<CurrentUser | null>(
         initialDataMatchesMonth ? initialData.currentUser : null
     );
@@ -192,15 +192,15 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
     }, []);
 
     useEffect(() => {
-        if (initialDataMatchesMonth && !initialDataConsumedRef.current) {
-            initialDataConsumedRef.current = true;
+        if (shouldSkipInitialFetchRef.current) {
+            shouldSkipInitialFetchRef.current = false;
             return;
         }
 
         const controller = new AbortController();
         void fetchData(controller.signal);
         return () => controller.abort();
-    }, [fetchData, initialDataMatchesMonth]);
+    }, [fetchData]);
 
     async function handleSaveChecklist(empId: string, field: string, value: string) {
         if (isClosed) {
@@ -208,10 +208,16 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
             return;
         }
         try {
-            const newValue = parseFloat(value);
-            const month = currentMonth.toISOString().substring(0, 7); // Format: "2026-02"
+            const trimmedValue = value.trim();
+            const newValue = trimmedValue === '' ? 0 : Number(trimmedValue);
+            if (!Number.isFinite(newValue)) {
+                setPageError('Введите корректное числовое значение.');
+                return;
+            }
 
-            await fetch('/api/checklist', {
+            const month = format(currentMonth, 'yyyy-MM');
+
+            const res = await fetch('/api/checklist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -222,10 +228,16 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                 }),
             });
 
-            fetchData();
+            if (!res.ok) {
+                const data = await res.json().catch(() => null);
+                throw new Error(data?.error || 'Failed to save checklist');
+            }
+
+            await fetchData();
             setEditingCell(null);
         } catch (e) {
             console.error('Failed to save checklist:', e);
+            setPageError('Не удалось сохранить ручной показатель. Попробуйте обновить страницу и повторить ввод.');
         }
     }
 
@@ -311,7 +323,7 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                 ? empDailyChecklists.reduce((sum, c) => sum + c.totalScore, 0) / empDailyChecklists.length
                 : 0;
 
-            const monthStr = currentMonth.toISOString().substring(0, 7);
+            const monthStr = format(currentMonth, 'yyyy-MM');
             const empChecklist = monthlyChecklists.find(c => c.employeeId === enrichedEmp.id && c.month === monthStr);
             // Use daily average for calculation, ownChecklist is monthly constant (legacy if needed)
             const ownChecklist = empChecklist ? empChecklist.percentage : 0;

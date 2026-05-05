@@ -74,7 +74,7 @@ type ScheduleClientProps = {
 export default function SchedulePage({ initialMonth, initialData }: ScheduleClientProps) {
     const [currentMonth, setCurrentMonth] = useSharedMonth();
     const initialDataMatchesMonth = !!initialData && initialMonth === format(currentMonth, 'yyyy-MM');
-    const initialDataConsumedRef = useRef(false);
+    const shouldSkipInitialOverviewFetchRef = useRef(initialDataMatchesMonth);
     const { isClosed, refresh: refreshMonthStatus } = useMonthStatus(currentMonth);
     const [shifts, setShifts] = useState<Shift[]>(initialDataMatchesMonth ? initialData.shifts as Shift[] : []);
     const [employees, setEmployees] = useState<Employee[]>(initialDataMatchesMonth ? initialData.employees : []);
@@ -280,8 +280,8 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
     }, [initialDataMatchesMonth, initialData, initialMonth]);
 
     useEffect(() => {
-        if (initialDataMatchesMonth && !initialDataConsumedRef.current) {
-            initialDataConsumedRef.current = true;
+        if (shouldSkipInitialOverviewFetchRef.current) {
+            shouldSkipInitialOverviewFetchRef.current = false;
         } else {
             void loadOverview(currentMonth, true);
         }
