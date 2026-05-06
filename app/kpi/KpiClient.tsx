@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import Link from 'next/link';
 import { useSharedMonth } from '@/lib/useSharedMonth';
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -205,7 +204,7 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
     }, [fetchData]);
 
     async function handleSaveChecklist(empId: string, field: string, value: string) {
-        if (isClosed) {
+        if (isClosed || currentUser?.role !== 'MANAGER') {
             setEditingCell(null);
             return;
         }
@@ -348,8 +347,7 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
             const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
             const cardBonus = cardCreation * 60;
 
-            // Use checklist average from daily audits for KPI bonus
-            const calcChecklist = avgDailyChecklist || ownChecklist; // Fallback to legacy if no daily audits
+            const calcChecklist = empDailyChecklists.length > 0 ? avgDailyChecklist : ownChecklist;
             const checklistBreakdown = "";
 
             let checklistBonus = 0;
@@ -437,6 +435,7 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
         calc.rawHours > 0 || calc.dayOffHours > 0 || calc.totalPay > 0 || calc.seniorityBonus > 0
     );
     const payrollColumnCount = includeActingLeadBonus ? 16 : 15;
+    const canEditManualChecklistValues = currentUser?.role === 'MANAGER' && !isClosed;
 
     return (
         <div>
@@ -627,9 +626,9 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                                                 />
                                             ) : (
                                                 <div
-                                                    className={!isClosed ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
+                                                    className={canEditManualChecklistValues ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
                                                     onClick={() => {
-                                                        if (isClosed) return;
+                                                        if (!canEditManualChecklistValues) return;
                                                         setEditingCell({ empId: calc.empId, field: 'sickLeaveOpening' });
                                                         setTempValue(calc.sickLeaveOpening === 0 ? '' : calc.sickLeaveOpening.toString());
                                                     }}
@@ -656,9 +655,9 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                                                 />
                                             ) : (
                                                 <div
-                                                    className={!isClosed ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
+                                                    className={canEditManualChecklistValues ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
                                                     onClick={() => {
-                                                        if (isClosed) return;
+                                                        if (!canEditManualChecklistValues) return;
                                                         setEditingCell({ empId: calc.empId, field: 'sickLeaveClosing' });
                                                         setTempValue(calc.sickLeaveClosing === 0 ? '' : calc.sickLeaveClosing.toString());
                                                     }}
@@ -685,9 +684,9 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                                                 />
                                             ) : (
                                                 <div
-                                                    className={!isClosed ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
+                                                    className={canEditManualChecklistValues ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
                                                     onClick={() => {
-                                                        if (isClosed) return;
+                                                        if (!canEditManualChecklistValues) return;
                                                         setEditingCell({ empId: calc.empId, field: 'cardCreation' });
                                                         setTempValue(calc.cardCreation === 0 ? '' : calc.cardCreation.toString());
                                                     }}
@@ -704,9 +703,35 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                                         <td className="px-4 py-3 text-right text-zinc-600">
                                             <div className="flex flex-col items-end">
                                                 {calc.checklistBonus > 0 && <span className="text-green-600 font-medium">+{calc.checklistBonus}</span>}
-                                                <div className="text-[10px] text-zinc-400 font-bold">
-                                                    {calc.calcChecklist.toFixed(1)}%
-                                                </div>
+                                                {editingCell?.empId === calc.empId && editingCell?.field === 'percentage' ? (
+                                                    <input
+                                                        autoFocus
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        step="0.1"
+                                                        className="w-16 px-1 py-0.5 border rounded text-right text-sm"
+                                                        value={tempValue}
+                                                        onFocus={(e) => e.target.select()}
+                                                        onChange={(e) => setTempValue(e.target.value)}
+                                                        onBlur={() => handleSaveChecklist(calc.empId, 'percentage', tempValue)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') handleSaveChecklist(calc.empId, 'percentage', tempValue);
+                                                            if (e.key === 'Escape') setEditingCell(null);
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        className={`text-[10px] text-zinc-400 font-bold ${canEditManualChecklistValues ? 'cursor-pointer hover:text-blue-600 transition-colors' : ''}`}
+                                                        onClick={() => {
+                                                            if (!canEditManualChecklistValues) return;
+                                                            setEditingCell({ empId: calc.empId, field: 'percentage' });
+                                                            setTempValue(calc.calcChecklist === 0 ? '' : calc.calcChecklist.toFixed(1));
+                                                        }}
+                                                    >
+                                                        {calc.calcChecklist.toFixed(1)}%
+                                                    </div>
+                                                )}
                                             </div>
                                         </td>
 
@@ -797,7 +822,7 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
 
                                 <div className="p-3 bg-zinc-50 rounded-lg border border-zinc-200">
                                     <p className="text-xs text-zinc-500 text-center">
-                                        Показатель чеклиста теперь рассчитывается автоматически на основе ежедневных аудитов на странице <Link href="/checklist" className="text-blue-600 underline">Чеклист</Link>.
+                                        Показатель чеклиста вносится вручную в таблице KPI и зарплаты.
                                     </p>
                                 </div>
 

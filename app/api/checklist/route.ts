@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isMonthClosed } from '@/lib/monthStatus';
-import { requireSession } from '@/lib/api-auth';
+import { requireManager, requireSession } from '@/lib/api-auth';
 import type { Prisma } from '@prisma/client';
 
 export async function GET(req: NextRequest) {
@@ -32,6 +32,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     try {
+        const auth = await requireManager();
+        if (auth.response) return auth.response;
+
         const json = await req.json();
         const { month, employeeId, percentage, sickLeaveOpening, sickLeaveClosing, cardCreation, closingBonus, updatedBy } = json;
 

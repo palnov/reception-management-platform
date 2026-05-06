@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { Users, Calendar, BarChart3, ShoppingCart, FileCheck, BadgeCheck, LogOut, User as UserIcon, Database, Menu, X } from 'lucide-react';
+import { Users, Calendar, BarChart3, ShoppingCart, FileCheck, LogOut, User as UserIcon, Database, Menu, X } from 'lucide-react';
 import { APP_NAME } from '@/lib/constants';
 
 interface User {
@@ -49,9 +49,6 @@ export function Navbar({ initialUser }: { initialUser: User | null }) {
                 </Link>
                 <Link href="/registration" className={`flex items-center gap-2 hover:text-blue-600 transition-colors ${pathname === '/registration' ? 'text-blue-600' : ''}`}>
                     <FileCheck className="w-4 h-4" /> Качество оформления
-                </Link>
-                <Link href="/checklist" className={`flex items-center gap-2 hover:text-blue-600 transition-colors ${pathname === '/checklist' ? 'text-blue-600' : ''}`}>
-                    <BadgeCheck className="w-4 h-4" /> Чеклист
                 </Link>
                 <Link href="/kpi" className={`flex items-center gap-2 hover:text-blue-600 transition-colors ${pathname === '/kpi' ? 'text-blue-600' : ''}`}>
                     <BarChart3 className="w-4 h-4" /> KPI и Зарплата
@@ -131,9 +128,6 @@ export function Navbar({ initialUser }: { initialUser: User | null }) {
                             </Link>
                             <Link href="/registration" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${pathname === '/registration' ? 'bg-blue-50 text-blue-600' : 'text-zinc-600 active:bg-zinc-100'}`}>
                                 <FileCheck className="w-5 h-5" /> Качество оформления
-                            </Link>
-                            <Link href="/checklist" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${pathname === '/checklist' ? 'bg-blue-50 text-blue-600' : 'text-zinc-600 active:bg-zinc-100'}`}>
-                                <BadgeCheck className="w-5 h-5" /> Чеклист
                             </Link>
                             <Link href="/kpi" className={`flex items-center gap-3 p-4 rounded-xl font-bold transition-all ${pathname === '/kpi' ? 'bg-blue-50 text-blue-600' : 'text-zinc-600 active:bg-zinc-100'}`}>
                                 <BarChart3 className="w-5 h-5" /> KPI и Зарплата

@@ -20,7 +20,7 @@ function getSecret() {
     return new TextEncoder().encode(value || 'development-only-secret-change-me');
 }
 
-function useSecureCookies() {
+function shouldUseSecureCookies() {
     const value = process.env.COOKIE_SECURE;
     if (value !== undefined) {
         return value === 'true' || value === '1';
@@ -36,7 +36,7 @@ export async function login(employee: { id: string, name: string, role: string }
     const cookieStore = await cookies();
     cookieStore.set('session', session, {
         httpOnly: true,
-        secure: useSecureCookies(),
+        secure: shouldUseSecureCookies(),
         expires: expiresAt,
         sameSite: 'lax',
         path: '/',
@@ -87,7 +87,7 @@ export async function updateSession(request: NextRequest) {
         name: 'session',
         value: await encrypt(parsed),
         httpOnly: true,
-        secure: useSecureCookies(),
+        secure: shouldUseSecureCookies(),
         expires: parsed.expiresAt,
         sameSite: 'lax',
         path: '/',

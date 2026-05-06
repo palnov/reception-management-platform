@@ -424,6 +424,9 @@ export class ReportService {
             const allChecklists = await prisma.monthlyChecklist.findMany({
                 where: { month: monthStr }
             });
+            const allDailyChecklists = await prisma.dailyChecklist.findMany({
+                where: { date: dateFilter }
+            });
 
             for (const emp of employees as EmployeeWithSalaryHistory[]) {
                 if (emp.role === 'MANAGER') continue;
@@ -480,12 +483,15 @@ export class ReportService {
 
                 // Restore missing checklist/manual bonus variables
                 const empChecklist = allChecklists.find(c => c.employeeId === emp.id);
+                const empDailyChecklists = allDailyChecklists.filter(c => c.employeeId === emp.id);
+                const avgDailyChecklist = empDailyChecklists.length > 0
+                    ? (empDailyChecklists.reduce((sum, c) => sum + c.totalScore, 0) / empDailyChecklists.length) / 100
+                    : 0;
                 const ownChecklist = empChecklist ? empChecklist.percentage / 100 : 0;
                 const sickLeaveOpening = empChecklist ? (empChecklist.sickLeaveOpening || 0) : 0;
                 const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
                 const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
-                // Use checklist percentage
-                const calcChecklist = ownChecklist;
+                const calcChecklist = empDailyChecklists.length > 0 ? avgDailyChecklist : ownChecklist;
 
                 const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
                 const cardBonus = cardCreation * 60;
@@ -703,7 +709,11 @@ export class ReportService {
         const sickOpening = monthlyChecklist?.sickLeaveOpening || 0;
         const sickClosing = monthlyChecklist?.sickLeaveClosing || 0;
         const elnBonus = sickOpening * 130 + sickClosing * 80;
-        const avgChecklist = dailyChecklists.length > 0 ? dailyChecklists.reduce((sum, c) => sum + c.totalScore, 0) / dailyChecklists.length : 0;
+        const avgDailyChecklist = dailyChecklists.length > 0
+            ? dailyChecklists.reduce((sum, c) => sum + c.totalScore, 0) / dailyChecklists.length
+            : 0;
+        const manualChecklist = monthlyChecklist?.percentage || 0;
+        const avgChecklist = dailyChecklists.length > 0 ? avgDailyChecklist : manualChecklist;
         let checklistBonus = 0;
         if (avgChecklist >= 90) checklistBonus = 5000;
         else if (avgChecklist >= 76) checklistBonus = 2500;
