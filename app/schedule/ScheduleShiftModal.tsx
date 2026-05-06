@@ -5,6 +5,7 @@ import { ru } from 'date-fns/locale';
 import { Activity, Briefcase, CheckSquare, Clock, LayoutList, Percent, Timer, X } from 'lucide-react';
 import type { Dispatch, FormEvent, SetStateAction } from 'react';
 import type { ShiftFormData, ShiftType } from './schedule-types';
+import { shouldIncludeActingLeadBonus } from '@/lib/acting-lead-policy';
 
 const shiftTypes: readonly {
     id: ShiftType;
@@ -48,6 +49,7 @@ export function ScheduleShiftModal({
     onSave,
 }: ScheduleShiftModalProps) {
     const canChangeProtectedFields = isManager || isSenior;
+    const includeActingLeadBonus = selectedDate ? shouldIncludeActingLeadBonus(selectedDate) : false;
 
     return (
         <div className="fixed inset-0 h-dvh min-h-dvh w-dvw bg-black/60 flex items-center justify-center z-[100] backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-300" onMouseDown={onClose}>
@@ -148,7 +150,7 @@ export function ScheduleShiftModal({
                                     </label>
                                 </div>
                             ))}
-                            {selectedDate && selectedDate < new Date('2026-04-01') && (
+                            {includeActingLeadBonus && (
                                 <div className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => canChangeProtectedFields && onFormDataChange(prev => ({ ...prev, isActingLead: !prev.isActingLead }))}>
                                     <input type="checkbox" checked={formData.isActingLead} readOnly className="w-5 h-5 text-indigo-600 rounded-lg border-zinc-300 pointer-events-none" />
                                     <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">

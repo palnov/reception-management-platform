@@ -1,4 +1,5 @@
 import { eachDayOfInterval, endOfMonth, format, parseISO, startOfMonth, subDays } from 'date-fns';
+import { shouldIncludeActingLeadBonus } from '@/lib/acting-lead-policy';
 import type { BatchShiftDeleteOperation, BatchShiftOperation, Employee, SelectionBounds, SelectionState, Shift, ShiftFormData } from './schedule-types';
 
 export const DEFAULT_SHIFT_FORM_DATA: ShiftFormData = {
@@ -262,7 +263,7 @@ export function buildFillOperations({
             hours: sourceShift.hours,
             cabinetClosed: sourceShift.cabinetClosed,
             centerClosed: sourceShift.centerClosed,
-            isActingLead: sourceShift.isActingLead,
+            isActingLead: shouldIncludeActingLeadBonus(cell.date) && sourceShift.isActingLead,
             isTrainee: sourceShift.isTrainee,
             coefficient: sourceShift.coefficient,
             id: shiftsByEmployee[cell.empId]?.[cell.date]?.id,

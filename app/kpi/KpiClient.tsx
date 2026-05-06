@@ -15,6 +15,7 @@ import { MonthClosureControls } from '@/components/MonthClosureControls';
 import { EmptyState } from '@/components/EmptyState';
 import { InlineStatus } from '@/components/InlineStatus';
 import type { KpiOverview } from '@/lib/overview-data';
+import { shouldIncludeActingLeadBonus } from '@/lib/acting-lead-policy';
 
 interface Employee {
     id: string;
@@ -123,6 +124,7 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
     const [dailyChecklists, setDailyChecklists] = useState<DailyChecklist[]>(initialDataMatchesMonth ? initialData.dailyChecklists : []);
     const [monthNorm, setMonthNorm] = useState<number>(initialDataMatchesMonth ? initialData.monthNorm : 176);
     const [isColumnCollapsed, setIsColumnCollapsed] = useState(false);
+    const includeActingLeadBonus = shouldIncludeActingLeadBonus(currentMonth);
 
     function getInitials(name: string): string {
         const parts = name.trim().split(/\s+/);
@@ -380,7 +382,7 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
             else if (finalQuality >= 85) qualityBonus = 2500;
 
             const actualClosingBonuses = closingBonuses;
-            const totalPay = basePay + coeffBonus + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + traineeBonus + (currentMonth < new Date('2026-04-01') ? actingLeadBonus : 0);
+            const totalPay = basePay + coeffBonus + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + traineeBonus + (includeActingLeadBonus ? actingLeadBonus : 0);
 
             // Aggregate all audit logs
             const allLogs = [
@@ -428,12 +430,13 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                 auditLogs: uniqueLogs
             };
         });
-    }, [employees, shifts, kpiRecords, promotionSales, registrationKpis, monthlyChecklists, dailyChecklists, monthNorm, currentUser, isUserLoading, currentMonth]);
+    }, [employees, shifts, kpiRecords, promotionSales, registrationKpis, monthlyChecklists, dailyChecklists, monthNorm, currentUser, isUserLoading, currentMonth, includeActingLeadBonus]);
 
     const isPayrollLoading = isUserLoading || isDataLoading;
     const visiblePayrollData = payrollData.filter(calc =>
         calc.rawHours > 0 || calc.dayOffHours > 0 || calc.totalPay > 0 || calc.seniorityBonus > 0
     );
+    const payrollColumnCount = includeActingLeadBonus ? 16 : 15;
 
     return (
         <div>
@@ -490,7 +493,7 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за открытие, закрытие центра и за закрытие кабинетов">Откр/Закр.</Tooltip>
                             </th>
-                            {currentMonth < new Date('2026-04-01') && (
+                            {includeActingLeadBonus && (
                                 <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-right whitespace-nowrap min-w-[60px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>
                                     <Tooltip content="Доплата за исполнение обязанностей старшей смены">ИО</Tooltip>
                                 </th>
@@ -525,7 +528,7 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                         {isPayrollLoading ? (
                             Array.from({ length: 6 }).map((_, rowIndex) => (
                                 <tr key={rowIndex}>
-                                    {Array.from({ length: 15 }).map((__, cellIndex) => (
+                                    {Array.from({ length: payrollColumnCount }).map((__, cellIndex) => (
                                         <td key={cellIndex} className="px-4 py-3">
                                             <div className="h-4 rounded bg-zinc-100 animate-pulse" />
                                         </td>
@@ -534,7 +537,7 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                             ))
                         ) : visiblePayrollData.length === 0 ? (
                             <tr>
-                                <td colSpan={15}>
+                                <td colSpan={payrollColumnCount}>
                                     <EmptyState
                                         icon={User}
                                         title="Нет данных для расчета KPI"
@@ -590,7 +593,7 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                                                 <div className="text-emerald-600 font-medium">+{calc.closingBonuses}</div>
                                             ) : '-'}
                                         </td>
-                                        {currentMonth < new Date('2026-04-01') && (
+                                        {includeActingLeadBonus && (
                                             <td className="px-4 py-3 text-right">
                                                 {calc.actingLeadBonus > 0 ? (
                                                     <div className="text-emerald-600 font-medium">+{calc.actingLeadBonus}</div>

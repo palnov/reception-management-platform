@@ -8,6 +8,7 @@ import { QuickContextMenu } from '@/components/QuickContextMenu';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { ScheduleOverview } from '@/lib/overview-data';
+import { shouldIncludeActingLeadBonus } from '@/lib/acting-lead-policy';
 import { ScheduleToolbar } from './ScheduleToolbar';
 import { ScheduleNormModal } from './ScheduleNormModal';
 import { ScheduleShiftModal } from './ScheduleShiftModal';
@@ -390,6 +391,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
             date: format(selectedDate, 'yyyy-MM-dd'),
             employeeId: selectedEmployeeId,
             ...formData,
+            isActingLead: shouldIncludeActingLeadBonus(selectedDate) ? formData.isActingLead : false,
             coefficient: Math.min(parseFloat(formData.coefficient || '1.0'), 1.5).toString()
         });
 
@@ -464,7 +466,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
                 date: cell.date,
                 employeeId: cell.empId,
                 ...formData,
-                isActingLead: formData.isActingLead && emp?.role === 'ADMIN',
+                isActingLead: shouldIncludeActingLeadBonus(cell.date) && formData.isActingLead && emp?.role === 'ADMIN',
                 isTrainee: formData.isTrainee,
                 id: shiftsByEmployee[cell.empId]?.[cell.date]?.id
             };

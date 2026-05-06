@@ -4,6 +4,7 @@ import { startOfMonth, endOfMonth, format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import JSZip from 'jszip';
 import type { Prisma, RegistrationKpi } from '@prisma/client';
+import { shouldIncludeActingLeadBonus } from '@/lib/acting-lead-policy';
 
 type EmployeeWithSalaryHistory = Prisma.EmployeeGetPayload<{
     include: { salaryHistory: true };
@@ -36,6 +37,7 @@ export class ReportService {
             lte: format(endDate, 'yyyy-MM-dd')
         };
         const monthStr = format(startDate, 'yyyy-MM'); // e.g. "2026-02"
+        const includeActingLeadBonus = shouldIncludeActingLeadBonus(startDate);
 
         const empFilter: Prisma.EmployeeWhereInput = employeeId ? { id: employeeId } : {
             role: { not: 'MANAGER' },
@@ -371,7 +373,7 @@ export class ReportService {
                 { header: 'Откр/Закр', key: 'closing', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
             ];
 
-            if (startDate < new Date('2026-04-01')) {
+            if (includeActingLeadBonus) {
                 salaryCols.push({ header: 'ИО', key: 'actingLead', width: 12, style: { ...cellStyle, numFmt: '#,##0' } });
             }
             salaryCols.push({ header: 'Стажёр', key: 'trainee', width: 12, style: { ...cellStyle, numFmt: '#,##0' } });
@@ -450,7 +452,7 @@ export class ReportService {
                     }
                     if (s.cabinetClosed) closingBonuses += 250;
                     if (s.centerClosed) closingBonuses += 500;
-                    if (s.isActingLead && startDate < new Date('2026-04-01')) actingLeadBonus += 250;
+                    if (s.isActingLead && includeActingLeadBonus) actingLeadBonus += 250;
                     if (s.isTrainee) traineeBonus += 500;
                 });
 
