@@ -104,7 +104,7 @@ function formatSeniority(years: number): string {
 }
 
 export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
-    const [currentMonth, setCurrentMonth] = useSharedMonth();
+    const [currentMonth, setCurrentMonth] = useSharedMonth(initialMonth);
     const initialDataMatchesMonth = !!initialData && initialMonth === format(currentMonth, 'yyyy-MM');
     const shouldSkipInitialFetchRef = useRef(initialDataMatchesMonth);
     const [currentUser, setCurrentUser] = useState<CurrentUser | null>(

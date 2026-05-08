@@ -79,6 +79,10 @@ export default function DataPage() {
     if (loading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin w-8 h-8 text-blue-600" /></div>;
     if (!user) return null;
 
+    const isPersonalReport = reportType === 'SALARY_SLIP' || reportType === 'DETAILIZATION';
+    const personalReportTitle = reportType === 'DETAILIZATION' ? 'Детализация' : 'Расчетный лист';
+    const personalReportFilePrefix = reportType === 'DETAILIZATION' ? 'Детализация' : 'Расчетный_лист';
+
     const handleExport = async (mode: 'GENERAL' | 'INDIVIDUAL') => {
         setOperationStatus(null);
         if (mode === 'GENERAL') setIsExportingGeneral(true);
@@ -264,10 +268,11 @@ export default function DataPage() {
                                         onChange={(e) => setReportType(e.target.value)}
                                         className="w-full px-4 py-3 border-2 border-zinc-100 rounded-xl focus:border-blue-500 outline-none font-bold bg-white"
                                     >
-                                        <option value="SALARY_SLIP">Расчетный лист (Детальный)</option>
+                                        <option value="SALARY_SLIP">Расчетный лист</option>
+                                        <option value="DETAILIZATION">Детализация</option>
                                         <option value="ACCOUNTANT">Для бухгалтера</option>
                                         <option value="ACCOUNTANT_15">Для бухгалтера (1-15 число)</option>
-                                        <option value="FULL">Полный отчет (Всё включено)</option>
+                                        <option value="FULL">Полный отчет</option>
                                         <option value="SCHEDULE">Только График</option>
                                         <option value="SALES">Только Продажи</option>
                                         <option value="REGISTRATION">Только Оформления</option>
@@ -279,7 +284,7 @@ export default function DataPage() {
 
                         <div className="space-y-4 pt-5 border-t border-zinc-100">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {reportType === 'SALARY_SLIP' ? (
+                                {isPersonalReport ? (
                                     <div className="p-5 sm:p-6 border border-blue-100 bg-gradient-to-br from-blue-50 to-white rounded-3xl flex flex-col justify-between">
                                         <div className="flex items-start gap-4 mb-4 text-blue-600">
                                             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shrink-0">
@@ -287,7 +292,7 @@ export default function DataPage() {
                                             </div>
                                             <div>
                                                 <div className="font-bold text-lg text-zinc-900">Индивидуально</div>
-                                                <div className="text-sm text-zinc-500 mt-1">Один расчётный лист для выбранного сотрудника</div>
+                                                <div className="text-sm text-zinc-500 mt-1">Один файл «{personalReportTitle}» для выбранного сотрудника</div>
                                             </div>
                                         </div>
                                         
@@ -322,7 +327,7 @@ export default function DataPage() {
                                                         const res = await fetch('/api/reports/excel', {
                                                             method: 'POST',
                                                             headers: { 'Content-Type': 'application/json' },
-                                                            body: JSON.stringify({ date, type: 'SALARY_SLIP', employeeId: empId })
+                                                            body: JSON.stringify({ date, type: reportType, employeeId: empId })
                                                         });
                                                         if (!res.ok) throw new Error();
                                                         const blob = await res.blob();
@@ -330,10 +335,10 @@ export default function DataPage() {
                                                         const a = document.createElement('a');
                                                         a.href = url;
                                                         const empName = employees.find(e => e.id === empId)?.name || 'Employee';
-                                                        a.download = `Расчетный_лист_${empName.replace(/\\s+/g, '_')}_${exportDate}.xlsx`;
+                                                        a.download = `${personalReportFilePrefix}_${empName.replace(/\\s+/g, '_')}_${exportDate}.xlsx`;
                                                         a.click();
                                                         window.URL.revokeObjectURL(url);
-                                                        setOperationStatus({ type: 'success', message: 'Индивидуальный расчетный лист сформирован и скачан.' });
+                                                        setOperationStatus({ type: 'success', message: 'Индивидуальный отчет сформирован и скачан.' });
                                                     } catch {
                                                         setOperationStatus({ type: 'error', message: 'Ошибка при загрузке индивидуального отчета.' });
                                                     } finally {

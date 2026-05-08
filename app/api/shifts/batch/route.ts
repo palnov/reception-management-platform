@@ -25,6 +25,23 @@ function toNumber(value: string | number | undefined, fallback = 0) {
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function toMonthKey(date: string) {
+    return date.slice(0, 7);
+}
+
+async function findClosedMonths(dates: string[]) {
+    const monthKeys = [...new Set(dates.map(toMonthKey).filter(Boolean))];
+    if (monthKeys.length === 0) return [];
+
+    return prisma.closedMonth.findMany({
+        where: {
+            month: { in: monthKeys },
+            isClosed: true,
+        },
+        select: { month: true },
+    });
+}
+
 export async function POST(request: Request) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -47,6 +64,11 @@ export async function POST(request: Request) {
             });
 
             if (shiftsToDelete.length > 0) {
+                const closedMonths = await findClosedMonths(shiftsToDelete.map(shift => shift.date));
+                if (closedMonths.length > 0) {
+                    return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
+                }
+
                 await prisma.$transaction([
                     ...shiftsToDelete.map(shift =>
                         prisma.auditLog.create({
@@ -72,6 +94,11 @@ export async function POST(request: Request) {
 
         // 2. Handle Upserts (Operations)
         if (Array.isArray(operations) && operations.length > 0) {
+            const closedMonths = await findClosedMonths(operations.map(op => op.date));
+            if (closedMonths.length > 0) {
+                return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
+            }
+
             // Optimization: fetch all existing shifts for the given employee+date combinations
             const existingShifts = await prisma.shift.findMany({
                 where: {

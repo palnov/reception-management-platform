@@ -1,25 +1,32 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { format, startOfMonth } from 'date-fns';
 
 export function useMonthStatus(currentMonth: Date) {
   const [isClosed, setIsClosed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const statusRequestIdRef = useRef(0);
 
   const fetchStatus = useCallback(async () => {
+    const requestId = ++statusRequestIdRef.current;
+
     try {
       setIsLoading(true);
       const m = format(startOfMonth(currentMonth), 'yyyy-MM');
       const res = await fetch(`/api/months/status?month=${m}`);
       if (res.ok) {
         const data = await res.json();
-        setIsClosed(!!data.isClosed);
+        if (requestId === statusRequestIdRef.current) {
+          setIsClosed(!!data.isClosed);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch month status', error);
     } finally {
-      setIsLoading(false);
+      if (requestId === statusRequestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [currentMonth]);
 

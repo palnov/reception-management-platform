@@ -5,8 +5,24 @@ import { startOfMonth } from 'date-fns';
 
 const STORAGE_KEY = 'shared_selected_month';
 
-function getStoredMonth(): Date {
-    if (typeof window === 'undefined') return new Date();
+function parseInitialMonth(initialMonth?: string): Date | null {
+    if (!initialMonth) return null;
+
+    const match = /^(\d{4})-(\d{2})$/.exec(initialMonth);
+    if (!match) return null;
+
+    const year = Number(match[1]);
+    const monthIndex = Number(match[2]) - 1;
+    if (monthIndex < 0 || monthIndex > 11) return null;
+
+    return new Date(year, monthIndex, 1);
+}
+
+function getInitialMonth(initialMonth?: string): Date {
+    return startOfMonth(parseInitialMonth(initialMonth) ?? new Date());
+}
+
+function getStoredMonth(): Date | null {
     try {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
@@ -14,7 +30,7 @@ function getStoredMonth(): Date {
             if (!isNaN(parsed.getTime())) return parsed;
         }
     } catch { }
-    return new Date();
+    return null;
 }
 
 function storeMonth(date: Date) {
@@ -23,32 +39,41 @@ function storeMonth(date: Date) {
     } catch { }
 }
 
-export function useSharedMonth(): [Date, (date: Date) => void] {
-    // Start with current date normalized to start of month to avoid hydration mismatch
-    // and time-of-day issues.
-    const [currentMonth, setCurrentMonthState] = useState<Date>(() => startOfMonth(getStoredMonth()));
+export function useSharedMonth(initialMonth?: string): [Date, (date: Date) => void] {
+    const [currentMonth, setCurrentMonthState] = useState<Date>(() => getInitialMonth(initialMonth));
 
-    // Sync with localStorage on mount and listen for changes
     useEffect(() => {
         const handleStorage = (e: StorageEvent) => {
             if (e.key === STORAGE_KEY && e.newValue) {
                 const parsed = new Date(e.newValue);
                 if (!isNaN(parsed.getTime())) {
-                    setCurrentMonthState(parsed);
+                    setCurrentMonthState(startOfMonth(parsed));
                 }
             }
         };
         window.addEventListener('storage', handleStorage);
-        return () => window.removeEventListener('storage', handleStorage);
+
+        const syncStoredMonth = window.setTimeout(() => {
+            const storedMonth = getStoredMonth();
+            if (storedMonth) {
+                setCurrentMonthState(startOfMonth(storedMonth));
+            }
+        }, 0);
+
+        return () => {
+            window.clearTimeout(syncStoredMonth);
+            window.removeEventListener('storage', handleStorage);
+        };
     }, []);
 
     const setCurrentMonth = useCallback((date: Date) => {
-        storeMonth(date);
-        setCurrentMonthState(date);
+        const month = startOfMonth(date);
+        storeMonth(month);
+        setCurrentMonthState(month);
         // Dispatch custom event so other pages in the SAME tab can also sync
         window.dispatchEvent(new StorageEvent('storage', {
             key: STORAGE_KEY,
-            newValue: date.toISOString(),
+            newValue: month.toISOString(),
         }));
     }, []);
 

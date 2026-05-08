@@ -73,7 +73,7 @@ type ScheduleClientProps = {
 
 // --- Main Page Component ---
 export default function SchedulePage({ initialMonth, initialData }: ScheduleClientProps) {
-    const [currentMonth, setCurrentMonth] = useSharedMonth();
+    const [currentMonth, setCurrentMonth] = useSharedMonth(initialMonth);
     const initialDataMatchesMonth = !!initialData && initialMonth === format(currentMonth, 'yyyy-MM');
     const shouldSkipInitialOverviewFetchRef = useRef(initialDataMatchesMonth);
     const { isClosed, refresh: refreshMonthStatus } = useMonthStatus(currentMonth);
@@ -106,8 +106,16 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
     const handleCellRef = useRef<{ empId: string, dateKey: string } | null>(null);
     const selectionBoundsRef = useRef<SelectionBounds | null>(null);
     const lastSelectionEndRef = useRef<{ empId: string, date: string } | null>(null);
-    const overviewCacheRef = useRef<Map<string, ScheduleOverviewResponse>>(new Map());
+    const overviewCacheRef = useRef<Map<string, ScheduleOverviewResponse>>(
+        new Map(initialDataMatchesMonth && initialData && initialMonth
+            ? [[initialMonth, initialData as ScheduleOverviewResponse]]
+            : [])
+    );
+    const overviewCacheGenerationRef = useRef(0);
     const overviewRequestIdRef = useRef(0);
+    const currentMonthKey = format(currentMonth, 'yyyy-MM');
+    const currentMonthKeyRef = useRef(currentMonthKey);
+    currentMonthKeyRef.current = currentMonthKey;
 
     const [userData, setUserData] = useState<CurrentUser | null>(
         initialDataMatchesMonth ? initialData.currentUser : null
@@ -153,9 +161,21 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         }, type === 'success' ? 3500 : 7000);
     }, []);
 
-    const mergeLocalShifts = useCallback((updatedShifts: Shift[]) => {
+    const invalidateOverviewCacheForMonth = useCallback((monthKey: string) => {
+        overviewCacheGenerationRef.current += 1;
+        overviewCacheRef.current.delete(monthKey);
+    }, []);
+
+    const invalidateAllOverviewCache = useCallback(() => {
+        overviewCacheGenerationRef.current += 1;
+        overviewCacheRef.current.clear();
+    }, []);
+
+    const mergeLocalShifts = useCallback((updatedShifts: Shift[], monthKey = currentMonthKeyRef.current) => {
         if (updatedShifts.length === 0) return;
-        overviewCacheRef.current.delete(format(currentMonth, 'yyyy-MM'));
+        invalidateOverviewCacheForMonth(monthKey);
+
+        if (currentMonthKeyRef.current !== monthKey) return;
 
         setShifts(previous => {
             const byId = new Map(previous.map(shift => [shift.id, shift]));
@@ -171,14 +191,17 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
 
             return Array.from(byId.values());
         });
-    }, [currentMonth]);
+    }, [invalidateOverviewCacheForMonth]);
 
-    const removeLocalShiftIds = useCallback((ids: string[]) => {
+    const removeLocalShiftIds = useCallback((ids: string[], monthKey = currentMonthKeyRef.current) => {
         if (ids.length === 0) return;
-        overviewCacheRef.current.delete(format(currentMonth, 'yyyy-MM'));
+        invalidateOverviewCacheForMonth(monthKey);
+
+        if (currentMonthKeyRef.current !== monthKey) return;
+
         const idSet = new Set(ids);
         setShifts(previous => previous.filter(shift => !idSet.has(shift.id)));
-    }, [currentMonth]);
+    }, [invalidateOverviewCacheForMonth]);
 
     const isMonthEmpty = useMemo(() => shifts.filter(s => !s.isDeleted).length === 0, [shifts]);
     const prevMonthHasShifts = useMemo(() => prevMonthShifts.filter(s => !s.isDeleted).length > 0, [prevMonthShifts]);
@@ -205,6 +228,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         }
 
         const requestId = shouldApply ? ++overviewRequestIdRef.current : overviewRequestIdRef.current;
+        const cacheGenerationAtRequest = overviewCacheGenerationRef.current;
         if (shouldApply) setIsOverviewLoading(true);
 
         try {
@@ -219,9 +243,13 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
             }
 
             const data = await parseScheduleOverview(res);
+            if (cacheGenerationAtRequest !== overviewCacheGenerationRef.current) {
+                return;
+            }
+
             overviewCacheRef.current.set(monthKey, data);
 
-            if (shouldApply && requestId === overviewRequestIdRef.current) {
+            if (shouldApply && requestId === overviewRequestIdRef.current && currentMonthKeyRef.current === monthKey) {
                 applyOverviewData(data);
             }
 
@@ -237,12 +265,19 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
     }, [applyOverviewData, showFeedback]);
 
     const fetchShifts = useCallback(async () => {
+        const month = currentMonth;
+        const monthKey = format(month, 'yyyy-MM');
+
         try {
-            const currentShifts = await fetchMonthShifts(currentMonth);
+            const currentShifts = await fetchMonthShifts(month);
+            if (currentMonthKeyRef.current !== monthKey) return;
+
             setShifts(currentShifts);
 
             if (currentShifts.filter((s) => !s.isDeleted).length === 0) {
-                setPrevMonthShifts(await fetchPreviousShifts(currentMonth));
+                const previousShifts = await fetchPreviousShifts(month);
+                if (currentMonthKeyRef.current !== monthKey) return;
+                setPrevMonthShifts(previousShifts);
             } else {
                 setPrevMonthShifts([]);
             }
@@ -256,9 +291,35 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         void fetchShifts();
     }, [fetchShifts]);
 
+    const resetTransientScheduleState = useCallback(() => {
+        setSelectedDate(null);
+        setSelectedEmployeeId(null);
+        setShowModal(false);
+        setShowNormModal(false);
+        setSelection(null);
+        setIsDragging(false);
+        setIsFilling(false);
+        setFillSource(null);
+        setShowBatchModal(false);
+        setHandleCell(null);
+        setContextMenu(null);
+        blockModalRef.current = false;
+        lastSelectionEndRef.current = null;
+    }, []);
+
+    const handleMonthChange = useCallback((month: Date) => {
+        resetTransientScheduleState();
+        setCurrentMonth(month);
+    }, [resetTransientScheduleState, setCurrentMonth]);
+
     const fetchNorm = useCallback(async () => {
+        const month = currentMonth;
+        const monthKey = format(month, 'yyyy-MM');
+
         try {
-            const hours = await fetchMonthNorm(currentMonth);
+            const hours = await fetchMonthNorm(month);
+            if (currentMonthKeyRef.current !== monthKey) return;
+
             setMonthNorm(hours);
             setTempNorm(hours.toString());
         } catch (e) {
@@ -275,12 +336,6 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
     }, []);
 
     useEffect(() => {
-        if (initialDataMatchesMonth && initialData && initialMonth) {
-            overviewCacheRef.current.set(initialMonth, initialData as ScheduleOverviewResponse);
-        }
-    }, [initialDataMatchesMonth, initialData, initialMonth]);
-
-    useEffect(() => {
         if (shouldSkipInitialOverviewFetchRef.current) {
             shouldSkipInitialOverviewFetchRef.current = false;
         } else {
@@ -293,12 +348,16 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
 
     async function handleSaveNorm() {
         if (isClosed) return;
+        const mutationMonthKey = currentMonthKeyRef.current;
         try {
             const res = await saveMonthNorm(currentMonth, tempNorm);
             if (res.ok) {
-                setMonthNorm(parseFloat(tempNorm));
-                void fetchNorm();
-                setShowNormModal(false);
+                invalidateOverviewCacheForMonth(mutationMonthKey);
+                if (currentMonthKeyRef.current === mutationMonthKey) {
+                    setMonthNorm(parseFloat(tempNorm));
+                    void fetchNorm();
+                    setShowNormModal(false);
+                }
                 showFeedback('success', 'Норма часов обновлена.');
             } else {
                 showFeedback('error', await readApiError(res, 'Не удалось сохранить норму часов.'));
@@ -310,7 +369,8 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
     }
 
     const handleAutoFill = async () => {
-        if (!prevMonthHasShifts || !isMonthEmpty || isAutoFilling) return;
+        if (isClosed || !canEditShifts || !prevMonthHasShifts || !isMonthEmpty || isAutoFilling) return;
+        const mutationMonthKey = currentMonthKeyRef.current;
         setIsAutoFilling(true);
 
         try {
@@ -319,7 +379,17 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
             if (operations.length > 0) {
                 const res = await saveBatchShifts(operations);
                 if (res.ok) {
-                    fetchShifts();
+                    const data = await res.json().catch(() => null);
+                    const upsertedShifts = Array.isArray(data?.results?.upserted) ? data.results.upserted : [];
+                    if (upsertedShifts.length > 0) {
+                        mergeLocalShifts(upsertedShifts, mutationMonthKey);
+                    } else {
+                        invalidateOverviewCacheForMonth(mutationMonthKey);
+                    }
+                    if (currentMonthKeyRef.current === mutationMonthKey) {
+                        setPrevMonthShifts([]);
+                    }
+                    syncShiftsInBackground();
                     showFeedback('success', 'График заполнен по предыдущим сменам.');
                 } else {
                     showFeedback('error', await readApiError(res, 'Не удалось заполнить график.'));
@@ -351,15 +421,24 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
                     sortOrder: i
                 }));
 
+                invalidateAllOverviewCache();
                 fetch('/api/employees', {
                     method: 'PATCH',
                     body: JSON.stringify({ employees: updatedEmployees })
+                }).then((res) => {
+                    if (!res.ok) {
+                        showFeedback('error', 'Не удалось сохранить порядок сотрудников.');
+                        void loadOverview(currentMonth, true);
+                    }
+                }).catch(() => {
+                    showFeedback('error', 'Не удалось сохранить порядок сотрудников.');
+                    void loadOverview(currentMonth, true);
                 });
 
                 return newArray;
             });
         }
-    }, []);
+    }, [currentMonth, invalidateAllOverviewCache, loadOverview, showFeedback]);
 
     const openModal = useCallback((date: Date, empId: string, existingShift?: Shift) => {
         const emp = employees.find(e => e.id === empId);
@@ -379,7 +458,8 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
 
     const handleSaveShift = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
-        if (!selectedDate || !selectedEmployeeId) return;
+        if (isClosed || !canEditShifts || !selectedDate || !selectedEmployeeId) return;
+        const mutationMonthKey = currentMonthKeyRef.current;
 
         const existingShift = shifts.find(s =>
             s.employeeId === selectedEmployeeId &&
@@ -401,13 +481,16 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         }
 
         const updatedShift = await res.json();
-        mergeLocalShifts([updatedShift]);
-        setShowModal(false);
+        mergeLocalShifts([updatedShift], mutationMonthKey);
+        if (currentMonthKeyRef.current === mutationMonthKey) {
+            setShowModal(false);
+        }
         syncShiftsInBackground();
     };
 
     const handleDeleteShift = async () => {
-        if (!selectedDate || !selectedEmployeeId) return;
+        if (isClosed || !canEditShifts || !selectedDate || !selectedEmployeeId) return;
+        const mutationMonthKey = currentMonthKeyRef.current;
         const existingShift = shifts.find(s =>
             s.employeeId === selectedEmployeeId &&
             format(parseISO(s.date), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
@@ -419,8 +502,10 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
                 showFeedback('error', await readApiError(res, 'Не удалось удалить смену.'));
                 return;
             }
-            removeLocalShiftIds([existingShift.id]);
-            setShowModal(false);
+            removeLocalShiftIds([existingShift.id], mutationMonthKey);
+            if (currentMonthKeyRef.current === mutationMonthKey) {
+                setShowModal(false);
+            }
             syncShiftsInBackground();
         }
     };
@@ -455,7 +540,8 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
 
     const handleBatchSave = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
-        if (!selection) return;
+        if (isClosed || !canEditShifts || !selection) return;
+        const mutationMonthKey = currentMonthKeyRef.current;
 
         const range = getSelectedRange(selection);
         const operations = range.map<BatchShiftOperation | null>(cell => {
@@ -485,15 +571,18 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         }
 
         const data = await res.json();
-        mergeLocalShifts(Array.isArray(data?.results?.upserted) ? data.results.upserted : []);
-        setShowBatchModal(false);
-        setSelection(null);
+        mergeLocalShifts(Array.isArray(data?.results?.upserted) ? data.results.upserted : [], mutationMonthKey);
+        if (currentMonthKeyRef.current === mutationMonthKey) {
+            setShowBatchModal(false);
+            setSelection(null);
+        }
         syncShiftsInBackground();
         showFeedback('success', 'Выбранные смены сохранены.');
     };
 
     const handleBatchDelete = async () => {
-        if (!selection) return;
+        if (isClosed || !canEditShifts || !selection) return;
+        const mutationMonthKey = currentMonthKeyRef.current;
         const range = getSelectedRange(selection);
         const deleteIds = range
             .map(cell => shiftsByEmployee[cell.empId]?.[cell.date]?.id)
@@ -514,9 +603,11 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
                 return;
             }
         }
-        removeLocalShiftIds(deleteIds);
-        setShowBatchModal(false);
-        setSelection(null);
+        removeLocalShiftIds(deleteIds, mutationMonthKey);
+        if (currentMonthKeyRef.current === mutationMonthKey) {
+            setShowBatchModal(false);
+            setSelection(null);
+        }
         syncShiftsInBackground();
         if (deleteIds.length > 0) showFeedback('success', 'Выбранные смены удалены.');
     };
@@ -576,6 +667,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         const currentSelection = selection;
         const wasFilling = isFilling;
         const currentFillSource = fillSource;
+        const mutationMonthKey = currentMonthKeyRef.current;
 
         setIsDragging(false);
         setIsFilling(false);
@@ -609,16 +701,18 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
                 })));
                 if (res.ok) {
                     const data = await res.json();
-                    mergeLocalShifts(Array.isArray(data?.results?.upserted) ? data.results.upserted : []);
+                    mergeLocalShifts(Array.isArray(data?.results?.upserted) ? data.results.upserted : [], mutationMonthKey);
                 }
             }
 
             if (deletes.length > 0) {
                 const res = await deleteBatchShifts(deletes);
-                if (res.ok) removeLocalShiftIds(deletes);
+                if (res.ok) removeLocalShiftIds(deletes, mutationMonthKey);
             }
 
-            setSelection(null);
+            if (currentMonthKeyRef.current === mutationMonthKey) {
+                setSelection(null);
+            }
             syncShiftsInBackground();
         } else {
             if (isSingleCell) {
@@ -644,8 +738,9 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         }
 
         if (e.key === 'Delete' || e.key === 'Backspace') {
-            if (!isManager) return; // Non-managers cannot delete
+            if (isClosed || !isManager) return; // Non-managers cannot delete
             e.preventDefault();
+            const mutationMonthKey = currentMonthKeyRef.current;
             const range = getSelectedRange(selection);
             const deleteIds = range
                 .map(cell => shiftsByEmployee[cell.empId]?.[cell.date]?.id)
@@ -660,7 +755,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
                         showFeedback('error', message);
                         return;
                     }
-                    removeLocalShiftIds(deleteIds);
+                    removeLocalShiftIds(deleteIds, mutationMonthKey);
                     syncShiftsInBackground();
                     showFeedback('success', 'Выбранные смены удалены.');
                 } catch (err) {
@@ -668,11 +763,13 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
                     showFeedback('error', 'Не удалось связаться с сервером. Смены не удалены.');
                 }
             }
-            setSelection(null);
+            if (currentMonthKeyRef.current === mutationMonthKey) {
+                setSelection(null);
+            }
         } else if (e.key === 'Escape') {
             setSelection(null);
         }
-    }, [selection, isDragging, getSelectedRange, shiftsByEmployee, isManager, showFeedback, removeLocalShiftIds, syncShiftsInBackground]);
+    }, [selection, isDragging, getSelectedRange, shiftsByEmployee, isClosed, isManager, showFeedback, removeLocalShiftIds, syncShiftsInBackground]);
 
     const handleContextMenu = useCallback((e: React.MouseEvent, empId: string, dateKey: string, shift?: Shift) => {
         e.preventDefault();
@@ -694,7 +791,12 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
 
     const handleQuickAction = useCallback(async (action: 'SICK' | 'VACATION' | 'DELETE' | 'BATCH_EDIT') => {
         if (!contextMenu) return;
+        if (isClosed || !canEditShifts) {
+            setContextMenu(null);
+            return;
+        }
         const { empId, dateKey, shift, showBatchOption } = contextMenu;
+        const mutationMonthKey = dateKey.slice(0, 7);
         setContextMenu(null);
 
         if (action === 'BATCH_EDIT') {
@@ -746,7 +848,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
                         return;
                     }
                     const data = await res.json();
-                    mergeLocalShifts(Array.isArray(data?.results?.upserted) ? data.results.upserted : []);
+                    mergeLocalShifts(Array.isArray(data?.results?.upserted) ? data.results.upserted : [], mutationMonthKey);
                 } catch (err) {
                     console.error('Network error during batch update:', err);
                     showFeedback('error', 'Не удалось связаться с сервером. Смены не обновлены.');
@@ -757,9 +859,11 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
                 const deleteIds = range
                     .map(cell => shiftsByEmployee[cell.empId]?.[cell.date]?.id)
                     .filter(Boolean) as string[];
-                removeLocalShiftIds(deleteIds);
+                removeLocalShiftIds(deleteIds, mutationMonthKey);
             }
-            setSelection(null);
+            if (currentMonthKeyRef.current === mutationMonthKey) {
+                setSelection(null);
+            }
             syncShiftsInBackground();
             showFeedback('success', action === 'DELETE' ? 'Выбранные смены удалены.' : 'Выбранные смены обновлены.');
             return;
@@ -769,7 +873,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
             if (shift?.id) {
                 const res = await deleteShift(shift.id);
                 if (res.ok) {
-                    removeLocalShiftIds([shift.id]);
+                    removeLocalShiftIds([shift.id], mutationMonthKey);
                     syncShiftsInBackground();
                 }
             }
@@ -792,10 +896,10 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         });
         if (res.ok) {
             const updatedShift = await res.json();
-            mergeLocalShifts([updatedShift]);
+            mergeLocalShifts([updatedShift], mutationMonthKey);
             syncShiftsInBackground();
         }
-    }, [contextMenu, selection, getSelectedRange, shiftsByEmployee, showFeedback, mergeLocalShifts, removeLocalShiftIds, syncShiftsInBackground]);
+    }, [contextMenu, selection, getSelectedRange, shiftsByEmployee, isClosed, canEditShifts, showFeedback, mergeLocalShifts, removeLocalShiftIds, syncShiftsInBackground]);
 
     const handleHandleHover = useCallback((empId: string | null, dateKey: string | null) => {
         if (!isManager && !isSenior) return; // Non-managers/seniors don't see the drag handle
@@ -852,7 +956,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
                 prevMonthHasShifts={prevMonthHasShifts}
                 showManagerControls={userData?.role === 'MANAGER'}
                 onAutoFill={handleAutoFill}
-                onMonthChange={setCurrentMonth}
+                onMonthChange={handleMonthChange}
                 onMonthStatusChange={refreshMonthStatus}
                 onOpenNormModal={() => setShowNormModal(true)}
             />

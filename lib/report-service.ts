@@ -5,6 +5,7 @@ import { ru } from 'date-fns/locale';
 import JSZip from 'jszip';
 import type { Prisma, RegistrationKpi } from '@prisma/client';
 import { shouldIncludeActingLeadBonus } from '@/lib/acting-lead-policy';
+import { buildDetailizationWorkbook } from '@/lib/report-detailization';
 
 type EmployeeWithSalaryHistory = Prisma.EmployeeGetPayload<{
     include: { salaryHistory: true };
@@ -1020,6 +1021,142 @@ export class ReportService {
         sc(`M${curRow}`, salesBonus, fontA8b, centerMid, true);
 
         return workbook;
+    }
+
+    static async generateDetailizationWorkbook(date: string, employeeId: string): Promise<ExcelJS.Workbook> {
+        const dateObj = parseISO(date);
+        const startDate = startOfMonth(dateObj);
+        const endDate = endOfMonth(dateObj);
+        const monthStr = format(startDate, 'yyyy-MM');
+
+        const employee = await prisma.employee.findUnique({
+            where: { id: employeeId },
+            include: {
+                salaryHistory: {
+                    where: {
+                        startDate: { lte: format(endDate, 'yyyy-MM-dd') },
+                        OR: [{ endDate: null }, { endDate: { gte: format(startDate, 'yyyy-MM-dd') } }]
+                    },
+                    orderBy: { startDate: 'desc' },
+                    take: 1
+                }
+            }
+        });
+
+        if (!employee) throw new Error('Employee not found');
+        if (employee.role === 'MANAGER') throw new Error('Managers do not have detailization reports');
+
+        const normRecord = await prisma.monthlyNorm.findUnique({ where: { month: monthStr } });
+        const monthNorm = normRecord?.hours || 176;
+        const effectiveBaseSalary = (employee as EmployeeWithSalaryHistory).salaryHistory?.[0]?.baseSalary ?? employee.baseSalary;
+        const hourlyBase = effectiveBaseSalary / monthNorm;
+
+        const dateFilter = { gte: format(startDate, 'yyyy-MM-dd'), lte: format(endDate, 'yyyy-MM-dd') };
+        const shifts = await prisma.shift.findMany({ where: { employeeId, date: dateFilter, isDeleted: false } });
+        const sales = await prisma.promotionSale.findMany({ where: { employeeId, date: dateFilter } });
+        const regs = await prisma.registrationKpi.findMany({ where: { employeeId, date: dateFilter } });
+        const dailyChecklists = await prisma.dailyChecklist.findMany({ where: { employeeId, date: dateFilter } });
+        const monthlyChecklist = await prisma.monthlyChecklist.findUnique({
+            where: {
+                month_employeeId: {
+                    month: monthStr,
+                    employeeId
+                }
+            }
+        });
+
+        let intensityDays = 0;
+        let intensityBonus = 0;
+        let closingDays = 0;
+        let closingBonus = 0;
+        let archiveHours = 0;
+        let archiveBonus = 0;
+        let traineeDays = 0;
+        let traineeBonus = 0;
+
+        shifts.forEach(s => {
+            if (s.type === 'REGULAR') {
+                intensityDays++;
+                intensityBonus += hourlyBase * s.hours * Math.max(0, s.coefficient - 1);
+            } else if (s.type === 'ARCHIVE_WORK') {
+                archiveHours += s.hours;
+                archiveBonus += (3500 / 11) * s.hours;
+            }
+
+            if (s.cabinetClosed || s.centerClosed) closingDays++;
+            if (s.cabinetClosed) closingBonus += 250;
+            if (s.centerClosed) closingBonus += 500;
+            if (s.isTrainee) {
+                traineeDays++;
+                traineeBonus += 500;
+            }
+        });
+
+        const salesTotal = sales.reduce((sum, s) => sum + s.price, 0);
+        const salesBonus = sales.reduce((sum, s) => sum + s.bonus, 0);
+
+        const avgDailyChecklist = dailyChecklists.length > 0
+            ? dailyChecklists.reduce((sum, c) => sum + c.totalScore, 0) / dailyChecklists.length
+            : 0;
+        const manualChecklist = monthlyChecklist?.percentage || 0;
+        const checklistPercent = dailyChecklists.length > 0 ? avgDailyChecklist : manualChecklist;
+        let checklistBonus = 0;
+        if (checklistPercent >= 90) checklistBonus = 5000;
+        else if (checklistPercent >= 76) checklistBonus = 2500;
+
+        const qualityTotalScore = regs.reduce((sum, r) => sum + r.totalScore, 0);
+        const qualityMaxScore = regs.reduce((sum, r) => sum + (r.maxScore || (r.count * 3) || 0), 0);
+        const cardQualityPercent = qualityMaxScore > 0 ? (qualityTotalScore / qualityMaxScore) * 100 : 100;
+        let cardQualityBonus = 0;
+        if (cardQualityPercent >= 95) cardQualityBonus = 5000;
+        else if (cardQualityPercent >= 85) cardQualityBonus = 2500;
+
+        const sickLeaveOpening = monthlyChecklist?.sickLeaveOpening || 0;
+        const sickLeaveClosing = monthlyChecklist?.sickLeaveClosing || 0;
+        const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
+
+        const cardCreationCount = monthlyChecklist?.cardCreation || 0;
+        const cardCreationBonus = cardCreationCount * 60;
+
+        const hireDateParsed = employee.hireDate ? new Date(employee.hireDate) : null;
+        const dismissalDateParsed = employee.dismissalDate ? new Date(employee.dismissalDate) : null;
+        const calculationEndDate = (dismissalDateParsed && dismissalDateParsed < new Date())
+            ? dismissalDateParsed.getTime()
+            : Date.now();
+        const seniorityYears = hireDateParsed && !isNaN(hireDateParsed.getTime())
+            ? (calculationEndDate - hireDateParsed.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+            : 0;
+        let seniorityPercent = 0;
+        if (seniorityYears >= 3) seniorityPercent = 10;
+        else if (seniorityYears >= 2) seniorityPercent = 7;
+        else if (seniorityYears >= 1) seniorityPercent = 3;
+        const seniorityBonus = Math.round(effectiveBaseSalary * seniorityPercent / 100);
+
+        return await buildDetailizationWorkbook({
+            employeeName: employee.name,
+            reportDate: startDate,
+            intensityDays,
+            intensityBonus: Math.round(intensityBonus),
+            checklistPercent: Math.round(checklistPercent),
+            checklistBonus,
+            cardQualityPercent: Math.round(cardQualityPercent),
+            cardQualityBonus,
+            salesTotal: Math.round(salesTotal * 100) / 100,
+            salesBonus: Math.round(salesBonus * 100) / 100,
+            closingDays,
+            closingBonus,
+            archiveHours: Math.round(archiveHours * 100) / 100,
+            archiveBonus: Math.round(archiveBonus),
+            sickLeaveOpening,
+            sickLeaveClosing,
+            sickLeaveBonus,
+            traineeDays,
+            traineeBonus,
+            cardCreationCount,
+            cardCreationBonus,
+            seniorityPercent,
+            seniorityBonus
+        });
     }
 
     static async generateAllSalarySlipsZip(date: string): Promise<Buffer> {

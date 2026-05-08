@@ -13,7 +13,9 @@ export async function POST(request: Request) {
     try {
         const workbook = (type === 'SALARY_SLIP' && employeeId)
             ? await ReportService.generateSalarySlipWorkbook(date, employeeId)
-            : await ReportService.generateExcel(date, type, employeeId);
+            : (type === 'DETAILIZATION' && employeeId)
+                ? await ReportService.generateDetailizationWorkbook(date, employeeId)
+                : await ReportService.generateExcel(date, type, employeeId);
 
         if (!workbook) throw new Error('Failed to generate workbook');
 

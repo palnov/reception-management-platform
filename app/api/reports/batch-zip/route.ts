@@ -29,7 +29,9 @@ export async function POST(request: Request) {
         const promises = employees.map(async (emp) => {
             const workbook = (type === 'SALARY_SLIP')
                 ? await ReportService.generateSalarySlipWorkbook(date, emp.id)
-                : await ReportService.generateExcel(date, type, emp.id);
+                : (type === 'DETAILIZATION')
+                    ? await ReportService.generateDetailizationWorkbook(date, emp.id)
+                    : await ReportService.generateExcel(date, type, emp.id);
 
             if (!workbook) throw new Error(`Failed to generate workbook for employee ${emp.id}`);
             const buffer = await workbook.xlsx.writeBuffer();
