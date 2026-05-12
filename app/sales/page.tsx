@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSharedMonth } from '@/lib/useSharedMonth';
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, ShoppingCart, ArrowUp, ArrowDown, BadgePercent, WalletCards } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, ShoppingCart, ArrowUp, ArrowDown, BadgePercent, WalletCards, CalendarRange } from 'lucide-react';
 import { InfoTooltip } from '@/components/InfoTooltip';
 import { useMonthStatus } from '@/lib/useMonthStatus';
 import { MonthStatusBadge } from '@/components/MonthStatusBadge';
@@ -43,6 +43,22 @@ interface Sale {
     auditLogs?: AuditLog[];
 }
 
+interface CurrentUser {
+    id: string;
+    name: string;
+    role: string;
+}
+
+interface PromotionSummaryItem {
+    name: string;
+    count: number;
+}
+
+interface PromotionSummary {
+    total: number;
+    items: PromotionSummaryItem[];
+}
+
 export default function SalesPage() {
     const [currentMonth, setCurrentMonth] = useSharedMonth();
     const { isClosed, refresh: refreshMonthStatus } = useMonthStatus(currentMonth);
@@ -57,6 +73,12 @@ export default function SalesPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [pendingDelete, setPendingDelete] = useState<Sale | null>(null);
+    const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+    const [summaryStartDate, setSummaryStartDate] = useState(() => format(startOfMonth(currentMonth), 'yyyy-MM-dd'));
+    const [summaryEndDate, setSummaryEndDate] = useState(() => format(endOfMonth(currentMonth), 'yyyy-MM-dd'));
+    const [promotionSummary, setPromotionSummary] = useState<PromotionSummary>({ total: 0, items: [] });
+    const [isPromotionSummaryLoading, setIsPromotionSummaryLoading] = useState(false);
+    const [promotionSummaryError, setPromotionSummaryError] = useState<string | null>(null);
 
     const initialForm = {
         id: '',
@@ -67,6 +89,20 @@ export default function SalesPage() {
         price: '',
     };
     const [formData, setFormData] = useState(initialForm);
+
+    const fetchCurrentUser = useCallback(async (ignore = { val: false }) => {
+        try {
+            const res = await fetch('/api/auth/me');
+            if (!res.ok) throw new Error('Current user fetch failed');
+            const data = await res.json();
+            if (!ignore.val) {
+                setCurrentUser(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch current user', error);
+            if (!ignore.val) setCurrentUser(null);
+        }
+    }, []);
 
     const fetchEmployees = useCallback(async (ignore = { val: false }) => {
         try {
@@ -103,14 +139,54 @@ export default function SalesPage() {
         }
     }, [currentMonth]);
 
+    const fetchPromotionSummary = useCallback(async (ignore = { val: false }) => {
+        if (!summaryStartDate || !summaryEndDate || summaryStartDate > summaryEndDate) {
+            setPromotionSummaryError('Проверьте период: дата начала должна быть раньше даты окончания.');
+            setPromotionSummary({ total: 0, items: [] });
+            return;
+        }
+
+        try {
+            if (!ignore.val) setIsPromotionSummaryLoading(true);
+            setPromotionSummaryError(null);
+            const res = await fetch(`/api/sales/summary?start=${summaryStartDate}&end=${summaryEndDate}`);
+            if (!res.ok) throw new Error('Promotion summary fetch failed');
+            const data = await res.json();
+            if (!ignore.val) {
+                setPromotionSummary({
+                    total: Number(data?.total) || 0,
+                    items: Array.isArray(data?.items) ? data.items : [],
+                });
+            }
+        } catch (error) {
+            console.error('Failed to fetch promotion summary', error);
+            if (!ignore.val) {
+                setPromotionSummaryError('Не удалось загрузить статистику акций за выбранный период.');
+                setPromotionSummary({ total: 0, items: [] });
+            }
+        } finally {
+            if (!ignore.val) setIsPromotionSummaryLoading(false);
+        }
+    }, [summaryStartDate, summaryEndDate]);
+
     useEffect(() => {
         const ignore = { val: false };
         queueMicrotask(() => {
+            void fetchCurrentUser(ignore);
             void fetchEmployees(ignore);
             void fetchSales(ignore);
         });
         return () => { ignore.val = true; };
-    }, [fetchEmployees, fetchSales]);
+    }, [fetchCurrentUser, fetchEmployees, fetchSales]);
+
+    useEffect(() => {
+        if (currentUser?.role !== 'MANAGER') return;
+        const ignore = { val: false };
+        queueMicrotask(() => {
+            void fetchPromotionSummary(ignore);
+        });
+        return () => { ignore.val = true; };
+    }, [currentUser?.role, fetchPromotionSummary]);
 
     async function handleSave(e: React.FormEvent) {
         e.preventDefault();
@@ -130,6 +206,7 @@ export default function SalesPage() {
                 return;
             }
             fetchSales();
+            if (currentUser?.role === 'MANAGER') fetchPromotionSummary();
             setShowModal(false);
         } catch (error) {
             console.error('Failed to save sale', error);
@@ -153,6 +230,7 @@ export default function SalesPage() {
             }
             setPendingDelete(null);
             fetchSales();
+            if (currentUser?.role === 'MANAGER') fetchPromotionSummary();
         } catch (error) {
             console.error('Failed to delete sale', error);
             setPageError('Не удалось связаться с сервером. Продажа не удалена.');
@@ -237,6 +315,67 @@ export default function SalesPage() {
                     </div>
                 </div>
             </div>
+
+            {currentUser?.role === 'MANAGER' && (
+                <section className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4 shadow-sm shadow-sky-950/5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white text-sky-700 shadow-sm shadow-sky-950/5">
+                                <CalendarRange className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h2 className="text-sm font-black uppercase tracking-wider text-sky-950">Статистика акций</h2>
+                                <p className="mt-1 text-sm text-sky-800/75">Отдельный период для подсчета проданных акций.</p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                            <label className="text-xs font-bold uppercase tracking-wider text-sky-900">
+                                С
+                                <input
+                                    type="date"
+                                    value={summaryStartDate}
+                                    onChange={(e) => setSummaryStartDate(e.target.value)}
+                                    className="mt-1 w-full rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-zinc-900 outline-none transition-colors focus:border-sky-500"
+                                />
+                            </label>
+                            <label className="text-xs font-bold uppercase tracking-wider text-sky-900">
+                                По
+                                <input
+                                    type="date"
+                                    value={summaryEndDate}
+                                    onChange={(e) => setSummaryEndDate(e.target.value)}
+                                    className="mt-1 w-full rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-zinc-900 outline-none transition-colors focus:border-sky-500"
+                                />
+                            </label>
+                            <div className="rounded-xl bg-white px-4 py-3 shadow-sm shadow-sky-950/5">
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-sky-700">Всего акций</div>
+                                <div className="mt-1 flex items-center gap-2 text-2xl font-black text-sky-950">
+                                    {isPromotionSummaryLoading && <Loader2 className="h-4 w-4 animate-spin text-sky-600" />}
+                                    {promotionSummary.total}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {promotionSummaryError ? (
+                        <InlineStatus type="error" message={promotionSummaryError} className="mt-4 px-4 py-3" />
+                    ) : (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            {promotionSummary.items.length > 0 ? promotionSummary.items.map((item) => (
+                                <span
+                                    key={item.name}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-sky-100 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 shadow-sm shadow-sky-950/5"
+                                >
+                                    <span className="max-w-[220px] truncate">{item.name}</span>
+                                    <span className="rounded-lg bg-sky-100 px-2 py-0.5 text-xs font-black text-sky-800">{item.count}</span>
+                                </span>
+                            )) : (
+                                <span className="text-sm font-medium text-sky-800/75">За выбранный период акций нет.</span>
+                            )}
+                        </div>
+                    )}
+                </section>
+            )}
 
             {pageError && (
                 <InlineStatus type="error" message={pageError} className="px-4 py-3" />
