@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { startOfMonth } from 'date-fns';
 
 const STORAGE_KEY = 'shared_selected_month';
+const SAME_TAB_MONTH_EVENT = 'sharedMonthChanged';
 
 function parseInitialMonth(initialMonth?: string): Date | null {
     if (!initialMonth) return null;
@@ -43,15 +44,23 @@ export function useSharedMonth(initialMonth?: string): [Date, (date: Date) => vo
     const [currentMonth, setCurrentMonthState] = useState<Date>(() => getInitialMonth(initialMonth));
 
     useEffect(() => {
-        const handleStorage = (e: StorageEvent) => {
-            if (e.key === STORAGE_KEY && e.newValue) {
-                const parsed = new Date(e.newValue);
-                if (!isNaN(parsed.getTime())) {
-                    setCurrentMonthState(startOfMonth(parsed));
-                }
+        const applyStoredValue = (value: string | null) => {
+            if (!value) return;
+            const parsed = new Date(value);
+            if (!isNaN(parsed.getTime())) {
+                setCurrentMonthState(startOfMonth(parsed));
             }
         };
+
+        const handleStorage = (e: StorageEvent) => {
+            if (e.key === STORAGE_KEY) applyStoredValue(e.newValue);
+        };
+
+        const handleSameTabMonthChange = (e: Event) => {
+            applyStoredValue((e as CustomEvent<string>).detail);
+        };
         window.addEventListener('storage', handleStorage);
+        window.addEventListener(SAME_TAB_MONTH_EVENT, handleSameTabMonthChange);
 
         const syncStoredMonth = window.setTimeout(() => {
             const storedMonth = getStoredMonth();
@@ -63,6 +72,7 @@ export function useSharedMonth(initialMonth?: string): [Date, (date: Date) => vo
         return () => {
             window.clearTimeout(syncStoredMonth);
             window.removeEventListener('storage', handleStorage);
+            window.removeEventListener(SAME_TAB_MONTH_EVENT, handleSameTabMonthChange);
         };
     }, []);
 
@@ -70,10 +80,8 @@ export function useSharedMonth(initialMonth?: string): [Date, (date: Date) => vo
         const month = startOfMonth(date);
         storeMonth(month);
         setCurrentMonthState(month);
-        // Dispatch custom event so other pages in the SAME tab can also sync
-        window.dispatchEvent(new StorageEvent('storage', {
-            key: STORAGE_KEY,
-            newValue: month.toISOString(),
+        window.dispatchEvent(new CustomEvent(SAME_TAB_MONTH_EVENT, {
+            detail: month.toISOString(),
         }));
     }, []);
 

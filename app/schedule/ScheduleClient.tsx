@@ -140,6 +140,32 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         return userData?.role === 'MANAGER' || userData?.role === 'SENIOR';
     }, [userData]);
 
+    const canAssignArchiveWork = isManager;
+
+    const canEditEmployeeShift = useCallback((employee: Employee | undefined, existingShift?: Shift) => {
+        if (!employee || !userData) return false;
+        if (isManager) return true;
+        if (isSenior) return employee.id === userData.id || employee.seniorId === userData.id;
+        return !!existingShift && employee.id === userData.id;
+    }, [isManager, isSenior, userData]);
+
+    const selectedExistingShift = useMemo(() => {
+        if (!selectedDate || !selectedEmployeeId) return undefined;
+        const selectedDateKey = format(selectedDate, 'yyyy-MM-dd');
+
+        return shifts.find(s =>
+            s.employeeId === selectedEmployeeId &&
+            format(parseISO(s.date), 'yyyy-MM-dd') === selectedDateKey
+        );
+    }, [selectedDate, selectedEmployeeId, shifts]);
+
+    const selectedEmployee = useMemo(() => {
+        return employees.find(employee => employee.id === selectedEmployeeId);
+    }, [employees, selectedEmployeeId]);
+
+    const isOwnExistingShift = !!selectedExistingShift && selectedEmployeeId === userData?.id;
+    const canSaveSelectedShift = canEditEmployeeShift(selectedEmployee, selectedExistingShift) || isOwnExistingShift;
+
     useEffect(() => {
         selectionRef.current = selection;
     }, [selection]);
@@ -374,7 +400,11 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         setIsAutoFilling(true);
 
         try {
-            const operations = buildAutoFillOperations(employees, prevMonthShifts, currentMonth);
+            const operations = buildAutoFillOperations(
+                employees.filter(employee => canEditEmployeeShift(employee)),
+                prevMonthShifts,
+                currentMonth
+            );
 
             if (operations.length > 0) {
                 const res = await saveBatchShifts(operations);
@@ -458,16 +488,11 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
 
     const handleSaveShift = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
-        if (isClosed || !canEditShifts || !selectedDate || !selectedEmployeeId) return;
+        if (isClosed || !canSaveSelectedShift || !selectedDate || !selectedEmployeeId) return;
         const mutationMonthKey = currentMonthKeyRef.current;
 
-        const existingShift = shifts.find(s =>
-            s.employeeId === selectedEmployeeId &&
-            format(parseISO(s.date), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
-        );
-
         const res = await saveShift({
-            id: existingShift?.id,
+            id: selectedExistingShift?.id,
             date: format(selectedDate, 'yyyy-MM-dd'),
             employeeId: selectedEmployeeId,
             ...formData,
@@ -490,11 +515,9 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
 
     const handleDeleteShift = async () => {
         if (isClosed || !canEditShifts || !selectedDate || !selectedEmployeeId) return;
+        if (!canEditEmployeeShift(selectedEmployee, selectedExistingShift)) return;
         const mutationMonthKey = currentMonthKeyRef.current;
-        const existingShift = shifts.find(s =>
-            s.employeeId === selectedEmployeeId &&
-            format(parseISO(s.date), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd')
-        );
+        const existingShift = selectedExistingShift;
 
         if (existingShift) {
             const res = await deleteShift(existingShift.id);
@@ -546,6 +569,8 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         const range = getSelectedRange(selection);
         const operations = range.map<BatchShiftOperation | null>(cell => {
             const emp = employees.find(e => e.id === cell.empId);
+            const existingShift = shiftsByEmployee[cell.empId]?.[cell.date];
+            if (!canEditEmployeeShift(emp, existingShift)) return null;
             if (emp?.dismissalDate && cell.date > emp.dismissalDate) return null;
 
             return {
@@ -554,9 +579,14 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
                 ...formData,
                 isActingLead: shouldIncludeActingLeadBonus(cell.date) && formData.isActingLead && emp?.role === 'ADMIN',
                 isTrainee: formData.isTrainee,
-                id: shiftsByEmployee[cell.empId]?.[cell.date]?.id
+                id: existingShift?.id
             };
         }).filter(isDefinedBatchShiftOperation);
+
+        if (operations.length !== range.length) {
+            showFeedback('error', 'Можно редактировать только свои смены и смены закрепленных администраторов.');
+            return;
+        }
 
         const res = await saveBatchShifts(operations.map(op => ({
             ...op,
@@ -584,6 +614,10 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         if (isClosed || !canEditShifts || !selection) return;
         const mutationMonthKey = currentMonthKeyRef.current;
         const range = getSelectedRange(selection);
+        if (!range.every(cell => canEditEmployeeShift(employees.find(e => e.id === cell.empId), shiftsByEmployee[cell.empId]?.[cell.date]))) {
+            showFeedback('error', 'Можно удалять только свои смены и смены закрепленных администраторов.');
+            return;
+        }
         const deleteIds = range
             .map(cell => shiftsByEmployee[cell.empId]?.[cell.date]?.id)
             .filter(Boolean) as string[];
@@ -615,6 +649,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
     const handleMouseDown = useCallback((e: React.MouseEvent, empId: string, date: string) => {
         e.preventDefault();
         const sourceShift = shiftsByEmployee[empId]?.[date];
+        const employee = employees.find(emp => emp.id === empId);
         const isActuallyAdmin = userData?.role === 'ADMIN';
         const currentSelection = selectionRef.current;
         const currentContextMenu = contextMenuRef.current;
@@ -626,9 +661,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
 
         if (currentContextMenu) setContextMenu(null);
 
-        // ADMINs and regular users can only click existing shifts, not drag or select multiple cells
-        if ((!isManager && !isSenior) && !sourceShift) {
-            // If it's an empty cell, do nothing for admins/regular employees
+        if (!canEditEmployeeShift(employee, sourceShift)) {
             return;
         }
 
@@ -648,16 +681,19 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         setIsDragging(true);
         setIsFilling(false);
         setHandleCell(null);
-    }, [shiftsByEmployee, isManager, isSenior, userData, openModal]);
+    }, [shiftsByEmployee, employees, userData, openModal, canEditEmployeeShift]);
 
     const handleMouseEnter = useCallback((empId: string, date: string) => {
         if (!isDragging && !isFilling) return;
         if ((!isManager && !isSenior) && isDragging) return; // Prevent extending selection for admins/seniors
+        const employee = employees.find(emp => emp.id === empId);
+        const targetShift = shiftsByEmployee[empId]?.[date];
+        if (!canEditEmployeeShift(employee, targetShift)) return;
         const lastEnd = lastSelectionEndRef.current;
         if (lastEnd?.empId === empId && lastEnd.date === date) return;
         lastSelectionEndRef.current = { empId, date };
         setSelection(prev => prev ? { ...prev, end: { empId, date } } : null);
-    }, [isDragging, isFilling, isManager, isSenior]);
+    }, [isDragging, isFilling, isManager, isSenior, employees, shiftsByEmployee, canEditEmployeeShift]);
 
     const handleMouseUp = useCallback(async () => {
         if (!isDragging && !isFilling) {
@@ -681,6 +717,10 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
 
         if (wasFilling && currentFillSource) {
             const range = getSelectedRange(currentSelection);
+            if (!range.every(cell => canEditEmployeeShift(employees.find(emp => emp.id === cell.empId), shiftsByEmployee[cell.empId]?.[cell.date]))) {
+                showFeedback('error', 'Можно редактировать только свои смены и смены закрепленных администраторов.');
+                return;
+            }
             const operations = buildFillOperations({
                 currentFillSource,
                 dateKeyToIndex,
@@ -726,7 +766,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         }
 
         blockModalRef.current = false;
-    }, [isDragging, isFilling, fillSource, selection, employees, days, shiftsByEmployee, getSelectedRange, openModal, empIdToIndex, dateKeyToIndex, mergeLocalShifts, removeLocalShiftIds, syncShiftsInBackground]);
+    }, [isDragging, isFilling, fillSource, selection, employees, days, shiftsByEmployee, getSelectedRange, openModal, empIdToIndex, dateKeyToIndex, mergeLocalShifts, removeLocalShiftIds, syncShiftsInBackground, canEditEmployeeShift, showFeedback]);
 
     const handleKeyDown = useCallback(async (e: KeyboardEvent) => {
         if (!selection || isDragging) return;
@@ -738,10 +778,14 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         }
 
         if (e.key === 'Delete' || e.key === 'Backspace') {
-            if (isClosed || !isManager) return; // Non-managers cannot delete
+            if (isClosed || (!isManager && !isSenior)) return;
             e.preventDefault();
             const mutationMonthKey = currentMonthKeyRef.current;
             const range = getSelectedRange(selection);
+            if (!range.every(cell => canEditEmployeeShift(employees.find(emp => emp.id === cell.empId), shiftsByEmployee[cell.empId]?.[cell.date]))) {
+                showFeedback('error', 'Можно удалять только свои смены и смены закрепленных администраторов.');
+                return;
+            }
             const deleteIds = range
                 .map(cell => shiftsByEmployee[cell.empId]?.[cell.date]?.id)
                 .filter(Boolean) as string[];
@@ -769,11 +813,12 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         } else if (e.key === 'Escape') {
             setSelection(null);
         }
-    }, [selection, isDragging, getSelectedRange, shiftsByEmployee, isClosed, isManager, showFeedback, removeLocalShiftIds, syncShiftsInBackground]);
+    }, [selection, isDragging, getSelectedRange, shiftsByEmployee, employees, isClosed, isManager, isSenior, showFeedback, removeLocalShiftIds, syncShiftsInBackground, canEditEmployeeShift]);
 
     const handleContextMenu = useCallback((e: React.MouseEvent, empId: string, dateKey: string, shift?: Shift) => {
         e.preventDefault();
         if (!isManager && !isSenior) return; // Admins and regular employees have no context menu
+        if (!canEditEmployeeShift(employees.find(emp => emp.id === empId), shift)) return;
 
         const currentSelection = selectionRef.current;
         const isPointInSelection = isCellInSelection(empId, dateKey, selectionBoundsRef.current, empIdToIndex, dateKeyToIndex);
@@ -787,7 +832,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
             shift,
             showBatchOption: !!(isPointInSelection && isRange)
         });
-    }, [empIdToIndex, dateKeyToIndex, isManager, isSenior]);
+    }, [empIdToIndex, dateKeyToIndex, isManager, isSenior, employees, canEditEmployeeShift]);
 
     const handleQuickAction = useCallback(async (action: 'SICK' | 'VACATION' | 'DELETE' | 'BATCH_EDIT') => {
         if (!contextMenu) return;
@@ -806,6 +851,10 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
 
         if (showBatchOption && selection) {
             const range = getSelectedRange(selection);
+            if (!range.every(cell => canEditEmployeeShift(employees.find(emp => emp.id === cell.empId), shiftsByEmployee[cell.empId]?.[cell.date]))) {
+                showFeedback('error', 'Можно редактировать только свои смены и смены закрепленных администраторов.');
+                return;
+            }
             if (action === 'DELETE') {
                 const deleteIds = range
                     .map(cell => shiftsByEmployee[cell.empId]?.[cell.date]?.id)
@@ -870,7 +919,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         }
 
         if (action === 'DELETE') {
-            if (shift?.id) {
+            if (shift?.id && canEditEmployeeShift(employees.find(emp => emp.id === empId), shift)) {
                 const res = await deleteShift(shift.id);
                 if (res.ok) {
                     removeLocalShiftIds([shift.id], mutationMonthKey);
@@ -879,6 +928,9 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
             }
             return;
         }
+
+        const employee = employees.find(emp => emp.id === empId);
+        if (!canEditEmployeeShift(employee, shift)) return;
 
         const payload = {
             date: dateKey,
@@ -899,7 +951,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
             mergeLocalShifts([updatedShift], mutationMonthKey);
             syncShiftsInBackground();
         }
-    }, [contextMenu, selection, getSelectedRange, shiftsByEmployee, isClosed, canEditShifts, showFeedback, mergeLocalShifts, removeLocalShiftIds, syncShiftsInBackground]);
+    }, [contextMenu, selection, getSelectedRange, shiftsByEmployee, employees, isClosed, canEditShifts, showFeedback, mergeLocalShifts, removeLocalShiftIds, syncShiftsInBackground, canEditEmployeeShift]);
 
     const handleHandleHover = useCallback((empId: string | null, dateKey: string | null) => {
         if (!isManager && !isSenior) return; // Non-managers/seniors don't see the drag handle
@@ -1000,7 +1052,8 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
             )}
             {showModal && selectedEmployeeId && (
                 <ScheduleShiftModal
-                    canEditShifts={canEditShifts}
+                    canAssignArchiveWork={canAssignArchiveWork}
+                    canEditShifts={canSaveSelectedShift}
                     employeeName={employees.find(e => e.id === selectedEmployeeId)?.name}
                     formData={formData}
                     isManager={isManager}
@@ -1015,6 +1068,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
 
             {showBatchModal && (
                 <ScheduleBatchModal
+                    canAssignArchiveWork={canAssignArchiveWork}
                     formData={formData}
                     isManager={isManager}
                     isSenior={isSenior}

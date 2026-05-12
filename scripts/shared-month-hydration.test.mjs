@@ -37,4 +37,10 @@ assert(
   'Schedule page should seed useSharedMonth with the server initialMonth.'
 );
 
+assert(
+  !/new StorageEvent\(/.test(sharedMonthSource)
+    && /new CustomEvent\(/.test(sharedMonthSource),
+  'useSharedMonth should not construct StorageEvent manually because it can throw in some browsers.'
+);
+
 console.log('shared month hydration contract ok');

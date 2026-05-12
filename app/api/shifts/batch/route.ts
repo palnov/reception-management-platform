@@ -29,6 +29,21 @@ function toMonthKey(date: string) {
     return date.slice(0, 7);
 }
 
+function canEditShiftForSession(
+    role: string | undefined,
+    sessionEmployeeId: string,
+    employee: { id: string; seniorId?: string | null } | null | undefined,
+) {
+    if (!employee) return false;
+    if (role === 'MANAGER') return true;
+    if (role === 'SENIOR') return employee.id === sessionEmployeeId || employee.seniorId === sessionEmployeeId;
+    return false;
+}
+
+function isAssigningArchiveWork(role: string | undefined, type: string, existingType?: string) {
+    return role === 'SENIOR' && type === 'ARCHIVE_WORK' && existingType !== 'ARCHIVE_WORK';
+}
+
 async function findClosedMonths(dates: string[]) {
     const monthKeys = [...new Set(dates.map(toMonthKey).filter(Boolean))];
     if (monthKeys.length === 0) return [];
@@ -60,10 +75,22 @@ export async function POST(request: Request) {
         // 1. Handle Deletions (Soft Delete with Audit)
         if (Array.isArray(deleteIds) && deleteIds.length > 0) {
             const shiftsToDelete = await prisma.shift.findMany({
-                where: { id: { in: deleteIds } }
+                where: { id: { in: deleteIds } },
+                include: {
+                    employee: {
+                        select: { id: true, seniorId: true },
+                    },
+                },
             });
 
             if (shiftsToDelete.length > 0) {
+                const hasForbiddenShift = shiftsToDelete.some(shift =>
+                    !canEditShiftForSession(role, session.employee.id, shift.employee)
+                );
+                if (hasForbiddenShift) {
+                    return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
+                }
+
                 const closedMonths = await findClosedMonths(shiftsToDelete.map(shift => shift.date));
                 if (closedMonths.length > 0) {
                     return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
@@ -116,9 +143,21 @@ export async function POST(request: Request) {
             const involvedEmpIds = [...new Set(operations.map(op => op.employeeId))];
             const involvedEmps = await prisma.employee.findMany({
                 where: { id: { in: involvedEmpIds } },
-                select: { id: true, hireDate: true, dismissalDate: true }
+                select: { id: true, hireDate: true, dismissalDate: true, seniorId: true }
             });
             const employeeDateMap = new Map(involvedEmps.map(e => [e.id, e]));
+
+            for (const op of operations) {
+                const employee = employeeDateMap.get(op.employeeId);
+                if (!canEditShiftForSession(role, session.employee.id, employee)) {
+                    return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
+                }
+
+                const existing = op.id ? existingShifts.find(s => s.id === op.id) : existingMap.get(`${op.employeeId}_${op.date}`);
+                if (isAssigningArchiveWork(role, op.type, existing?.type)) {
+                    return NextResponse.json({ error: 'Cannot assign archive work' }, { status: 403 });
+                }
+            }
 
             const validOperations = operations.filter(op => {
                 const employeeDates = employeeDateMap.get(op.employeeId);

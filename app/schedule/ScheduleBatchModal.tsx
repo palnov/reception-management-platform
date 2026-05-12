@@ -21,6 +21,7 @@ const shiftTypes: readonly {
 ];
 
 type ScheduleBatchModalProps = {
+    canAssignArchiveWork: boolean;
     formData: ShiftFormData;
     isManager: boolean;
     isSenior: boolean;
@@ -32,6 +33,7 @@ type ScheduleBatchModalProps = {
 };
 
 export function ScheduleBatchModal({
+    canAssignArchiveWork,
     formData,
     isManager,
     isSenior,
@@ -66,7 +68,7 @@ export function ScheduleBatchModal({
                         <div className="space-y-2 col-span-2">
                             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Тип смены</label>
                             <div className="grid grid-cols-2 gap-2">
-                                {shiftTypes.map(type => (
+                                {shiftTypes.filter(type => canAssignArchiveWork || type.id !== 'ARCHIVE_WORK').map(type => (
                                     <button
                                         type="button"
                                         key={type.id}

@@ -27,6 +27,23 @@ function toNumber(value: string | number | undefined, fallback = 0) {
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+async function canEditShiftForSession(role: string | undefined, sessionEmployeeId: string, employeeId: string) {
+    if (role === 'MANAGER') return true;
+    if (role === 'ADMIN') return employeeId === sessionEmployeeId;
+    if (role !== 'SENIOR') return false;
+
+    const employee = await prisma.employee.findUnique({
+        where: { id: employeeId },
+        select: { seniorId: true },
+    });
+
+    return employeeId === sessionEmployeeId || employee?.seniorId === sessionEmployeeId;
+}
+
+function isAssigningArchiveWork(role: string | undefined, type: string, existingType?: string) {
+    return role === 'SENIOR' && type === 'ARCHIVE_WORK' && existingType !== 'ARCHIVE_WORK';
+}
+
 export async function GET(request: Request) {
     try {
         const auth = await requireSession();
@@ -106,7 +123,8 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json() as ShiftPayload;
-    const { id, date, employeeId, cabinetClosed, centerClosed, isTrainee, coefficient } = body;
+    const { id, date, employeeId, cabinetClosed, centerClosed } = body;
+    const { isTrainee, coefficient } = body;
     let { type, hours, isActingLead } = body;
 
     if (await isMonthClosed(date)) {
@@ -130,11 +148,25 @@ export async function POST(request: Request) {
             const existing = await prisma.shift.findUnique({ where: { id } });
             if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-            // ADMIN role restrictions: Cannot change type, hours, or isActingLead
+            if (!await canEditShiftForSession(role, session.employee.id, existing.employeeId)) {
+                return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
+            }
+
+            // ADMIN self-service can only change opening/closing flags on their own existing shift.
             if (role === 'ADMIN') {
+                if (existing.employeeId !== session.employee.id) {
+                    return NextResponse.json({ error: 'Admins can edit only their own shifts' }, { status: 403 });
+                }
+                if (employeeId !== existing.employeeId || date !== existing.date) {
+                    return NextResponse.json({ error: 'Admins cannot move shifts' }, { status: 403 });
+                }
                 type = existing.type;
                 hours = existing.hours;
                 isActingLead = existing.isActingLead;
+            }
+
+            if (isAssigningArchiveWork(role, type, existing.type)) {
+                return NextResponse.json({ error: 'Cannot assign archive work' }, { status: 403 });
             }
 
             const newData = {
@@ -172,11 +204,25 @@ export async function POST(request: Request) {
             });
 
             if (existing) {
-                // ADMIN role restrictions: Cannot change type, hours, or isActingLead
+                if (!await canEditShiftForSession(role, session.employee.id, existing.employeeId)) {
+                    return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
+                }
+
+                // ADMIN self-service can only change opening/closing flags on their own existing shift.
                 if (role === 'ADMIN') {
+                    if (existing.employeeId !== session.employee.id) {
+                        return NextResponse.json({ error: 'Admins can edit only their own shifts' }, { status: 403 });
+                    }
+                    if (employeeId !== existing.employeeId || date !== existing.date) {
+                        return NextResponse.json({ error: 'Admins cannot move shifts' }, { status: 403 });
+                    }
                     type = existing.type;
                     hours = existing.hours;
                     isActingLead = existing.isActingLead;
+                }
+
+                if (isAssigningArchiveWork(role, type, existing.type)) {
+                    return NextResponse.json({ error: 'Cannot assign archive work' }, { status: 403 });
                 }
 
                 const newData = {
@@ -209,6 +255,14 @@ export async function POST(request: Request) {
             // If it's a new shift and user is ADMIN, block it
             if (role === 'ADMIN') {
                 return NextResponse.json({ error: 'Admins cannot create new shifts. Only Manager/Senior can.' }, { status: 403 });
+            }
+
+            if (!await canEditShiftForSession(role, session.employee.id, employeeId)) {
+                return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
+            }
+
+            if (isAssigningArchiveWork(role, type)) {
+                return NextResponse.json({ error: 'Cannot assign archive work' }, { status: 403 });
             }
 
             const shift = await prisma.shift.create({
@@ -261,6 +315,10 @@ export async function DELETE(request: Request) {
 
     const existing = await prisma.shift.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    if (!await canEditShiftForSession(role, session.employee.id, existing.employeeId)) {
+        return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
+    }
 
     if (await isMonthClosed(existing.date)) {
         return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });

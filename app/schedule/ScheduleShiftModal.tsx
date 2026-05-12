@@ -24,6 +24,7 @@ const shiftTypes: readonly {
 ];
 
 type ScheduleShiftModalProps = {
+    canAssignArchiveWork: boolean;
     canEditShifts: boolean;
     employeeName?: string;
     formData: ShiftFormData;
@@ -37,6 +38,7 @@ type ScheduleShiftModalProps = {
 };
 
 export function ScheduleShiftModal({
+    canAssignArchiveWork,
     canEditShifts,
     employeeName,
     formData,
@@ -49,6 +51,9 @@ export function ScheduleShiftModal({
     onSave,
 }: ScheduleShiftModalProps) {
     const canChangeProtectedFields = isManager || isSenior;
+    const canEditClosingFields = canEditShifts;
+    const canChangeTraineeField = canEditShifts;
+    const canChangeCoefficientField = canEditShifts;
     const includeActingLeadBonus = selectedDate ? shouldIncludeActingLeadBonus(selectedDate) : false;
 
     return (
@@ -77,19 +82,20 @@ export function ScheduleShiftModal({
                         {shiftTypes.map(type => {
                             const Icon = type.icon;
                             const isSelected = formData.type === type.id;
+                            const canChooseType = canChangeProtectedFields && (canAssignArchiveWork || type.id !== 'ARCHIVE_WORK');
 
                             return (
                             <button
                                 key={type.id}
                                 type="button"
-                                disabled={!canChangeProtectedFields}
+                                disabled={!canChooseType}
                                 aria-pressed={isSelected}
-                                onClick={() => canChangeProtectedFields && onFormDataChange(prev => ({ ...prev, type: type.id }))}
+                                onClick={() => canChooseType && onFormDataChange(prev => ({ ...prev, type: type.id }))}
                                 className={`group flex items-center gap-2 rounded-xl border-2 p-3 text-left text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-4 ${type.ringColor} ${
                                     isSelected
                                         ? `${type.borderColor} ${type.bgColor} ${type.textColor}`
                                         : 'border-zinc-100 bg-zinc-50/70 text-zinc-600 hover:border-zinc-200 hover:bg-white'
-                                } ${!canChangeProtectedFields ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                } ${!canChooseType ? 'opacity-60 cursor-not-allowed' : ''}`}
                             >
                                 <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
                                     isSelected ? `${type.iconBg} text-white` : 'bg-white text-zinc-400 group-hover:text-zinc-500'
@@ -125,8 +131,9 @@ export function ScheduleShiftModal({
                                             min="0"
                                             max="1.5"
                                             value={formData.coefficient}
+                                            disabled={!canChangeCoefficientField}
                                             onChange={e => onFormDataChange(prev => ({ ...prev, coefficient: e.target.value }))}
-                                            className="w-full rounded-xl border-2 border-zinc-100 bg-zinc-50 p-3 pl-10 font-bold tabular-nums transition-colors focus:border-blue-500 focus:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
+                                            className="w-full rounded-xl border-2 border-zinc-100 bg-zinc-50 p-3 pl-10 font-bold tabular-nums transition-colors focus:border-blue-500 focus:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:opacity-60"
                                         />
                                         <Percent className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400 transition-colors group-focus-within:text-blue-500" />
                                     </div>
@@ -138,13 +145,13 @@ export function ScheduleShiftModal({
                     {formData.type !== 'SICK' && formData.type !== 'VACATION' && (
                         <div className="grid grid-cols-1 gap-3">
                             {[
-                                ['cabinetClosed', 'Открытие/Закрытие', '+250р.'],
-                                ['centerClosed', 'Открытие + Закрытие', '+500р.'],
-                                ['isTrainee', 'Обучение стажера', '+500р.'],
-                            ].map(([field, label, bonus]) => (
-                                <div key={field} className="flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 cursor-pointer hover:border-blue-100 transition-all" onClick={() => onFormDataChange(prev => ({ ...prev, [field]: !prev[field as keyof ShiftFormData] }))}>
+                                ['cabinetClosed', 'Открытие/Закрытие', '+250р.', canEditClosingFields],
+                                ['centerClosed', 'Открытие + Закрытие', '+500р.', canEditClosingFields],
+                                ['isTrainee', 'Обучение стажера', '+500р.', canChangeTraineeField],
+                            ].map(([field, label, bonus, canEdit]) => (
+                                <div key={field as string} className={`flex items-center p-3 bg-zinc-50 rounded-xl border-2 border-zinc-100 transition-all ${canEdit ? 'cursor-pointer hover:border-blue-100' : 'cursor-not-allowed opacity-60'}`} onClick={() => canEdit && onFormDataChange(prev => ({ ...prev, [field as keyof ShiftFormData]: !prev[field as keyof ShiftFormData] }))}>
                                     <input type="checkbox" checked={Boolean(formData[field as keyof ShiftFormData])} readOnly className="w-5 h-5 text-blue-600 rounded-lg border-zinc-300 pointer-events-none" />
-                                    <label className="text-sm font-bold text-zinc-700 ml-3 cursor-pointer select-none flex items-center justify-between flex-1">
+                                    <label className={`text-sm font-bold text-zinc-700 ml-3 select-none flex items-center justify-between flex-1 ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
                                         <span>{label}</span>
                                         <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-xs font-bold">{bonus}</span>
                                     </label>
