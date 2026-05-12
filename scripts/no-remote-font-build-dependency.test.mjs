@@ -26,4 +26,12 @@ assert(
   'Global CSS should provide the app font stack without next/font/google.'
 );
 
+assert(
+  /@font-face/.test(globals)
+    && /font-family:\s*"Inter"/.test(globals)
+    && /\/fonts\/inter-all-400-normal\.woff/.test(globals)
+    && /\/fonts\/inter-all-600-normal\.woff/.test(globals),
+  'Global CSS should load Inter from local font files.'
+);
+
 console.log('no remote font build dependency contract ok');
