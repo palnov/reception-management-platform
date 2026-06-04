@@ -379,6 +379,12 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
             if (finalQuality >= 95) qualityBonus = 5000;
             else if (finalQuality >= 85) qualityBonus = 2500;
 
+            if (monthStr >= '2026-05') {
+                const coeff = Math.min(1.0, Math.round((rawHours / monthNorm) * 100) / 100);
+                checklistBonus = Math.round(checklistBonus * coeff);
+                qualityBonus = Math.round(qualityBonus * coeff);
+            }
+
             const actualClosingBonuses = closingBonuses;
             const totalPay = basePay + coeffBonus + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + traineeBonus + (includeActingLeadBonus ? actingLeadBonus : 0);
 
