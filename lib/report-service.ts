@@ -366,18 +366,18 @@ export class ReportService {
 
             if (salarySheet) {
                 const salaryCols = [
-                { header: 'Сотрудник', key: 'name', width: 25, style: cellStyle },
-                { header: 'Оклад', key: 'base', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                { header: 'Часы', key: 'hours', width: 12, style: { ...cellStyle, numFmt: '0.0' } },
-                { header: 'Смены (Руб)', key: 'shiftPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                { header: 'Работа в арх.', key: 'dayOffPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                { header: 'Откр/Закр', key: 'closing', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-            ];
+                    { header: 'Сотрудник', key: 'name', width: 25, style: cellStyle },
+                    { header: 'Оклад', key: 'base', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                    { header: 'Часы', key: 'hours', width: 12, style: { ...cellStyle, numFmt: '0.0' } },
+                    { header: 'Смены (Руб)', key: 'shiftPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                    { header: 'Работа в арх.', key: 'dayOffPay', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                    { header: 'Откр/Закр', key: 'closing', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                ];
 
-            if (includeActingLeadBonus) {
-                salaryCols.push({ header: 'ИО', key: 'actingLead', width: 12, style: { ...cellStyle, numFmt: '#,##0' } });
-            }
-            salaryCols.push({ header: 'Стажёр', key: 'trainee', width: 12, style: { ...cellStyle, numFmt: '#,##0' } });
+                if (includeActingLeadBonus) {
+                    salaryCols.push({ header: 'ИО', key: 'actingLead', width: 12, style: { ...cellStyle, numFmt: '#,##0' } });
+                }
+                salaryCols.push({ header: 'Стажёр', key: 'trainee', width: 12, style: { ...cellStyle, numFmt: '#,##0' } });
 
                 salaryCols.push(
                     { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
@@ -394,22 +394,88 @@ export class ReportService {
                 salarySheet.columns = salaryCols;
             }
 
+            // UI-matching fill colors for accountant daily schedule
+            const fillRegular: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }; // blue-100
+            const fillDayOff: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } }; // amber-100
+            const fillSick: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }; // red-100
+            const fillVacation: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } }; // green-100
+
             if (accountantSheet) {
-                accountantSheet.columns = [
-                    { header: 'Сотрудник', key: 'name', width: 25, style: cellStyle },
-                    { header: 'Часы', key: 'hours', width: 12, style: { ...cellStyle, numFmt: '0.0' } },
-                    { header: 'Оклад', key: 'base_paid', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                    { header: 'Надбавки', key: 'bonuses', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
-                    { header: 'ИТОГО', key: 'total', width: 15, style: { ...cellStyle, font: { bold: true }, numFmt: '#,##0' } },
+                // Row 1: Month name in Russian
+                const monthName = format(startDate, 'LLLL', { locale: ru });
+                accountantSheet.getCell('A1').value = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+                accountantSheet.getCell('A1').font = { bold: true, size: 16 };
+
+                // Row 2: Norm hours
+                accountantSheet.getCell('A2').value = `Норма часов: ${monthNorm}`;
+                accountantSheet.getCell('A2').font = { bold: true, size: 11 };
+
+                // Row 4: Header
+                accountantSheet.getColumn(1).width = 25;
+                const hdrRow = accountantSheet.getRow(4);
+                hdrRow.getCell(1).value = 'Сотрудник';
+                hdrRow.getCell(1).style = headerStyle;
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const col = d + 1;
+                    accountantSheet.getColumn(col).width = 5;
+                    hdrRow.getCell(col).value = d;
+                    hdrRow.getCell(col).style = headerStyle;
+                }
+
+                // Add accountant extra columns
+                const extraCols = [
+                    { name: 'Часы', width: 12 },
+                    { name: 'Оклад', width: 15 },
+                    { name: 'Надбавки', width: 15 },
+                    { name: 'ИТОГО', width: 15 }
                 ];
+                extraCols.forEach((colInfo, idx) => {
+                    const col = daysInMonth + 2 + idx;
+                    accountantSheet.getColumn(col).width = colInfo.width;
+                    const cell = hdrRow.getCell(col);
+                    cell.value = colInfo.name;
+                    cell.style = headerStyle;
+                });
+                hdrRow.height = 24;
             }
 
             if (accountant15Sheet) {
-                accountant15Sheet.columns = [
-                    { header: 'Сотрудник', key: 'name', width: 25, style: cellStyle },
-                    { header: 'Часы', key: 'hours', width: 12, style: { ...cellStyle, numFmt: '0.0' } },
-                    { header: 'Оклад', key: 'base_paid', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
+                // Row 1: Month name in Russian
+                const monthName = format(startDate, 'LLLL', { locale: ru });
+                accountant15Sheet.getCell('A1').value = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+                accountant15Sheet.getCell('A1').font = { bold: true, size: 16 };
+
+                // Row 2: Norm hours
+                accountant15Sheet.getCell('A2').value = `Норма часов: ${monthNorm}`;
+                accountant15Sheet.getCell('A2').font = { bold: true, size: 11 };
+
+                // Row 4: Header
+                accountant15Sheet.getColumn(1).width = 25;
+                const hdrRow = accountant15Sheet.getRow(4);
+                hdrRow.getCell(1).value = 'Сотрудник';
+                hdrRow.getCell(1).style = headerStyle;
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const col = d + 1;
+                    accountant15Sheet.getColumn(col).width = 5;
+                    hdrRow.getCell(col).value = d;
+                    hdrRow.getCell(col).style = headerStyle;
+                }
+
+                // Add accountant extra columns
+                const extraCols = [
+                    { name: 'Часы', width: 12 },
+                    { name: 'Оклад', width: 15 }
                 ];
+                extraCols.forEach((colInfo, idx) => {
+                    const col = daysInMonth + 2 + idx;
+                    accountant15Sheet.getColumn(col).width = colInfo.width;
+                    const cell = hdrRow.getCell(col);
+                    cell.value = colInfo.name;
+                    cell.style = headerStyle;
+                });
+                hdrRow.height = 24;
             }
 
             const allShifts = await prisma.shift.findMany({
@@ -428,6 +494,17 @@ export class ReportService {
             const allDailyChecklists = await prisma.dailyChecklist.findMany({
                 where: { date: dateFilter }
             });
+
+            // Pre-index shifts by employeeId|date for O(1) lookup
+            const shiftMap = new Map<string, typeof allShifts[0]>();
+            for (const s of allShifts) {
+                const normalizedDate = s.date.substring(0, 10);
+                const key = `${s.employeeId}|${normalizedDate}`;
+                shiftMap.set(key, s);
+            }
+
+            let accRowIdx = 5;
+            let acc15RowIdx = 5;
 
             for (const emp of employees as EmployeeWithSalaryHistory[]) {
                 if (emp.role === 'MANAGER') continue;
@@ -556,30 +633,100 @@ export class ReportService {
                     row.eachCell((cell) => { cell.border = borderStyle; });
                 }
 
+                const writeShiftsToSheet = (sheet: ExcelJS.Worksheet, rowNum: number) => {
+                    const isDismissed = emp.dismissalDate && emp.dismissalDate !== "" && emp.dismissalDate <= format(endDate, 'yyyy-MM-dd');
+                    const mainRow = sheet.getRow(rowNum);
+
+                    // A: name
+                    mainRow.getCell(1).value = emp.name + (isDismissed ? ' (Уволен)' : '');
+                    mainRow.getCell(1).style = cellStyle;
+                    mainRow.getCell(1).font = { bold: true, color: isDismissed ? { argb: 'FF9CA3AF' } : { argb: 'FF000000' } };
+
+                    // Day columns
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        const col = d + 1;
+                        const dayStr = `${monthStr}-${String(d).padStart(2, '0')}`;
+
+                        const isBeforeHire = emp.hireDate && emp.hireDate !== "" && dayStr < emp.hireDate;
+                        const isAfterDismissal = emp.dismissalDate && emp.dismissalDate !== "" && dayStr >= emp.dismissalDate;
+
+                        const cell = mainRow.getCell(col);
+                        cell.border = borderStyle;
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+                        if (isBeforeHire || isAfterDismissal) {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+                            continue;
+                        }
+
+                        const shift = shiftMap.get(`${emp.id}|${dayStr}`);
+                        if (shift) {
+                            if (shift.type === 'REGULAR') {
+                                cell.value = shift.hours;
+                                cell.fill = fillRegular;
+                                cell.font = { bold: true, color: { argb: 'FF1E3A5F' } };
+                            } else if (shift.type === 'ARCHIVE_WORK') {
+                                cell.value = shift.hours;
+                                cell.fill = fillDayOff;
+                                cell.font = { bold: true, color: { argb: 'FF78350F' } };
+                            } else if (shift.type === 'SICK') {
+                                cell.value = 'Б';
+                                cell.fill = fillSick;
+                                cell.font = { bold: true, color: { argb: 'FF7F1D1D' } };
+                            } else if (shift.type === 'VACATION') {
+                                cell.value = 'О';
+                                cell.fill = fillVacation;
+                                cell.font = { bold: true, color: { argb: 'FF064E3B' } };
+                            }
+                        }
+                    }
+                    mainRow.height = 22;
+                };
+
                 if (accountantSheet) {
-                    const row = accountantSheet.addRow({
-                        name: emp.name,
-                        hours: hoursWorked,
-                        base_paid: baseShiftPay,
-                        bonuses: totalBonuses,
-                        total: total
-                    });
-                    row.eachCell((cell) => { cell.border = borderStyle; });
+                    writeShiftsToSheet(accountantSheet, accRowIdx);
+                    const row = accountantSheet.getRow(accRowIdx);
+                    
+                    const colHours = daysInMonth + 2;
+                    const colBase = daysInMonth + 3;
+                    const colBonuses = daysInMonth + 4;
+                    const colTotal = daysInMonth + 5;
+
+                    row.getCell(colHours).value = hoursWorked;
+                    row.getCell(colHours).style = { ...cellStyle, numFmt: '0.0', border: borderStyle, alignment: { horizontal: 'right', vertical: 'middle' } };
+
+                    row.getCell(colBase).value = baseShiftPay;
+                    row.getCell(colBase).style = { ...cellStyle, numFmt: '#,##0', border: borderStyle, alignment: { horizontal: 'right', vertical: 'middle' } };
+
+                    row.getCell(colBonuses).value = totalBonuses;
+                    row.getCell(colBonuses).style = { ...cellStyle, numFmt: '#,##0', border: borderStyle, alignment: { horizontal: 'right', vertical: 'middle' } };
+
+                    row.getCell(colTotal).value = total;
+                    row.getCell(colTotal).style = { ...cellStyle, font: { bold: true }, numFmt: '#,##0', border: borderStyle, alignment: { horizontal: 'right', vertical: 'middle' } };
+                    
+                    accRowIdx++;
                 }
 
                 if (accountant15Sheet) {
-                    const row = accountant15Sheet.addRow({
-                        name: emp.name,
-                        hours: hoursWorked,
-                        base_paid: baseShiftPay,
-                    });
-                    row.eachCell((cell) => { cell.border = borderStyle; });
+                    writeShiftsToSheet(accountant15Sheet, acc15RowIdx);
+                    const row = accountant15Sheet.getRow(acc15RowIdx);
+
+                    const colHours = daysInMonth + 2;
+                    const colBase = daysInMonth + 3;
+
+                    row.getCell(colHours).value = hoursWorked;
+                    row.getCell(colHours).style = { ...cellStyle, numFmt: '0.0', border: borderStyle, alignment: { horizontal: 'right', vertical: 'middle' } };
+
+                    row.getCell(colBase).value = baseShiftPay;
+                    row.getCell(colBase).style = { ...cellStyle, numFmt: '#,##0', border: borderStyle, alignment: { horizontal: 'right', vertical: 'middle' } };
+
+                    acc15RowIdx++;
                 }
             }
 
             if (salarySheet) applyHeader(salarySheet);
-        if (accountantSheet) applyHeader(accountantSheet);
-        if (accountant15Sheet) applyHeader(accountant15Sheet);
+            if (accountantSheet) applyHeader(accountantSheet, 4);
+            if (accountant15Sheet) applyHeader(accountant15Sheet, 4);
         }
 
         return workbook;
