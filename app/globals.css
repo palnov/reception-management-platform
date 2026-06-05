@@ -69,13 +69,13 @@ body {
 }
 
 /* Hide number input spinners */
-input::-webkit-outer-spin-button,
-input::-webkit-inner-spin-button {
+input:not(.show-spinners)::-webkit-outer-spin-button,
+input:not(.show-spinners)::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-input[type=number] {
+input[type=number]:not(.show-spinners) {
   -moz-appearance: textfield;
 }
 /* Custom Minimalist Scrollbar */

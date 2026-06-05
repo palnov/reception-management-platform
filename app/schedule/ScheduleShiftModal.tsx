@@ -114,10 +114,13 @@ export function ScheduleShiftModal({
                                     <div className="relative group">
                                         <input
                                             type="number"
+                                            step="1"
+                                            min="1"
+                                            max="11"
                                             value={formData.hours}
                                             disabled={!canChangeProtectedFields}
                                             onChange={e => onFormDataChange(prev => ({ ...prev, hours: e.target.value }))}
-                                            className="w-full rounded-xl border-2 border-zinc-100 bg-zinc-50 p-3 pl-10 font-bold tabular-nums transition-colors focus:border-blue-500 focus:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:opacity-60"
+                                            className="w-full show-spinners rounded-xl border-2 border-zinc-100 bg-zinc-50 p-3 pl-10 font-bold tabular-nums transition-colors focus:border-blue-500 focus:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:opacity-60"
                                         />
                                         <Timer className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400 transition-colors group-focus-within:text-blue-500" />
                                     </div>
@@ -128,12 +131,12 @@ export function ScheduleShiftModal({
                                         <input
                                             type="number"
                                             step="0.1"
-                                            min="0"
+                                            min="1"
                                             max="1.5"
                                             value={formData.coefficient}
                                             disabled={!canChangeCoefficientField}
                                             onChange={e => onFormDataChange(prev => ({ ...prev, coefficient: e.target.value }))}
-                                            className="w-full rounded-xl border-2 border-zinc-100 bg-zinc-50 p-3 pl-10 font-bold tabular-nums transition-colors focus:border-blue-500 focus:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:opacity-60"
+                                            className="w-full show-spinners rounded-xl border-2 border-zinc-100 bg-zinc-50 p-3 pl-10 font-bold tabular-nums transition-colors focus:border-blue-500 focus:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:opacity-60"
                                         />
                                         <Percent className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400 transition-colors group-focus-within:text-blue-500" />
                                     </div>
