@@ -582,6 +582,12 @@ export class ReportService {
                 if (calcChecklist >= 0.90) checklistBonus = 5000;
                 else if (calcChecklist >= 0.76) checklistBonus = 2500;
 
+                if (monthStr >= '2026-05') {
+                    const coeff = Math.min(1.0, Math.round((hoursWorked / monthNorm) * 100) / 100);
+                    checklistBonus = Math.round(checklistBonus * coeff);
+                    kpiBonus = Math.round(kpiBonus * coeff);
+                }
+
                 // Seniority (Выслуга)
                 const hireDateStr = emp.hireDate;
                 const hireDateParsed = hireDateStr ? new Date(hireDateStr) : null;
@@ -835,10 +841,12 @@ export class ReportService {
         let traineeBonus = 0;
         let archiveBonus = 0;
         let archiveHours = 0;
+        let hoursWorked = 0;
 
         shifts.forEach(s => {
             if (s.type === 'REGULAR') {
                 daysWorked++;
+                hoursWorked += s.hours;
                 shiftPay += hourlyBase * s.hours;
                 intensityTotal += hourlyBase * s.hours * (s.coefficient - 1);
             } else if (s.type === 'ARCHIVE_WORK') {
@@ -869,6 +877,12 @@ export class ReportService {
         let qualityBonus = 0;
         if (avgQuality >= 95) qualityBonus = 5000;
         else if (avgQuality >= 85) qualityBonus = 2500;
+
+        if (monthStr >= '2026-05') {
+            const coeff = Math.min(1.0, Math.round((hoursWorked / monthNorm) * 100) / 100);
+            checklistBonus = Math.round(checklistBonus * coeff);
+            qualityBonus = Math.round(qualityBonus * coeff);
+        }
         const hireDate = employee.hireDate ? new Date(employee.hireDate) : null;
         const seniorityYears = hireDate ? (Date.now() - hireDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000) : 0;
         let seniorityPct = 0;
@@ -1220,10 +1234,12 @@ export class ReportService {
         let archiveBonus = 0;
         let traineeDays = 0;
         let traineeBonus = 0;
+        let hoursWorked = 0;
 
         shifts.forEach(s => {
             if (s.type === 'REGULAR') {
                 intensityDays++;
+                hoursWorked += s.hours;
                 intensityBonus += hourlyBase * s.hours * Math.max(0, s.coefficient - 1);
             } else if (s.type === 'ARCHIVE_WORK') {
                 archiveHours += s.hours;
@@ -1257,6 +1273,12 @@ export class ReportService {
         let cardQualityBonus = 0;
         if (cardQualityPercent >= 95) cardQualityBonus = 5000;
         else if (cardQualityPercent >= 85) cardQualityBonus = 2500;
+
+        if (monthStr >= '2026-05') {
+            const coeff = Math.min(1.0, Math.round((hoursWorked / monthNorm) * 100) / 100);
+            checklistBonus = Math.round(checklistBonus * coeff);
+            cardQualityBonus = Math.round(cardQualityBonus * coeff);
+        }
 
         const sickLeaveOpening = monthlyChecklist?.sickLeaveOpening || 0;
         const sickLeaveClosing = monthlyChecklist?.sickLeaveClosing || 0;
