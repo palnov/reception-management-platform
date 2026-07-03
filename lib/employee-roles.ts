@@ -22,8 +22,25 @@ type EmployeeCoefficientSource = {
     maxCoefficient?: number | null;
 };
 
+type EmployeeSenioritySource = {
+    role?: string | null;
+    hireDate?: string | null;
+    dismissalDate?: string | null;
+};
+
+export type SeniorityBonusResult = {
+    years: number;
+    percent: number;
+    bonus: number;
+};
+
 export function canCustomizeMaxCoefficient(role: string | null | undefined) {
     return role === EMPLOYEE_ROLES.HOSPITALIZATION_MANAGER;
+}
+
+export function isSeniorityBonusEligible(employeeOrRole: EmployeeSenioritySource | string | null | undefined) {
+    const role = typeof employeeOrRole === 'string' ? employeeOrRole : employeeOrRole?.role;
+    return role !== EMPLOYEE_ROLES.HOSPITALIZATION_MANAGER;
 }
 
 export function clampNumber(value: number, min: number, max: number) {
@@ -52,4 +69,37 @@ export function clampShiftCoefficient(value: string | number | null | undefined,
     const coefficient = Number.isFinite(parsed) ? parsed : MIN_COEFFICIENT;
 
     return clampNumber(coefficient, MIN_COEFFICIENT, getEmployeeShiftCoefficientLimit(employee));
+}
+
+export function calculateSeniorityBonus(
+    employee: EmployeeSenioritySource | null | undefined,
+    baseSalary: number,
+    now = new Date(),
+): SeniorityBonusResult {
+    const hireDate = employee?.hireDate ? new Date(employee.hireDate) : null;
+    const dismissalDate = employee?.dismissalDate ? new Date(employee.dismissalDate) : null;
+    const isHireDateValid = !!hireDate && !Number.isNaN(hireDate.getTime());
+
+    const calculationEndDate = dismissalDate && !Number.isNaN(dismissalDate.getTime()) && dismissalDate < now
+        ? dismissalDate.getTime()
+        : now.getTime();
+
+    const years = isHireDateValid
+        ? (calculationEndDate - hireDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+        : 0;
+
+    if (!isSeniorityBonusEligible(employee)) {
+        return { years, percent: 0, bonus: 0 };
+    }
+
+    let percent = 0;
+    if (years >= 3) percent = 10;
+    else if (years >= 2) percent = 7;
+    else if (years >= 1) percent = 3;
+
+    return {
+        years,
+        percent,
+        bonus: Math.round(baseSalary * percent / 100),
+    };
 }

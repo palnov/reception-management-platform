@@ -6,7 +6,7 @@ import JSZip from 'jszip';
 import type { Prisma, RegistrationKpi } from '@prisma/client';
 import { shouldIncludeActingLeadBonus } from '@/lib/acting-lead-policy';
 import { buildDetailizationWorkbook } from '@/lib/report-detailization';
-import { getEmployeeRoleLabel } from '@/lib/employee-roles';
+import { calculateSeniorityBonus, getEmployeeRoleLabel } from '@/lib/employee-roles';
 
 type EmployeeWithSalaryHistory = Prisma.EmployeeGetPayload<{
     include: { salaryHistory: true };
@@ -589,27 +589,8 @@ export class ReportService {
                     kpiBonus = Math.round(kpiBonus * coeff);
                 }
 
-                // Seniority (Выслуга)
-                const hireDateStr = emp.hireDate;
-                const hireDateParsed = hireDateStr ? new Date(hireDateStr) : null;
-                const dismissalDateStr = emp.dismissalDate;
-                const dismissalDateParsed = dismissalDateStr ? new Date(dismissalDateStr) : null;
-
-                const isHireDateValid = hireDateParsed && !isNaN(hireDateParsed.getTime());
-
-                // Use dismissal date as end point if it exists
-                const calculationEndDate = (dismissalDateParsed && dismissalDateParsed < new Date())
-                    ? dismissalDateParsed.getTime()
-                    : Date.now();
-
-                const seniorityYears = isHireDateValid
-                    ? (calculationEndDate - hireDateParsed!.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
-                    : 0;
-
-                let seniorityBonus = 0;
-                if (seniorityYears >= 3) seniorityBonus = Math.round(effectiveBaseSalary * 0.10);
-                else if (seniorityYears >= 2) seniorityBonus = Math.round(effectiveBaseSalary * 0.07);
-                else if (seniorityYears >= 1) seniorityBonus = Math.round(effectiveBaseSalary * 0.03);
+                const seniority = calculateSeniorityBonus(emp, effectiveBaseSalary);
+                const seniorityBonus = seniority.bonus;
 
                 const baseShiftPay = Math.round(hourlyBase * hoursWorked);
                 const bonuses = Math.round(dayOffPayTotal + closingBonuses + actingLeadBonus + traineeBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus);
@@ -884,13 +865,9 @@ export class ReportService {
             checklistBonus = Math.round(checklistBonus * coeff);
             qualityBonus = Math.round(qualityBonus * coeff);
         }
-        const hireDate = employee.hireDate ? new Date(employee.hireDate) : null;
-        const seniorityYears = hireDate ? (Date.now() - hireDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000) : 0;
-        let seniorityPct = 0;
-        if (seniorityYears >= 3) seniorityPct = 10;
-        else if (seniorityYears >= 2) seniorityPct = 7;
-        else if (seniorityYears >= 1) seniorityPct = 3;
-        const seniorityBonus = Math.round(effectiveBaseSalary * seniorityPct / 100);
+        const seniority = calculateSeniorityBonus(employee, effectiveBaseSalary);
+        const seniorityPct = seniority.percent;
+        const seniorityBonus = seniority.bonus;
 
         const totalAccrued = Math.round(shiftPay + intensityTotal + checklistBonus + qualityBonus + salesBonus + closingBonuses + archiveBonus + elnBonus + traineeBonus + cardCreationBonus + seniorityBonus);
         const tax = Math.round(totalAccrued * 0.13);
@@ -1288,19 +1265,9 @@ export class ReportService {
         const cardCreationCount = monthlyChecklist?.cardCreation || 0;
         const cardCreationBonus = cardCreationCount * 60;
 
-        const hireDateParsed = employee.hireDate ? new Date(employee.hireDate) : null;
-        const dismissalDateParsed = employee.dismissalDate ? new Date(employee.dismissalDate) : null;
-        const calculationEndDate = (dismissalDateParsed && dismissalDateParsed < new Date())
-            ? dismissalDateParsed.getTime()
-            : Date.now();
-        const seniorityYears = hireDateParsed && !isNaN(hireDateParsed.getTime())
-            ? (calculationEndDate - hireDateParsed.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
-            : 0;
-        let seniorityPercent = 0;
-        if (seniorityYears >= 3) seniorityPercent = 10;
-        else if (seniorityYears >= 2) seniorityPercent = 7;
-        else if (seniorityYears >= 1) seniorityPercent = 3;
-        const seniorityBonus = Math.round(effectiveBaseSalary * seniorityPercent / 100);
+        const seniority = calculateSeniorityBonus(employee, effectiveBaseSalary);
+        const seniorityPercent = seniority.percent;
+        const seniorityBonus = seniority.bonus;
 
         return await buildDetailizationWorkbook({
             employeeName: employee.name,

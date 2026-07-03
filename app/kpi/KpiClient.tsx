@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { InlineStatus } from '@/components/InlineStatus';
 import type { KpiOverview } from '@/lib/overview-data';
 import { shouldIncludeActingLeadBonus } from '@/lib/acting-lead-policy';
+import { calculateSeniorityBonus } from '@/lib/employee-roles';
 
 interface Employee {
     id: string;
@@ -311,25 +312,10 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
             const salesBonus = Math.round(empKpis.reduce((sum, k) => sum + k.salesBonus, 0) +
                 empSales.reduce((sum, s) => sum + s.bonus, 0));
 
-            // Seniority (Выслуга)
-            const hireDateParsed = enrichedEmp.hireDate ? new Date(enrichedEmp.hireDate) : null;
-            const dismissalDateParsed = enrichedEmp.dismissalDate ? new Date(enrichedEmp.dismissalDate) : null;
-            const isHireDateValid = hireDateParsed && !isNaN(hireDateParsed.getTime());
-
-            // For seniority, we calculate time from hire to either NOW or DISMISSAL
-            const endDate = (dismissalDateParsed && !isNaN(dismissalDateParsed.getTime()))
-                ? dismissalDateParsed.getTime()
-                : Date.now();
-
-            const seniorityYears = isHireDateValid
-                ? (endDate - hireDateParsed!.getTime()) / (365.25 * 24 * 60 * 60 * 1000)
-                : 0;
-
-            let seniorityBonus = 0;
             const baseSalary = enrichedEmp.baseSalary || 0;
-            if (seniorityYears >= 3) seniorityBonus = Math.round(baseSalary * 0.10);
-            else if (seniorityYears >= 2) seniorityBonus = Math.round(baseSalary * 0.07);
-            else if (seniorityYears >= 1) seniorityBonus = Math.round(baseSalary * 0.03);
+            const seniority = calculateSeniorityBonus(enrichedEmp, baseSalary);
+            const seniorityYears = seniority.years;
+            const seniorityBonus = seniority.bonus;
 
             // Get checklist from daily audits
             const empDailyChecklists = dailyChecklists.filter(c => c.employeeId === enrichedEmp.id);

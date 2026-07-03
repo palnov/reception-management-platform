@@ -6,12 +6,15 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf
 const schema = read('prisma/schema.prisma');
 const employeesPage = read('app/employees/page.tsx');
 const employeeApi = read('app/api/employees/route.ts');
+const kpiClient = read('app/kpi/KpiClient.tsx');
+const reportService = read('lib/report-service.ts');
 const shiftApi = read('app/api/shifts/route.ts');
 const batchShiftApi = read('app/api/shifts/batch/route.ts');
 const scheduleTypes = read('app/schedule/schedule-types.ts');
 const scheduleClient = read('app/schedule/ScheduleClient.tsx');
 const shiftModal = read('app/schedule/ScheduleShiftModal.tsx');
 const batchModal = read('app/schedule/ScheduleBatchModal.tsx');
+const employeeRoles = read('lib/employee-roles.ts');
 
 assert.match(schema, /maxCoefficient\s+Float\s+@default\(1\.5\)/, 'Employee must persist maxCoefficient with 1.5 default');
 assert.match(employeesPage, /HOSPITALIZATION_MANAGER/, 'Employees form must include hospitalization manager role');
@@ -24,11 +27,20 @@ assert.match(shiftModal, /coefficientMax/, 'Single shift modal must receive empl
 assert.match(batchModal, /coefficientMax/, 'Batch shift modal must receive selected employee coefficient max');
 assert.match(shiftApi, /clampShiftCoefficient/, 'Single shift API must clamp coefficient with employee-specific limit');
 assert.match(batchShiftApi, /clampShiftCoefficient/, 'Batch shift API must clamp coefficient with employee-specific limit');
+assert.match(employeeRoles, /isSeniorityBonusEligible/, 'Employee role helper must expose seniority bonus eligibility');
+assert.match(employeeRoles, /calculateSeniorityBonus/, 'Employee role helper must calculate seniority bonus with role eligibility');
+assert.match(employeesPage, /Надбавка за выслугу/, 'Employees form must show seniority bonus checkbox');
+assert.match(employeesPage, /Для менеджера по госпитализации надбавка за выслугу не предусмотрена/, 'Employees form must explain disabled seniority bonus rule');
+assert.match(employeesPage, /disabled=\{!canReceiveSeniorityBonus\}/, 'Seniority bonus checkbox must be disabled when the role is not eligible');
+assert.match(kpiClient, /calculateSeniorityBonus/, 'KPI screen must use shared seniority calculation');
+assert.match(reportService, /calculateSeniorityBonus/, 'Excel reports must use shared seniority calculation');
 
 assert.doesNotMatch(shiftApi, /Math\.min\([^;\n]+,\s*1\.5\)/, 'Single shift API must not hard-code 1.5 coefficient cap');
 assert.doesNotMatch(batchShiftApi, /Math\.min\([^;\n]+,\s*1\.5\)/, 'Batch shift API must not hard-code 1.5 coefficient cap');
 assert.doesNotMatch(scheduleClient, /Math\.min\([^;\n]+,\s*1\.5\)/, 'Schedule client must not hard-code 1.5 coefficient cap');
 assert.doesNotMatch(shiftModal, /max="1\.5"/, 'Single shift modal must not hard-code 1.5 max');
 assert.doesNotMatch(batchModal, /max="1\.5"/, 'Batch shift modal must not hard-code 1.5 max');
+assert.doesNotMatch(kpiClient, /if \(seniorityYears >= 3\)/, 'KPI screen must not duplicate seniority thresholds');
+assert.doesNotMatch(reportService, /if \(seniorityYears >= 3\)/, 'Excel reports must not duplicate seniority thresholds');
 
 console.log('employee max coefficient checks passed');

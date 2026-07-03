@@ -2,11 +2,11 @@
 'use client';
 
 import { useState, useEffect, FormEvent } from 'react';
-import { CalendarX, KeyRound, Loader2, Plus, RefreshCw, User, MapPin, BadgeCheck, Trash2, Crown, AlertTriangle } from 'lucide-react';
+import { CalendarX, KeyRound, Loader2, Plus, RefreshCw, User, MapPin, BadgeCheck, Trash2, Crown, AlertTriangle, Info } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { InlineStatus } from '@/components/InlineStatus';
 import { Tooltip } from '@/components/Tooltip';
-import { EMPLOYEE_ROLES, canCustomizeMaxCoefficient, getEmployeeRoleLabel } from '@/lib/employee-roles';
+import { EMPLOYEE_ROLES, canCustomizeMaxCoefficient, getEmployeeRoleLabel, isSeniorityBonusEligible } from '@/lib/employee-roles';
 
 interface Employee {
     id: string;
@@ -52,6 +52,7 @@ export default function EmployeesPage() {
 
     const [formData, setFormData] = useState(initialForm);
     const router = useRouter();
+    const canReceiveSeniorityBonus = isSeniorityBonusEligible(formData.role);
 
     useEffect(() => {
         fetchEmployees();
@@ -259,17 +260,36 @@ export default function EmployeesPage() {
                             </div>
 
                             {canCustomizeMaxCoefficient(formData.role) && (
-                                <div>
-                                    <label className="block text-sm font-medium text-zinc-700 mb-1">Максимальный коэффициент</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        max="2"
-                                        step="0.1"
-                                        value={formData.maxCoefficient}
-                                        onChange={e => setFormData({ ...formData, maxCoefficient: e.target.value })}
-                                        className="show-spinners w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                                    />
+                                <div className="grid grid-cols-1 gap-4 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+                                    <div>
+                                        <label className="block text-sm font-medium text-zinc-700 mb-1">Максимальный коэффициент</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="2"
+                                            step="0.1"
+                                            value={formData.maxCoefficient}
+                                            onChange={e => setFormData({ ...formData, maxCoefficient: e.target.value })}
+                                            className="show-spinners w-full px-3 py-2 border border-zinc-300 bg-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                        />
+                                    </div>
+                                    <label className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                                        <span className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+                                            <input
+                                                type="checkbox"
+                                                checked={canReceiveSeniorityBonus}
+                                                disabled={!canReceiveSeniorityBonus}
+                                                readOnly
+                                                className="h-4 w-4 rounded border-zinc-300 text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                            />
+                                            Надбавка за выслугу
+                                        </span>
+                                        <Tooltip content="Бонус за выслугу лет. Для менеджера по госпитализации надбавка за выслугу не предусмотрена.">
+                                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-50 hover:text-zinc-600">
+                                                <Info className="h-4 w-4" />
+                                            </span>
+                                        </Tooltip>
+                                    </label>
                                 </div>
                             )}
 
