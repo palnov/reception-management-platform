@@ -97,6 +97,7 @@ export async function getKpiOverview({
             role: true,
             baseSalary: true,
             hourlyRate: true,
+            maxCoefficient: true,
             hireDate: true,
             branch: true,
             dismissalDate: true,
@@ -243,6 +244,7 @@ export async function getKpiOverview({
                     seniorId,
                     baseSalary,
                     hourlyRate,
+                    maxCoefficient: employee.maxCoefficient,
                 };
             })
             .filter((employee) => employee.role !== 'MANAGER'),
@@ -283,6 +285,7 @@ export async function getScheduleOverview(month: string) {
             role: true,
             baseSalary: true,
             hourlyRate: true,
+            maxCoefficient: true,
             branch: true,
             hireDate: true,
             dismissalDate: true,

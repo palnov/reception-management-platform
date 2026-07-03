@@ -25,6 +25,7 @@ export type Employee = {
     role: string;
     baseSalary: number;
     hourlyRate: number;
+    maxCoefficient?: number;
     branch?: string | null;
     hireDate?: string;
     dismissalDate?: string;

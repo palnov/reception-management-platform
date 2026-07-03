@@ -6,6 +6,7 @@ import { CalendarX, KeyRound, Loader2, Plus, RefreshCw, User, MapPin, BadgeCheck
 import { useRouter } from 'next/navigation';
 import { InlineStatus } from '@/components/InlineStatus';
 import { Tooltip } from '@/components/Tooltip';
+import { EMPLOYEE_ROLES, canCustomizeMaxCoefficient, getEmployeeRoleLabel } from '@/lib/employee-roles';
 
 interface Employee {
     id: string;
@@ -13,6 +14,7 @@ interface Employee {
     role: string;
     baseSalary: number;
     hourlyRate: number;
+    maxCoefficient?: number;
     branch?: string;
     hireDate?: string;
     dismissalDate?: string;
@@ -37,9 +39,10 @@ export default function EmployeesPage() {
 
     const initialForm = {
         name: '',
-        role: 'ADMIN',
+        role: EMPLOYEE_ROLES.ADMIN as string,
         password: '',
         baseSalary: '',
+        maxCoefficient: '1.5',
         branch: 'Дзержинского 26',
         hireDate: '',
         dismissalDate: '',
@@ -81,6 +84,7 @@ export default function EmployeesPage() {
             role: emp.role,
             password: '',
             baseSalary: emp.baseSalary.toString(),
+            maxCoefficient: (emp.maxCoefficient ?? 1.5).toString(),
             branch: emp.branch || 'Дзержинского 26',
             hireDate: emp.hireDate || '',
             dismissalDate: emp.dismissalDate || '',
@@ -225,19 +229,20 @@ export default function EmployeesPage() {
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
-                                <div className={formData.role === 'MANAGER' ? 'col-span-2' : ''}>
+                                <div className={formData.role === EMPLOYEE_ROLES.MANAGER ? 'col-span-2' : ''}>
                                     <label className="block text-sm font-medium text-zinc-700 mb-1">Должность</label>
                                     <select
                                         value={formData.role}
                                         onChange={e => setFormData({ ...formData, role: e.target.value })}
                                         className="w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                     >
-                                        <option value="ADMIN">Администратор</option>
-                                        <option value="SENIOR">Старший смены</option>
-                                        <option value="MANAGER">Руководитель</option>
+                                        <option value={EMPLOYEE_ROLES.ADMIN}>Администратор</option>
+                                        <option value={EMPLOYEE_ROLES.SENIOR}>Старший смены</option>
+                                        <option value={EMPLOYEE_ROLES.HOSPITALIZATION_MANAGER}>Менеджер по госпитализации</option>
+                                        <option value={EMPLOYEE_ROLES.MANAGER}>Руководитель</option>
                                     </select>
                                 </div>
-                                {formData.role !== 'MANAGER' && (
+                                {formData.role !== EMPLOYEE_ROLES.MANAGER && (
                                     <div>
                                         <label className="block text-sm font-medium text-zinc-700 mb-1">Филиал</label>
                                         <select
@@ -252,6 +257,21 @@ export default function EmployeesPage() {
                                     </div>
                                 )}
                             </div>
+
+                            {canCustomizeMaxCoefficient(formData.role) && (
+                                <div>
+                                    <label className="block text-sm font-medium text-zinc-700 mb-1">Максимальный коэффициент</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="2"
+                                        step="0.1"
+                                        value={formData.maxCoefficient}
+                                        onChange={e => setFormData({ ...formData, maxCoefficient: e.target.value })}
+                                        className="show-spinners w-full px-3 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                    />
+                                </div>
+                            )}
 
                             {editId && (formData.role !== originalRole || parseFloat(formData.baseSalary || '0') !== originalSalary) && (
                                 <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 animate-in slide-in-from-top-2">
@@ -270,7 +290,7 @@ export default function EmployeesPage() {
                                 </div>
                             )}
 
-                            {formData.role === 'SENIOR' && (
+                            {formData.role === EMPLOYEE_ROLES.SENIOR && (
                                 <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
                                     <div className="flex items-center justify-between mb-2">
                                         <label className="block text-sm font-bold text-amber-900">Администраторы в смене</label>
@@ -304,7 +324,7 @@ export default function EmployeesPage() {
                                                 >
                                                     <option value="">Выберите администратора</option>
                                                     {employees
-                                                        .filter(e => e.role === 'ADMIN' && (e.seniorId === null || e.seniorId === editId || !e.seniorId))
+                                                        .filter(e => e.role === EMPLOYEE_ROLES.ADMIN && (e.seniorId === null || e.seniorId === editId || !e.seniorId))
                                                         .filter(e => {
                                                             const today = new Date().toISOString().split('T')[0];
                                                             return !e.dismissalDate || e.dismissalDate > today;
@@ -333,7 +353,7 @@ export default function EmployeesPage() {
                                 </div>
                             )}
 
-                            {formData.role === 'ADMIN' && editId && (
+                            {formData.role === EMPLOYEE_ROLES.ADMIN && editId && (
                                 <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                                     <label className="block text-sm font-bold text-blue-900 mb-1">Старший смены</label>
                                     {(() => {
@@ -388,7 +408,7 @@ export default function EmployeesPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-4">
-                                    {formData.role !== 'MANAGER' && (
+                                    {formData.role !== EMPLOYEE_ROLES.MANAGER && (
                                         <div>
                                         <label className="block text-sm font-medium text-zinc-700 mb-1">Оклад (мес)</label>
                                         <div className="relative">
@@ -590,15 +610,17 @@ export default function EmployeesPage() {
                                         >
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${emp.role === 'MANAGER'
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${emp.role === EMPLOYEE_ROLES.MANAGER
                                                         ? 'bg-purple-100 text-purple-600'
-                                                        : emp.role === 'SENIOR'
+                                                        : emp.role === EMPLOYEE_ROLES.SENIOR
                                                             ? 'bg-amber-100 text-amber-600'
-                                                            : 'bg-zinc-100 text-zinc-500'
+                                                            : emp.role === EMPLOYEE_ROLES.HOSPITALIZATION_MANAGER
+                                                                ? 'bg-emerald-100 text-emerald-600'
+                                                                : 'bg-zinc-100 text-zinc-500'
                                                         }`}>
-                                                        {emp.role === 'MANAGER' ? (
+                                                        {emp.role === EMPLOYEE_ROLES.MANAGER ? (
                                                             <Crown className="w-5 h-5" />
-                                                        ) : emp.role === 'SENIOR' ? (
+                                                        ) : emp.role === EMPLOYEE_ROLES.SENIOR || emp.role === EMPLOYEE_ROLES.HOSPITALIZATION_MANAGER ? (
                                                             <BadgeCheck className="w-5 h-5" />
                                                         ) : (
                                                             <User className="w-4 h-4" />
@@ -610,17 +632,19 @@ export default function EmployeesPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-zinc-600 text-sm">
-                                                <span className={`inline-flex items-center w-fit px-2 py-0.5 rounded text-xs font-medium ${emp.role === 'MANAGER'
+                                                <span className={`inline-flex items-center w-fit px-2 py-0.5 rounded text-xs font-medium ${emp.role === EMPLOYEE_ROLES.MANAGER
                                                     ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                                                    : emp.role === 'SENIOR'
+                                                    : emp.role === EMPLOYEE_ROLES.SENIOR
                                                         ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                                        : 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                        : emp.role === EMPLOYEE_ROLES.HOSPITALIZATION_MANAGER
+                                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                            : 'bg-blue-50 text-blue-700 border border-blue-200'
                                                     }`}>
-                                                    {emp.role === 'MANAGER' ? 'Руководитель' : emp.role === 'SENIOR' ? 'Старший смены' : 'Администратор'}
+                                                    {getEmployeeRoleLabel(emp.role)}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-zinc-600 text-sm">
-                                                {emp.role === 'MANAGER' ? (
+                                                {emp.role === EMPLOYEE_ROLES.MANAGER ? (
                                                     <span className="text-zinc-400">-</span>
                                                 ) : emp.branch ? (
                                                     <div className="flex items-center text-zinc-600">
@@ -638,7 +662,7 @@ export default function EmployeesPage() {
                                                 </td>
                                             )}
                                             <td className="px-6 py-4 text-zinc-900 text-sm font-medium text-right">
-                                                {emp.role === 'MANAGER' ? '-' : `${(emp.baseSalary ?? 0).toLocaleString()} ₽`}
+                                                {emp.role === EMPLOYEE_ROLES.MANAGER ? '-' : `${(emp.baseSalary ?? 0).toLocaleString()} ₽`}
                                             </td>
                                         </tr>
                                     ))}

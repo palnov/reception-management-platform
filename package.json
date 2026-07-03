@@ -8,9 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test:employee-coefficient": "node scripts/employee-max-coefficient.test.mjs",
     "smoke": "node scripts/smoke-check.js",
     "migrate:passwords": "node scripts/migrate-legacy-passwords.js",
-    "check": "npm run lint && npm run typecheck && npm run smoke",
+    "check": "npm run lint && npm run typecheck && npm run test:employee-coefficient && npm run smoke",
     "sync-neon": "node scripts/sync-to-neon.js"
   },
   "dependencies": {

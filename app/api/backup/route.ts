@@ -106,6 +106,7 @@ export async function POST(request: Request) {
                             password: emp.password || '1234',
                             baseSalary: Number(emp.baseSalary ?? 0),
                             hourlyRate: Number(emp.hourlyRate ?? 0),
+                            maxCoefficient: Number(emp.maxCoefficient ?? 1.5),
                             branch: emp.branch,
                             hireDate: emp.hireDate || '',
                             dismissalDate: emp.dismissalDate || '',

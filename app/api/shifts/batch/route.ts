@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { clampShiftCoefficient } from '@/lib/employee-roles';
 
 type BatchShiftOperation = {
     id?: string;
@@ -143,7 +144,7 @@ export async function POST(request: Request) {
             const involvedEmpIds = [...new Set(operations.map(op => op.employeeId))];
             const involvedEmps = await prisma.employee.findMany({
                 where: { id: { in: involvedEmpIds } },
-                select: { id: true, hireDate: true, dismissalDate: true, seniorId: true }
+                select: { id: true, hireDate: true, dismissalDate: true, seniorId: true, role: true, maxCoefficient: true }
             });
             const employeeDateMap = new Map(involvedEmps.map(e => [e.id, e]));
 
@@ -186,7 +187,7 @@ export async function POST(request: Request) {
                         centerClosed: !!op.centerClosed,
                         isActingLead: !!op.isActingLead,
                         isTrainee: !!op.isTrainee,
-                        coefficient: Math.min(toNumber(op.coefficient, 1), 1.5),
+                        coefficient: clampShiftCoefficient(op.coefficient, employeeDateMap.get(op.employeeId)),
                         isDeleted: false
                     };
 

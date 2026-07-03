@@ -18,7 +18,7 @@ const REQUIRED_TABLES = [
 ];
 
 const REQUIRED_COLUMNS = {
-  Employee: ['id', 'name', 'role', 'password', 'hireDate', 'dismissalDate', 'seniorId'],
+  Employee: ['id', 'name', 'role', 'password', 'hireDate', 'dismissalDate', 'seniorId', 'maxCoefficient'],
   Shift: ['id', 'date', 'employeeId', 'type', 'hours', 'isDeleted', 'isActingLead', 'isTrainee'],
   DailyChecklist: ['id', 'date', 'employeeId', 'criterion1', 'criterion6', 'totalScore'],
   ClosedMonth: ['month', 'isClosed'],

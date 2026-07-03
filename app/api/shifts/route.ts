@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth';
 import { calculateDiff, logAudit } from '@/lib/audit';
 import { isMonthClosed } from '@/lib/monthStatus';
 import { requireSession } from '@/lib/api-auth';
+import { clampShiftCoefficient } from '@/lib/employee-roles';
 import type { AuditLog } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
@@ -134,8 +135,9 @@ export async function POST(request: Request) {
     try {
         const emp = await prisma.employee.findUnique({
             where: { id: employeeId },
-            select: { hireDate: true, dismissalDate: true }
+            select: { hireDate: true, dismissalDate: true, role: true, maxCoefficient: true }
         });
+        const normalizedCoefficient = clampShiftCoefficient(coefficient, emp);
         if (emp?.dismissalDate && date >= emp.dismissalDate) {
             return NextResponse.json({ error: `Employee dismissed on ${emp.dismissalDate}. Cannot create shift on ${date}.` }, { status: 400 });
         }
@@ -178,7 +180,7 @@ export async function POST(request: Request) {
                 centerClosed: centerClosed || false,
                 isActingLead: isActingLead || false,
                 isTrainee: isTrainee || false,
-                coefficient: Math.min(toNumber(coefficient, 1), 1.5),
+                coefficient: normalizedCoefficient,
                 createdBy: existing.createdBy,
                 isDeleted: false // Restore if it was deleted
             };
@@ -232,7 +234,7 @@ export async function POST(request: Request) {
                     centerClosed: centerClosed || false,
                     isActingLead: isActingLead || false,
                     isTrainee: isTrainee || false,
-                    coefficient: Math.min(toNumber(coefficient, 1), 1.5),
+                    coefficient: normalizedCoefficient,
                     isDeleted: false // Restore
                 };
                 const diff = calculateDiff(existing, newData);
@@ -275,7 +277,7 @@ export async function POST(request: Request) {
                     centerClosed: centerClosed || false,
                     isActingLead: isActingLead || false,
                     isTrainee: isTrainee || false,
-                    coefficient: Math.min(toNumber(coefficient, 1), 1.5),
+                    coefficient: normalizedCoefficient,
                     createdBy: session.employee.name,
                     isDeleted: false
                 }
@@ -289,7 +291,7 @@ export async function POST(request: Request) {
                 centerClosed: !!centerClosed,
                 isActingLead: !!isActingLead,
                 isTrainee: !!isTrainee,
-                coefficient: Math.min(toNumber(coefficient, 1), 1.5)
+                coefficient: normalizedCoefficient
             }, session);
             return NextResponse.json(shift);
         }

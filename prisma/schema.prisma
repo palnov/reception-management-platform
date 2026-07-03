@@ -15,6 +15,7 @@ model Employee {
   password          String             @default("1234")
   baseSalary        Float              @default(0)
   hourlyRate        Float              @default(0)
+  maxCoefficient    Float              @default(1.5)
   branch            String?
   sortOrder         Int                @default(0)
   createdAt         String             @default("")

@@ -9,6 +9,7 @@ import type { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { ScheduleOverview } from '@/lib/overview-data';
 import { shouldIncludeActingLeadBonus } from '@/lib/acting-lead-policy';
+import { clampShiftCoefficient, getEmployeeShiftCoefficientLimit } from '@/lib/employee-roles';
 import { ScheduleToolbar } from './ScheduleToolbar';
 import { ScheduleNormModal } from './ScheduleNormModal';
 import { ScheduleShiftModal } from './ScheduleShiftModal';
@@ -497,7 +498,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
             employeeId: selectedEmployeeId,
             ...formData,
             isActingLead: shouldIncludeActingLeadBonus(selectedDate) ? formData.isActingLead : false,
-            coefficient: Math.min(parseFloat(formData.coefficient || '1.0'), 1.5).toString()
+            coefficient: clampShiftCoefficient(formData.coefficient, selectedEmployee).toString()
         });
 
         if (!res.ok) {
@@ -540,6 +541,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
 
     // --- Optimization: Memoized Lookups ---
     const empIdToIndex = useMemo(() => buildIndexMap(employees), [employees]);
+    const employeeById = useMemo(() => new Map(employees.map(employee => [employee.id, employee])), [employees]);
     const dateKeyToIndex = useMemo(() => buildDateIndexMap(days), [days]);
 
     // Selection Bounds Memo
@@ -557,6 +559,19 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         (sel: NonNullable<typeof selection>) => getSelectedRangeFromState(sel, employees, days, empIdToIndex, dateKeyToIndex),
         [employees, days, empIdToIndex, dateKeyToIndex],
     );
+
+    const selectedCoefficientMax = useMemo(() => getEmployeeShiftCoefficientLimit(selectedEmployee), [selectedEmployee]);
+
+    const batchCoefficientMax = useMemo(() => {
+        if (!selection) return selectedCoefficientMax;
+
+        const range = getSelectedRange(selection);
+        const limits = range
+            .map(cell => getEmployeeShiftCoefficientLimit(employeeById.get(cell.empId)))
+            .filter(Number.isFinite);
+
+        return limits.length > 0 ? Math.min(...limits) : selectedCoefficientMax;
+    }, [employeeById, getSelectedRange, selectedCoefficientMax, selection]);
 
     // Group shifts for O(1) lookup
     const shiftsByEmployee = useMemo(() => groupShiftsByEmployee(shifts), [shifts]);
@@ -590,7 +605,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
 
         const res = await saveBatchShifts(operations.map(op => ({
             ...op,
-            coefficient: Math.min(parseFloat(formData.coefficient || '1.0'), 1.5).toString()
+            coefficient: clampShiftCoefficient(formData.coefficient, employeeById.get(op.employeeId)).toString()
         })));
 
         if (!res.ok) {
@@ -737,7 +752,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
             if (updates.length > 0) {
                 const res = await saveBatchShifts(updates.map(op => ({
                     ...op,
-                    coefficient: Math.min(parseFloat(op.coefficient?.toString() || '1.0'), 1.5).toString()
+                    coefficient: clampShiftCoefficient(op.coefficient, employeeById.get(op.employeeId)).toString()
                 })));
                 if (res.ok) {
                     const data = await res.json();
@@ -766,7 +781,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         }
 
         blockModalRef.current = false;
-    }, [isDragging, isFilling, fillSource, selection, employees, days, shiftsByEmployee, getSelectedRange, openModal, empIdToIndex, dateKeyToIndex, mergeLocalShifts, removeLocalShiftIds, syncShiftsInBackground, canEditEmployeeShift, showFeedback]);
+    }, [isDragging, isFilling, fillSource, selection, employees, employeeById, days, shiftsByEmployee, getSelectedRange, openModal, empIdToIndex, dateKeyToIndex, mergeLocalShifts, removeLocalShiftIds, syncShiftsInBackground, canEditEmployeeShift, showFeedback]);
 
     const handleKeyDown = useCallback(async (e: KeyboardEvent) => {
         if (!selection || isDragging) return;
@@ -944,7 +959,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
 
         const res = await saveShift({
             ...payload,
-            coefficient: Math.min(parseFloat(payload.coefficient.toString() || '1.0'), 1.5).toString()
+            coefficient: clampShiftCoefficient(payload.coefficient, employee).toString()
         });
         if (res.ok) {
             const updatedShift = await res.json();
@@ -1054,6 +1069,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
                 <ScheduleShiftModal
                     canAssignArchiveWork={canAssignArchiveWork}
                     canEditShifts={canSaveSelectedShift}
+                    coefficientMax={selectedCoefficientMax}
                     employeeName={employees.find(e => e.id === selectedEmployeeId)?.name}
                     formData={formData}
                     isManager={isManager}
@@ -1069,6 +1085,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
             {showBatchModal && (
                 <ScheduleBatchModal
                     canAssignArchiveWork={canAssignArchiveWork}
+                    coefficientMax={batchCoefficientMax}
                     formData={formData}
                     isManager={isManager}
                     isSenior={isSenior}

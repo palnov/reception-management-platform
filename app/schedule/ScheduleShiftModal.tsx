@@ -26,6 +26,7 @@ const shiftTypes: readonly {
 type ScheduleShiftModalProps = {
     canAssignArchiveWork: boolean;
     canEditShifts: boolean;
+    coefficientMax: number;
     employeeName?: string;
     formData: ShiftFormData;
     isManager: boolean;
@@ -40,6 +41,7 @@ type ScheduleShiftModalProps = {
 export function ScheduleShiftModal({
     canAssignArchiveWork,
     canEditShifts,
+    coefficientMax,
     employeeName,
     formData,
     isManager,
@@ -132,7 +134,7 @@ export function ScheduleShiftModal({
                                             type="number"
                                             step="0.1"
                                             min="1"
-                                            max="1.5"
+                                            max={coefficientMax}
                                             value={formData.coefficient}
                                             disabled={!canChangeCoefficientField}
                                             onChange={e => onFormDataChange(prev => ({ ...prev, coefficient: e.target.value }))}

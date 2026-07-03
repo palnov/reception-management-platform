@@ -22,6 +22,7 @@ const shiftTypes: readonly {
 
 type ScheduleBatchModalProps = {
     canAssignArchiveWork: boolean;
+    coefficientMax: number;
     formData: ShiftFormData;
     isManager: boolean;
     isSenior: boolean;
@@ -34,6 +35,7 @@ type ScheduleBatchModalProps = {
 
 export function ScheduleBatchModal({
     canAssignArchiveWork,
+    coefficientMax,
     formData,
     isManager,
     isSenior,
@@ -113,8 +115,8 @@ export function ScheduleBatchModal({
                                         <input
                                             type="number"
                                             step="0.1"
-                                            min="0"
-                                            max="1.5"
+                                            min="1"
+                                            max={coefficientMax}
                                             value={formData.coefficient}
                                             onChange={e => onFormDataChange(prev => ({ ...prev, coefficient: e.target.value }))}
                                             className="w-full bg-zinc-50 border-2 border-zinc-100 rounded-xl p-3 pl-10 font-bold focus:border-blue-500 focus:bg-white transition-all"

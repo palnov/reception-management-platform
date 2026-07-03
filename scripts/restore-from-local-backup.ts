@@ -43,6 +43,7 @@ async function restore() {
                         password: emp.password,
                         baseSalary: emp.baseSalary,
                         hourlyRate: emp.hourlyRate,
+                        maxCoefficient: Number(emp.maxCoefficient ?? 1.5),
                         branch: emp.branch,
                         hireDate: emp.hireDate || '',
                         dismissalDate: emp.dismissalDate || '',

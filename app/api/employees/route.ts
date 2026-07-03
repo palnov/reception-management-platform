@@ -3,9 +3,10 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { hashPassword } from '@/lib/password';
+import { normalizeEmployeeMaxCoefficient } from '@/lib/employee-roles';
 import type { Employee, EmployeeRoleHistory, EmployeeSalaryHistory, Prisma } from '@prisma/client';
 
-type EmployeeListItem = Pick<Employee, 'id' | 'name' | 'role' | 'baseSalary' | 'hourlyRate' | 'hireDate' | 'branch' | 'dismissalDate' | 'seniorId'> & {
+type EmployeeListItem = Pick<Employee, 'id' | 'name' | 'role' | 'baseSalary' | 'hourlyRate' | 'maxCoefficient' | 'hireDate' | 'branch' | 'dismissalDate' | 'seniorId'> & {
     sortOrder?: number;
     roleHistory?: EmployeeRoleHistory[];
     salaryHistory?: EmployeeSalaryHistory[];
@@ -222,6 +223,7 @@ export async function GET(request: Request) {
                 role: true,
                 baseSalary: true,
                 hourlyRate: true,
+                maxCoefficient: true,
                 hireDate: true,
                 branch: true,
                 dismissalDate: true,
@@ -286,7 +288,8 @@ export async function GET(request: Request) {
                 role,
                 seniorId,
                 baseSalary,
-                hourlyRate
+                hourlyRate,
+                maxCoefficient: emp.maxCoefficient
             };
         });
 
@@ -302,7 +305,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
     }
     const body = await request.json();
-    const { name, role, baseSalary, hourlyRate, branch, password, hireDate, dismissalDate, seniorId, subordinateIds } = body;
+    const { name, role, baseSalary, hourlyRate, maxCoefficient, branch, password, hireDate, dismissalDate, seniorId, subordinateIds } = body;
 
     if (!password) {
         return NextResponse.json({ error: 'Password is required' }, { status: 400 });
@@ -321,6 +324,7 @@ export async function POST(request: Request) {
             password: await hashPassword(password),
             baseSalary: parseFloat(baseSalary || 0),
             hourlyRate: parseFloat(hourlyRate || 0),
+            maxCoefficient: normalizeEmployeeMaxCoefficient(role, maxCoefficient),
             branch,
             hireDate: hireDate || '',
             dismissalDate: dismissalDate || '',
@@ -405,7 +409,7 @@ export async function PUT(request: Request) {
         return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
     }
     const body = await request.json();
-    const { id, name, role, baseSalary, hourlyRate, branch, sortOrder, password, hireDate, dismissalDate, seniorId, subordinateIds, effectiveDate } = body;
+    const { id, name, role, baseSalary, hourlyRate, maxCoefficient, branch, sortOrder, password, hireDate, dismissalDate, seniorId, subordinateIds, effectiveDate } = body;
 
     if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
 
@@ -427,6 +431,7 @@ export async function PUT(request: Request) {
         role,
         baseSalary: parseFloat(baseSalary || 0),
         hourlyRate: parseFloat(hourlyRate || 0),
+        maxCoefficient: normalizeEmployeeMaxCoefficient(role, maxCoefficient),
         branch,
         hireDate: hireDate || '',
         dismissalDate: dismissalDate || '',

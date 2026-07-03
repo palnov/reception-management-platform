@@ -6,6 +6,7 @@ import JSZip from 'jszip';
 import type { Prisma, RegistrationKpi } from '@prisma/client';
 import { shouldIncludeActingLeadBonus } from '@/lib/acting-lead-policy';
 import { buildDetailizationWorkbook } from '@/lib/report-detailization';
+import { getEmployeeRoleLabel } from '@/lib/employee-roles';
 
 type EmployeeWithSalaryHistory = Prisma.EmployeeGetPayload<{
     include: { salaryHistory: true };
@@ -904,7 +905,7 @@ export class ReportService {
         worksheet.getRow(4).height = 11.25;
         sc('A4', 'Должность:', fontA8, { vertical: 'top' } as Partial<ExcelJS.Alignment>);
         worksheet.mergeCells('E4:L4');
-        sc('E4', employee.role === 'ADMIN' ? 'Администратор регистратуры' : employee.role, fontA8, { vertical: 'top', wrapText: true } as Partial<ExcelJS.Alignment>);
+        sc('E4', employee.role === 'ADMIN' ? 'Администратор регистратуры' : getEmployeeRoleLabel(employee.role), fontA8, { vertical: 'top', wrapText: true } as Partial<ExcelJS.Alignment>);
 
         // === ROW 5: Department ===
         worksheet.getRow(5).height = 15.75;

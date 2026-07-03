@@ -1,0 +1,1 @@
+ALTER TABLE "Employee" ADD COLUMN "maxCoefficient" REAL NOT NULL DEFAULT 1.5;
