@@ -42,10 +42,14 @@ const SelectionOverlay = memo(function SelectionOverlay({
     bounds,
     tableRef,
     containerRef,
+    onHandleHover,
+    onHandleMouseDown,
 }: {
     bounds: SelectionBounds | null;
     tableRef: RefObject<HTMLTableSectionElement | null>;
     containerRef: RefObject<HTMLDivElement | null>;
+    onHandleHover: (empId: string | null, dateKey: string | null) => void;
+    onHandleMouseDown: (e: MouseEvent) => void;
 }) {
     const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -99,7 +103,12 @@ const SelectionOverlay = memo(function SelectionOverlay({
             ref={overlayRef}
             className="absolute left-0 top-0 hidden border-2 border-blue-500 bg-blue-500/10 pointer-events-none z-50 will-change-transform"
         >
-            <div className="absolute -bottom-[5px] -right-[5px] w-2.5 h-2.5 bg-blue-500 border border-white pointer-events-none shadow-sm z-[60]" />
+            <div
+                data-fill-handle-overlay
+                className="absolute -bottom-[5px] -right-[5px] h-2.5 w-2.5 cursor-crosshair pointer-events-auto border border-white bg-blue-500 shadow-sm z-[60]"
+                onMouseLeave={() => onHandleHover(null, null)}
+                onMouseDown={onHandleMouseDown}
+            />
         </div>
     );
 });
@@ -112,7 +121,6 @@ type SortableEmployeeRowProps = {
     onMouseEnter: (empId: string, dateKey: string) => void;
     onContextMenu: (e: MouseEvent, empId: string, dateKey: string, shift?: Shift) => void;
     onHandleHover: (empId: string | null, dateKey: string | null) => void;
-    onHandleMouseDown: (e: MouseEvent) => void;
     currentUser: CurrentUser | null;
     isClosed: boolean;
     isManager: boolean;
@@ -127,7 +135,6 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
     onMouseEnter,
     onContextMenu,
     onHandleHover,
-    onHandleMouseDown,
     currentUser,
     isClosed,
     isManager,
@@ -261,21 +268,18 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                             if (e.button === 0) onMouseDown(e, emp.id, dateKey);
                         }}
                         onMouseEnter={() => !isRestricted && !isClosed && onMouseEnter(emp.id, dateKey)}
+                        onMouseMove={(e) => {
+                            if (isRestricted || isClosed) return;
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const isOverHandle = e.clientX >= rect.right - 10 && e.clientY >= rect.bottom - 10;
+                            onHandleHover(isOverHandle ? emp.id : null, isOverHandle ? dateKey : null);
+                        }}
                         onContextMenu={(e) => {
                             if (isRestricted || isClosed) return;
                             if ((e.target as HTMLElement).closest('[data-audit-ignore="true"]')) return;
                             onContextMenu(e, emp.id, dateKey, shift);
                         }}
                     >
-                        {!isRestricted && !isClosed && (
-                            <div
-                                className="absolute -bottom-[5px] -right-[5px] w-2.5 h-2.5 z-40 cursor-crosshair"
-                                onMouseEnter={() => onHandleHover(emp.id, dateKey)}
-                                onMouseLeave={() => onHandleHover(null, null)}
-                                onMouseDown={onHandleMouseDown}
-                            />
-                        )}
-
                         {isRestricted && (
                             <div className="absolute inset-0 flex items-center justify-center opacity-40 pointer-events-none">
                                 <span className="text-[7px] font-black uppercase tracking-tighter rotate-[-15deg] border border-current px-0.5 rounded leading-tight">
@@ -462,7 +466,6 @@ export function ScheduleGrid({
                                     currentUser={currentUser}
                                     onContextMenu={onContextMenu}
                                     onHandleHover={onHandleHover}
-                                    onHandleMouseDown={onHandleMouseDown}
                                     isClosed={isClosed}
                                     isManager={isManager}
                                     isColumnCollapsed={isColumnCollapsed}
@@ -480,6 +483,8 @@ export function ScheduleGrid({
                 bounds={selectionBounds}
                 tableRef={tableBodyRef}
                 containerRef={gridContainerRef}
+                onHandleHover={onHandleHover}
+                onHandleMouseDown={onHandleMouseDown}
             />
 
             {isLoading && (
