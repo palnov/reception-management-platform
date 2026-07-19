@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { ARCHIVE_WORK_REPORT_LABEL } from './report-labels';
 
 export type DetailizationWorkbookData = {
     employeeName: string;
@@ -297,7 +298,7 @@ export function buildDetailizationWorkbook(data: DetailizationWorkbookData) {
         ['A7', 'H7', 'K7', 'Качество оформления карт', `Выполнение ${data.cardQualityPercent}%`, data.cardQualityBonus],
         ['A8', 'H8', 'K8', '% от продаж', data.salesTotal, data.salesBonus],
         ['A9', 'H9', 'K9', 'Открытие/закрытие центра', formatDays(data.closingDays), data.closingBonus],
-        ['A10', 'H10', 'K10', 'Работа в архиве', `${data.archiveHours} ${pluralRu(data.archiveHours, 'час', 'часа', 'часов')}`, data.archiveBonus],
+        ['A10', 'H10', 'K10', ARCHIVE_WORK_REPORT_LABEL, `${data.archiveHours} ${pluralRu(data.archiveHours, 'час', 'часа', 'часов')}`, data.archiveBonus],
         ['A11', 'H11', 'K11', 'Оформление ЭЛН', `${data.sickLeaveOpening} ${pluralRu(data.sickLeaveOpening, 'открытие', 'открытия', 'открытий')}, ${data.sickLeaveClosing} ${pluralRu(data.sickLeaveClosing, 'закрытие', 'закрытия', 'закрытий')}`, data.sickLeaveBonus],
         ['A12', 'H12', 'K12', 'Доплата за обучение стажёра', formatDays(data.traineeDays), data.traineeBonus],
         ['A13', 'H13', 'K13', 'Доплата за создание новых карт пациентов', `${data.cardCreationCount} ${pluralRu(data.cardCreationCount, 'штука', 'штуки', 'штук')}`, data.cardCreationBonus],

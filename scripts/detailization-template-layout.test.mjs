@@ -1,5 +1,38 @@
 import assert from 'node:assert/strict';
-import { buildDetailizationWorkbook } from '../lib/report-detailization.ts';
+import { existsSync, readFileSync } from 'node:fs';
+import Module from 'node:module';
+import { dirname, resolve } from 'node:path';
+import ts from 'typescript';
+
+function compileTsModule(module, filename) {
+  const source = readFileSync(filename, 'utf8');
+  const output = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+      esModuleInterop: true,
+    },
+  }).outputText;
+
+  module._compile(output, filename);
+}
+
+const require = Module.createRequire(import.meta.url);
+require.extensions['.ts'] = compileTsModule;
+
+function loadTsModule(filePath) {
+  if (!existsSync(filePath)) {
+    throw new Error(`Missing module: ${filePath}`);
+  }
+
+  const mod = new Module(filePath);
+  mod.filename = filePath;
+  mod.paths = Module._nodeModulePaths(dirname(filePath));
+  compileTsModule(mod, filePath);
+  return mod.exports;
+}
+
+const { buildDetailizationWorkbook } = loadTsModule(resolve('lib/report-detailization.ts'));
 
 const expectedMerges = [
   'A1:K1',
@@ -112,6 +145,10 @@ assert.equal(worksheet.getCell('K7').value, 5000);
 assert.equal(worksheet.getCell('H8').value, 29280);
 assert.equal(worksheet.getCell('K8').value, 2049.6);
 assert.equal(worksheet.getCell('H11').value, '3 открытия, 7 закрытий');
+assert.equal(
+  worksheet.getCell('A10').value,
+  'Выполнение доп.обязанностей в пределах рабочего времени в указанном объёме, ч.',
+);
 assert.deepEqual(worksheet.getCell('H15').value, new Date('2026-01-01T00:00:00.000Z'));
 assert.deepEqual(worksheet.getCell('K15').value, { formula: 'SUM(K5:L14)', result: 28197.6 });
 assert.equal(worksheet.getCell('K15').numFmt, '#,##0.00');

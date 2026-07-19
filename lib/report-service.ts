@@ -7,6 +7,7 @@ import type { Prisma, RegistrationKpi } from '@prisma/client';
 import { shouldIncludeActingLeadBonus } from '@/lib/acting-lead-policy';
 import { buildDetailizationWorkbook } from '@/lib/report-detailization';
 import { calculateSeniorityBonus, getEmployeeRoleLabel } from '@/lib/employee-roles';
+import { ARCHIVE_WORK_REPORT_LABEL } from './report-labels';
 
 type EmployeeWithSalaryHistory = Prisma.EmployeeGetPayload<{
     include: { salaryHistory: true };
@@ -941,7 +942,7 @@ export class ReportService {
         addSec1Row(13, 'Качество оформления карт', `Выполнение ${avgQuality.toFixed(0)}%`, qualityBonus);
         addSec1Row(14, '% от продаж', `${salesTotal}`, salesBonus);
         addSec1Row(15, 'Открытие/закрытие центра', `${closingDays} дней`, closingBonuses);
-        addSec1Row(16, 'Работа в архиве', `${archiveHours} часов`, Math.round(archiveBonus));
+        addSec1Row(16, ARCHIVE_WORK_REPORT_LABEL, `${archiveHours} часов`, Math.round(archiveBonus));
         addSec1Row(17, 'Оформление ЭЛН', `${sickOpening} открытия, ${sickClosing} закрытий`, elnBonus);
         addSec1Row(18, 'Доплата за обучение стажёра', `${shifts.filter(s => s.isTrainee).length} дня`, traineeBonus);
         addSec1Row(19, 'Доплата за создание новых карт пациентов', `${monthlyChecklist?.cardCreation || 0} штуки`, cardCreationBonus);
