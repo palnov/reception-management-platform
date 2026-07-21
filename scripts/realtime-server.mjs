@@ -79,7 +79,12 @@ const server = createServer(async (request, response) => {
   const url = new URL(request.url || '/', 'http://127.0.0.1');
 
   if (request.method === 'GET' && url.pathname === '/health') {
-    writeJson(response, 200, { ok: true, clients: clients.size });
+    writeJson(response, 200, {
+      ok: true,
+      clients: clients.size,
+      configured: Boolean(jwtSecret && publishSecret),
+      port,
+    });
     return;
   }
 
@@ -122,7 +127,11 @@ websocketServer.on('connection', (client) => {
 
 server.on('upgrade', async (request, socket, head) => {
   const url = new URL(request.url || '/', 'http://127.0.0.1');
-  if (url.pathname !== '/realtime' || !(await isAuthenticated(request))) {
+  const authenticated = await isAuthenticated(request);
+  if (url.pathname !== '/realtime' || !authenticated) {
+    console.warn(
+      `[REALTIME] WebSocket upgrade rejected: path=${url.pathname} hasSession=${Boolean(getCookie(request, 'session'))} authenticated=${authenticated}`,
+    );
     socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
     socket.destroy();
     return;
@@ -130,6 +139,7 @@ server.on('upgrade', async (request, socket, head) => {
 
   websocketServer.handleUpgrade(request, socket, head, (client) => {
     websocketServer.emit('connection', client, request);
+    console.info(`[REALTIME] WebSocket client connected. clients=${clients.size}`);
   });
 });
 

@@ -200,10 +200,10 @@ pm2 status
 pm2 logs staff-manager-realtime --lines 100 --nostream
 ```
 
-Ожидаемый ответ health:
+Ожидаемый ответ health. Поле `configured` должно быть `true`:
 
 ```json
-{"ok":true,"clients":0}
+{"ok":true,"clients":0,"configured":true,"port":3006}
 ```
 
 После открытия графика в браузере `clients` должен увеличиться. При изменении графика сервер должен вывести сообщение вида:

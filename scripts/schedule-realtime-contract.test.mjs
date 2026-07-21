@@ -15,6 +15,9 @@ assert.match(realtimeServer, /dotenv\/config/);
 assert.match(realtimeServer, /WebSocketServer/);
 assert.match(realtimeServer, /REALTIME_PUBLISH_SECRET/);
 assert.match(realtimeServer, /schedule\.changed/);
+assert.match(realtimeServer, /configured:\s*Boolean\(jwtSecret && publishSecret\)/);
+assert.match(realtimeServer, /WebSocket client connected/);
+assert.match(realtimeServer, /WebSocket upgrade rejected/);
 
 const publisher = read('lib/realtime-publisher.ts');
 assert.match(publisher, /REALTIME_PUBLISH_URL/);
@@ -24,6 +27,7 @@ assert.match(publisher, /schedule\.changed/);
 const realtimeHook = read('lib/useScheduleRealtime.ts');
 assert.match(realtimeHook, /NEXT_PUBLIC_REALTIME_URL/);
 assert.match(realtimeHook, /WebSocket/);
+assert.match(realtimeHook, /Connecting to realtime URL/);
 assert.match(realtimeHook, /visibilitychange/);
 assert.match(realtimeHook, /setInterval/);
 

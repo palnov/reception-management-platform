@@ -27,8 +27,9 @@ export function useScheduleRealtime({ monthKey, onMonthChanged }: ScheduleRealti
 
     const refresh = () => callbackRef.current();
 
-    const startFallback = () => {
+    const startFallback = (reason: string) => {
       if (fallbackTimer === null) {
+        console.warn(`[SCHEDULE_REALTIME] Fallback polling enabled (${reason}).`);
         fallbackTimer = window.setInterval(refresh, FALLBACK_SYNC_MS);
       }
     };
@@ -45,12 +46,15 @@ export function useScheduleRealtime({ monthKey, onMonthChanged }: ScheduleRealti
       if (!realtimeUrl || typeof window.WebSocket === 'undefined') {
         if (!realtimeUrl) {
           console.warn('[SCHEDULE_REALTIME] WebSocket URL is not configured; using fallback polling.');
+          startFallback('WebSocket URL is not configured');
+        } else {
+          startFallback('WebSocket is not supported by this browser');
         }
-        startFallback();
         return;
       }
 
-      startFallback();
+      console.info(`[SCHEDULE_REALTIME] Connecting to realtime URL: ${realtimeUrl}`);
+      startFallback('waiting for WebSocket connection');
       const currentSocket = new WebSocket(realtimeUrl);
       socket = currentSocket;
       currentSocket.onopen = () => {
@@ -70,7 +74,7 @@ export function useScheduleRealtime({ monthKey, onMonthChanged }: ScheduleRealti
         }
       };
       currentSocket.onerror = () => {
-        console.error('[SCHEDULE_REALTIME] WebSocket connection error.');
+        console.error(`[SCHEDULE_REALTIME] WebSocket connection error for ${realtimeUrl}.`);
         currentSocket.close();
       };
       currentSocket.onclose = (event) => {
@@ -78,7 +82,7 @@ export function useScheduleRealtime({ monthKey, onMonthChanged }: ScheduleRealti
         if (!disposed) {
           console.warn(`[SCHEDULE_REALTIME] WebSocket disconnected (${event.code}); using fallback until reconnect.`);
         }
-        startFallback();
+        startFallback('WebSocket disconnected');
         if (!disposed && reconnectTimer === null) {
           reconnectTimer = window.setTimeout(() => {
             reconnectTimer = null;

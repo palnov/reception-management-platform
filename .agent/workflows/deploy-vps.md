@@ -154,7 +154,7 @@ pm2 status
 pm2 logs staff-manager-realtime --lines 100 --nostream
 ```
 
-The health endpoint should return `ok: true`. Its `clients` value should increase when browsers open the schedule. A successful publication is logged as:
+The health endpoint should return `ok: true` and `configured: true`. Its `clients` value should increase when browsers open the schedule. A successful publication is logged as:
 
 ```text
 Published schedule.changed for 2026-07 to 2 client(s)

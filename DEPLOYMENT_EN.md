@@ -188,7 +188,7 @@ pm2 logs staff-manager-realtime --lines 100 --nostream
 Expected health response:
 
 ```json
-{"ok":true,"clients":0}
+{"ok":true,"clients":0,"configured":true,"port":3006}
 ```
 
 After opening the schedule in a browser, the client count should increase. When a change is published, the realtime log should contain a line like:
