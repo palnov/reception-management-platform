@@ -333,10 +333,21 @@ export async function getScheduleOverview(month: string) {
         });
     }
 
+    const shiftLogs = shifts.length
+        ? await prisma.auditLog.findMany({
+            where: {
+                entityType: 'SHIFT',
+                entityId: { in: shifts.map((shift) => shift.id) },
+            },
+            orderBy: { timestamp: 'desc' },
+            select: auditLogSelect(false),
+        })
+        : [];
+
     return {
         currentUser,
         employees: employees.filter((employee) => employee.role !== 'MANAGER'),
-        shifts,
+        shifts: withAuditLogs(shifts, shiftLogs as AuditLog[]),
         prevMonthShifts,
         monthNorm: norm?.hours || 176,
     };

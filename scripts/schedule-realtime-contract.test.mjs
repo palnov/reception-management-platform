@@ -39,6 +39,11 @@ assert.match(scheduleClient, /invalidateOverviewCacheForMonth\(currentMonthKey\)
 const scheduleApi = read('app/schedule/schedule-api.ts');
 assert.match(scheduleApi, /cache:\s*['"]no-store['"]/);
 
+const overviewData = read('lib/overview-data.ts');
+const scheduleOverviewBlock = overviewData.slice(overviewData.indexOf('export async function getScheduleOverview'));
+assert.match(scheduleOverviewBlock, /entityType:\s*['"]SHIFT['"]/);
+assert.match(scheduleOverviewBlock, /shifts:\s*withAuditLogs\(shifts,\s*shiftLogs/);
+
 const shiftsRoute = read('app/api/shifts/route.ts');
 assert.match(shiftsRoute, /publishScheduleChange/);
 assert.match(shiftsRoute, /findFirst\(\{\s*where:\s*\{\s*employeeId,\s*date\s*\}/s);
