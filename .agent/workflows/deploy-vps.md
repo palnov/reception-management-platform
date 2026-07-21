@@ -4,149 +4,170 @@ description: how to deploy the application on a VPS (Production Mode)
 
 # Deploying HR Platform to VPS
 
-This guide outlines the recommended process for deploying this Next.js + Prisma (SQLite) application to a Linux VPS (Ubuntu/Debian).
+This guide covers the production setup on a Linux VPS with Next.js, Prisma, SQLite, Nginx, and two PM2 processes:
 
-## 1. Environment Setup
+- `staff-manager` — the main Next.js application;
+- `staff-manager-realtime` — the self-hosted WebSocket server for schedule events.
 
-Connect to your VPS and install required dependencies:
+Vercel does not use the second process. See `DEPLOYMENT_RU.md` or `DEPLOYMENT_EN.md` for the complete deployment guide.
+
+## 1. Install server dependencies
 
 ```bash
-# Update system
 sudo apt update && sudo apt upgrade -y
 
-# Install Node.js (v18+)
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+# Install Node.js 20.9+ (required by Next.js 16)
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 
-# Install PM2 globally
 sudo npm install -g pm2
-
-# Install Nginx
 sudo apt install -y nginx
 ```
 
-## 2. Project Deployment
+## 2. Clone or update the project
 
-Clone your repository and install dependencies:
+For a new server:
 
 ```bash
-# Clone the repository
-git clone <your-repo-url> pdmc-hr
-cd pdmc-hr
+git clone <your-repo-url> /root/pdmc-rm
+cd /root/pdmc-rm
+npm ci
+```
 
-# Install dependencies
-npm install
+For an existing installation:
 
-# Setup Environment Variables
-nano .env
+```bash
+cd /root/pdmc-rm
+git pull --ff-only
+npm ci
+```
 
-# REQUIRED: Path to your SQLite database
+Use `npm ci`, not `npm audit fix --force`. The lockfile is the source of truth for the VPS versions.
+
+## 3. Configure the environment
+
+Create or edit `/root/pdmc-rm/.env`:
+
+```env
 DATABASE_URL="file:./dev.db"
+PORT=3005
 
-# REQUIRED: Secret key for signing JWT sessions. 
-# Use a long random string (e.g., generated with `openssl rand -base64 32`)
-JWT_SECRET="your-super-long-random-secret-string"
+# Keep the existing value if the application already has one.
+JWT_SECRET="your-existing-auth-secret"
 
-# OPTIONAL: Port to run the application on (default is 3000)
-# If 3000 is occupied, set another one (e.g., 4000)
-PORT=3000
+REALTIME_PORT=3006
+REALTIME_PUBLISH_URL="http://127.0.0.1:3006/publish"
+REALTIME_PUBLISH_SECRET="separate-long-publish-secret"
+NEXT_PUBLIC_REALTIME_URL="ws://your-domain-or-ip:3006/realtime"
 ```
 
-## 3. Database Initialization
-
-Run migrations and generate Prisma client:
+Generate a new random secret when needed:
 
 ```bash
-# Apply migrations to production database
-npx prisma migrate deploy
-
-# Generate Prisma client
-npx prisma generate
+openssl rand -hex 32
 ```
 
-## 4. Building and Running
+`REALTIME_PUBLISH_SECRET` is shared by the Next.js and realtime processes. It is an internal secret and must not be exposed in the browser or committed to GitHub.
 
-Build the application and start it with PM2:
+`JWT_SECRET` must be the same value used by the main application and the realtime server. Do not change an existing production value unless you intend to invalidate all current sessions.
 
-```bash
-# Build for production
-npm run build
+`REALTIME_PUBLISH_URL` is internal and should normally remain `http://127.0.0.1:3006/publish`. `NEXT_PUBLIC_REALTIME_URL` is different: it must be reachable from users' browsers. Never use `127.0.0.1` for the public value.
 
-# Start with PM2
-# IMPORTANT: Use the -- flag to pass arguments like port (-p) and host (-H) to Next.js
-# -H 0.0.0.0 is required to allow external access (not just localhost)
-pm2 start npm --name "pdmc-hr" -- start -- -p 3005 -H 0.0.0.0
+For direct HTTP access, use:
 
-# --- PERSISTENCE (Auto-restart on reboot) ---
-# 1. Save the current process list (and their arguments like -p 3005)
-pm2 save
-
-# 2. Setup system startup script
-pm2 startup
-# !!! AFTER running 'pm2 startup', copy, paste, and run the command it provides in your terminal !!!
-# ---------------------------------------------
+```env
+NEXT_PUBLIC_REALTIME_URL="ws://your-public-ip:3006/realtime"
 ```
 
-## 5. Reverse Proxy (Nginx)
-
-Configure Nginx to serve the application on port 80. 
-**IMPORTANT**: The `proxy_pass` port must match the `PORT` specified in your `.env` file.
-
-```bash
-sudo nano /etc/nginx/sites-available/pdmc-hr
-```
-
-Add the following configuration:
+For an HTTPS domain, use `wss://your-domain/realtime` and proxy the path through Nginx:
 
 ```nginx
-server {
-    listen 80;
-    server_name your-domain.com; # Replace with your domain or IP
-
-    location / {
-        proxy_pass http://localhost:3000; # Change 3000 to your PORT if changed
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
+location /realtime {
+    proxy_pass http://127.0.0.1:3006;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_read_timeout 86400;
 }
 ```
 
-Enable the configuration and restart Nginx:
+Check and reload Nginx:
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/pdmc-hr /etc/nginx/sites-enabled/
 sudo nginx -t
-sudo systemctl restart nginx
+sudo systemctl reload nginx
 ```
 
-## 6. SSL Security (Optional but Recommended)
-
-Use Certbot for free HTTPS:
+Open port `3006` only for the direct `ws://...:3006` option:
 
 ```bash
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d your-domain.com
+sudo ufw allow 3006/tcp
 ```
 
-## 7. Troubleshooting: Firewall and Ports
+## 4. Initialize and build
 
-If you can access the app via `curl http://localhost:PORT` inside the server but see a "Timeout" or "502 Bad Gateway" (from Cloudflare) in your browser:
+```bash
+cd /root/pdmc-rm
+npx prisma db push
+npm run migrate:passwords
+npm run build
+```
 
-1.  **Open the port in Ubuntu Firewall**:
-    ```bash
-    sudo ufw allow 3005 # Replace 3005 with your PORT
-    ```
-2.  **Check IP binding**: 
-    Ensure you start the app with `-H 0.0.0.0` to listen on all network interfaces:
-    ```bash
-    pm2 start npm --name "pdmc-hr" -- start -- -p 3005 -H 0.0.0.0
-    ```
+Run `npm run migrate:passwords` only when upgrading an existing installation that may contain legacy passwords. `NEXT_PUBLIC_REALTIME_URL` must be present before `npm run build`, because it is embedded in the client bundle.
 
-## 8. Data Backups
+## 5. Start and persist both PM2 processes
 
-Since the application uses SQLite, your database is the file `dev.db` (or whatever is in `.env`). 
-Make sure to include it in your regular VPS backup schedule.
-You can also use the built-in **Backup** feature in the "Data" section of the application to regularly download snapshots.
+```bash
+pm2 start npm --name "staff-manager" -- start -- -p 3005 -H 0.0.0.0
+pm2 start npm --name "staff-manager-realtime" -- run start:realtime
+pm2 startup
+```
+
+Run the command printed by `pm2 startup` to enable startup after reboot.
+
+Then save the process list:
+
+```bash
+pm2 save
+```
+
+## 6. Update an existing deployment
+
+```bash
+cd /root/pdmc-rm
+git pull --ff-only
+npm ci
+npm run build
+pm2 restart staff-manager --update-env
+pm2 restart staff-manager-realtime --update-env
+pm2 save
+```
+
+If `prisma/schema.prisma` changed, run `npx prisma db push` before the build. If the VPS was changed by `npm audit fix --force`, `npm ci` restores the versions from `package-lock.json`.
+
+## 7. Verify the service
+
+```bash
+curl http://127.0.0.1:3006/health
+pm2 status
+pm2 logs staff-manager-realtime --lines 100 --nostream
+```
+
+The health endpoint should return `ok: true`. Its `clients` value should increase when browsers open the schedule. A successful publication is logged as:
+
+```text
+Published schedule.changed for 2026-07 to 2 client(s)
+```
+
+The browser console should contain:
+
+```text
+[SCHEDULE_REALTIME] WebSocket connected.
+```
+
+If `NEXT_PUBLIC_REALTIME_URL` is missing, the browser logs a warning and uses the 30-second fallback. If the publish secret or URL is wrong, the Next.js process logs `REALTIME_PUBLISH_ERROR`.
+
+## 8. Backups
+
+The SQLite database is the file specified by `DATABASE_URL`, normally `dev.db`. Include it in the VPS backup schedule. The application also provides a backup feature in the Data section.

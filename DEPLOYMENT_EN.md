@@ -1,86 +1,226 @@
-# Deployment Guide - EN
+# Deployment Guide
 
-This guide will help you correctly deploy or update your project.
+The project supports two deployment modes:
 
-## 1. Deployment to Vercel (Demo version with Neon DB)
+- Vercel + Neon — demo deployment. It does not run a separate realtime process and uses fallback synchronization.
+- VPS + SQLite — production deployment. It runs the Next.js application and a separate WebSocket process managed by PM2.
 
-Leave `NEXT_PUBLIC_REALTIME_URL`, `REALTIME_PUBLISH_URL`, `REALTIME_PUBLISH_SECRET`, and `REALTIME_PORT` unset in Vercel. The demo deployment will automatically use the fallback synchronization interval.
+## 1. Vercel deployment
 
-### For FIRST-TIME Deployment (Fresh Install):
-1.  **Create a project on Vercel** and link your repository.
-2.  **Configure Environment Variables** in the Vercel dashboard:
-    *   `DATABASE_URL` — the connection string from your Neon dashboard.
-    *   `JWT_SECRET` — any long random string.
-3.  **Sync the database** from your computer ONCE:
-    *   Add `NEON_DATABASE_URL="your-neon-url"` to your local `.env` file.
-    *   Run `npm run sync-neon`. This will create all tables and initial settings in Neon.
-4.  **Done!** Vercel will automatically build the project.
+Configure these variables in Vercel:
 
-### When UPDATING the project (Changes made):
-1.  **Push to GitHub**: Just push your changes to the repository. Vercel will detect them and start a new build.
-2.  **If you modified the database (schema.prisma)**:
-    *   After pushing to GitHub, run locally on your machine:
-        ```bash
-        npm run sync-neon
-        ```
-    *   This will "push" new tables or fields to the Neon database. Your existing data will not be deleted.
+- `DATABASE_URL` — the Neon connection string.
+- `JWT_SECRET` — a long authentication secret. Keep it the same in every Vercel environment where users log in.
 
----
+Leave these realtime variables unset or empty in Vercel:
 
-## 2. Deployment to VPS (Production version with SQLite DB)
+- `NEXT_PUBLIC_REALTIME_URL`
+- `REALTIME_PUBLISH_URL`
+- `REALTIME_PUBLISH_SECRET`
+- `REALTIME_PORT`
 
-### For FIRST-TIME Deployment (Fresh Install):
-1.  **Clone the repository** to your server and install dependencies: `npm install`.
-2.  **Create a `.env` file** on the server and specify:
-    *   `DATABASE_URL="file:./dev.db"`
-    *   `JWT_SECRET="your-secret-string"`
-    *   `PORT=3005`
-    *   `REALTIME_PORT=3006`
-    *   `REALTIME_PUBLISH_URL="http://127.0.0.1:3006/publish"`
-    *   `REALTIME_PUBLISH_SECRET="long-random-publish-secret"`
-    *   `NEXT_PUBLIC_REALTIME_URL="ws://your-domain-or-ip:3006/realtime"`
+The demo will skip the WebSocket connection and use fallback synchronization automatically.
 
-    The WebSocket address must be reachable from users' computers. If the site uses HTTPS, use `wss://` and configure a reverse proxy with WebSocket Upgrade support. Set `NEXT_PUBLIC_REALTIME_URL` before running `npm run build`, because it is embedded in the client bundle.
-3.  **Initialize the database**:
-    ```bash
-    npx prisma db push
-    ```
-4.  **Build the project**:
-    ```bash
-    npm run build
-    ```
-5.  **Start with PM2**:
-    ```bash
-    pm2 start npm --name "staff-manager" -- start -- -p 3005 -H 0.0.0.0
-    pm2 start npm --name "staff-manager-realtime" -- run start:realtime
-    pm2 save
-    ```
-6.  **Setup the Admin**: Open `http://your-ip:3000/setup` in your browser and create the first user.
+### First deployment
 
-### When UPDATING the project (Changes made):
-1.  **Connect to your server** and pull the code:
-    ```bash
-    git pull
-    npm install
-    ```
-2.  **If you modified the database (schema.prisma)**:
-    ```bash
-    npx prisma db push
-    ```
-3.  **Build and restart**:
-    ```bash
-    npm run build
-    pm2 restart staff-manager
-    pm2 restart staff-manager-realtime
-    ```
+1. Create a Vercel project and connect the GitHub repository.
+2. Add `DATABASE_URL` and `JWT_SECRET` in Project → Settings → Environment Variables.
+3. For the initial Neon setup, add `NEON_DATABASE_URL` to the local `.env` and run:
 
----
+   ```bash
+   npm run sync-neon
+   ```
 
-## Command Quick Reference
+4. If the database is empty, open `/setup` on the Vercel domain and create the first user.
 
-| Command | What it does | When to use |
-| :--- | :--- | :--- |
-| `npm run build` | Compiles Next.js for production | Every time you update the code |
-| `npm run sync-neon` | Updates Neon structure and seeds it | On `schema.prisma` changes (for Vercel) |
-| `npx prisma db push` | Syncs SQLite with your code | On `schema.prisma` changes (for VPS) |
-| `pm2 restart [name]` | Restarts the running application | After `build` on VPS |
+### Updating the project
+
+1. Push changes to GitHub; Vercel will start a new deployment.
+2. If `schema.prisma` changed, run `npm run sync-neon` locally after the push.
+3. Redeploy after changing Vercel environment variables.
+
+Do not add VPS realtime secrets to GitHub or try to start the WebSocket process on Vercel.
+
+## 2. VPS deployment
+
+The examples below use `/root/pdmc-rm`, Next.js port `3005`, and realtime port `3006`. Replace them if your server uses different paths or ports.
+
+The current Next.js version requires Node.js `20.9+`.
+
+### Install dependencies
+
+```bash
+cd /root/pdmc-rm
+npm ci
+```
+
+`npm ci` installs the versions from `package-lock.json`. Do not run `npm audit fix --force` on the VPS: it can rewrite the lockfile, upgrade Next.js outside the pinned version, or downgrade packages such as ExcelJS.
+
+### Configure `.env`
+
+Keep the environment file in the project root on the VPS. Never commit it to GitHub.
+
+```bash
+cd /root/pdmc-rm
+cp .env .env.backup-$(date +%F-%H%M) 2>/dev/null || true
+nano .env
+```
+
+Example:
+
+```env
+DATABASE_URL="file:./dev.db"
+PORT=3005
+
+# Keep the existing value if the application already has one.
+JWT_SECRET="your-existing-auth-secret"
+
+REALTIME_PORT=3006
+
+# Internal VPS-only publisher address.
+REALTIME_PUBLISH_URL="http://127.0.0.1:3006/publish"
+
+# Generate a separate long secret and use the same value for both processes.
+REALTIME_PUBLISH_SECRET="separate-long-publish-secret"
+
+# Public address used by browsers. Do not use 127.0.0.1 here.
+NEXT_PUBLIC_REALTIME_URL="ws://your-domain-or-ip:3006/realtime"
+```
+
+Generate a long random secret with:
+
+```bash
+openssl rand -hex 32
+```
+
+Keep the existing `JWT_SECRET` if one is already configured. Changing it invalidates existing login sessions.
+
+### Choose the public WebSocket URL
+
+For direct HTTP access, for example `http://203.0.113.10:3005`, with port `3006` reachable from users' computers:
+
+```env
+NEXT_PUBLIC_REALTIME_URL="ws://203.0.113.10:3006/realtime"
+```
+
+For an HTTPS domain, use the same domain through an Nginx WebSocket proxy:
+
+```env
+NEXT_PUBLIC_REALTIME_URL="wss://hr.example.com/realtime"
+```
+
+Add this route before the general `location /` block:
+
+```nginx
+location /realtime {
+    proxy_pass http://127.0.0.1:3006;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_read_timeout 86400;
+}
+```
+
+Then validate and reload Nginx:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+When using a direct `ws://...:3006` address, open the port:
+
+```bash
+sudo ufw allow 3006/tcp
+```
+
+Do not expose port `3006` publicly when Nginx proxies `wss://` traffic to it.
+
+`NEXT_PUBLIC_REALTIME_URL` is embedded into the browser bundle, so it must be set before `npm run build`.
+
+### Initialize, build, and start
+
+```bash
+cd /root/pdmc-rm
+npx prisma db push
+npm run migrate:passwords
+npm run build
+
+pm2 start npm --name "staff-manager" -- start -- -p 3005 -H 0.0.0.0
+pm2 start npm --name "staff-manager-realtime" -- run start:realtime
+pm2 startup
+```
+
+After `pm2 startup`, execute the command printed by PM2.
+
+Then save the process list:
+
+```bash
+pm2 save
+```
+
+### Update an existing VPS
+
+```bash
+cd /root/pdmc-rm
+git pull --ff-only
+npm ci
+
+# Only when prisma/schema.prisma changed:
+# npx prisma db push
+# npm run migrate:passwords
+
+npm run build
+pm2 restart staff-manager --update-env
+pm2 restart staff-manager-realtime --update-env
+pm2 save
+```
+
+### Verify realtime
+
+```bash
+curl http://127.0.0.1:3006/health
+pm2 status
+pm2 logs staff-manager-realtime --lines 100 --nostream
+```
+
+Expected health response:
+
+```json
+{"ok":true,"clients":0}
+```
+
+After opening the schedule in a browser, the client count should increase. When a change is published, the realtime log should contain a line like:
+
+```text
+Published schedule.changed for 2026-07 to 2 client(s)
+```
+
+The browser console should show:
+
+```text
+[SCHEDULE_REALTIME] WebSocket connected.
+```
+
+### Troubleshooting
+
+- `WebSocket URL is not configured` means `NEXT_PUBLIC_REALTIME_URL` was missing during the build. Fix `.env` and run `npm run build` again.
+- `clients: 0` while the schedule is open means the browser cannot connect; check the public URL, firewall, Nginx, and `ws`/`wss` scheme.
+- `REALTIME_PUBLISH_ERROR` means the realtime process is unavailable or `REALTIME_PUBLISH_SECRET` does not match.
+- After a previous `npm audit fix --force`, run `npm ci` to restore the lockfile versions. Check with `npm ls exceljs next --depth=0`.
+
+Two computers using the same account still receive realtime updates. They are only treated as the same editor for the audit icon, so the “changed by another employee” icon is hidden for that same account.
+
+## Command reference
+
+| Command | Purpose |
+| :--- | :--- |
+| `npm ci` | Install dependencies from `package-lock.json` |
+| `npm run build` | Build production code and embed `NEXT_PUBLIC_REALTIME_URL` |
+| `npm run start:realtime` | Start the WebSocket server manually |
+| `curl http://127.0.0.1:3006/health` | Check the realtime process |
+| `pm2 restart staff-manager --update-env` | Restart Next.js after a build |
+| `pm2 restart staff-manager-realtime --update-env` | Restart the WebSocket process |
+| `npm run sync-neon` | Sync Neon for Vercel |
+| `npx prisma db push` | Sync SQLite with the Prisma schema |
