@@ -213,7 +213,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
                 byId.set(shift.id, {
                     ...previousShift,
                     ...shift,
-                    auditLogs: previousShift?.auditLogs || shift.auditLogs || [],
+                    auditLogs: shift.auditLogs ?? previousShift?.auditLogs ?? [],
                 });
             });
 
@@ -319,11 +319,6 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         void fetchShifts();
     }, [fetchShifts]);
 
-    useScheduleRealtime({
-        monthKey: currentMonthKey,
-        onMonthChanged: syncShiftsInBackground,
-    });
-
     const resetTransientScheduleState = useCallback(() => {
         setSelectedDate(null);
         setSelectedEmployeeId(null);
@@ -360,6 +355,20 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
             showFeedback('error', 'Не удалось загрузить норму часов.');
         }
     }, [currentMonth, showFeedback]);
+
+    const syncScheduleInBackground = useCallback(() => {
+        invalidateOverviewCacheForMonth(currentMonthKey);
+        void Promise.all([
+            fetchShifts(),
+            fetchNorm(),
+            refreshMonthStatus(),
+        ]);
+    }, [currentMonthKey, fetchNorm, fetchShifts, invalidateOverviewCacheForMonth, refreshMonthStatus]);
+
+    useScheduleRealtime({
+        monthKey: currentMonthKey,
+        onMonthChanged: syncScheduleInBackground,
+    });
 
     useEffect(() => {
         // Mobile-first: collapse column by default on small screens

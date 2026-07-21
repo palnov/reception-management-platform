@@ -14,8 +14,16 @@ export async function readApiError(res: Response, fallback: string): Promise<str
     return data?.error || fallback;
 }
 
+function fetchFresh(url: string, init: RequestInit = {}) {
+    const separator = url.includes('?') ? '&' : '?';
+    return fetch(`${url}${separator}_=${Date.now()}`, {
+        ...init,
+        cache: 'no-store',
+    });
+}
+
 export async function fetchScheduleOverview(month: Date): Promise<Response> {
-    return fetch(`/api/schedule/overview?month=${format(month, 'yyyy-MM')}`);
+    return fetchFresh(`/api/schedule/overview?month=${format(month, 'yyyy-MM')}`);
 }
 
 export async function parseScheduleOverview(res: Response): Promise<ScheduleOverviewResponse> {
@@ -32,7 +40,7 @@ export async function parseScheduleOverview(res: Response): Promise<ScheduleOver
 export async function fetchMonthShifts(month: Date): Promise<Shift[]> {
     const start = format(startOfMonth(month), 'yyyy-MM-dd');
     const end = format(endOfMonth(month), 'yyyy-MM-dd');
-    const res = await fetch(`/api/shifts?start=${start}&end=${end}`);
+    const res = await fetchFresh(`/api/shifts?start=${start}&end=${end}`);
     if (!res.ok) throw new Error(`Shifts fetch error: ${res.status}`);
     const data = await res.json();
     return Array.isArray(data) ? data : [];
@@ -42,14 +50,14 @@ export async function fetchPreviousShifts(month: Date): Promise<Shift[]> {
     const threeMonthsAgo = subMonths(month, 3);
     const start = format(startOfMonth(threeMonthsAgo), 'yyyy-MM-dd');
     const end = format(endOfMonth(subMonths(month, 1)), 'yyyy-MM-dd');
-    const res = await fetch(`/api/shifts?start=${start}&end=${end}`);
+    const res = await fetchFresh(`/api/shifts?start=${start}&end=${end}`);
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data) ? data : [];
 }
 
 export async function fetchMonthNorm(month: Date): Promise<number> {
-    const res = await fetch(`/api/norms?month=${format(month, 'yyyy-MM')}`);
+    const res = await fetchFresh(`/api/norms?month=${format(month, 'yyyy-MM')}`);
     if (!res.ok) throw new Error(`Norm fetch error: ${res.status}`);
     const data = await res.json();
     return data && data.hours ? data.hours : 176;

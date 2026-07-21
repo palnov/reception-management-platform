@@ -12,7 +12,7 @@ export async function publishScheduleChange(month: string) {
   const timeout = setTimeout(() => controller.abort(), 1000);
 
   try {
-    await fetch(url, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -21,6 +21,9 @@ export async function publishScheduleChange(month: string) {
       body: JSON.stringify({ type: 'schedule.changed', month }),
       signal: controller.signal,
     });
+    if (!response.ok) {
+      throw new Error(`Realtime publisher returned HTTP ${response.status}`);
+    }
   } catch (error) {
     console.error('REALTIME_PUBLISH_ERROR:', error);
   } finally {

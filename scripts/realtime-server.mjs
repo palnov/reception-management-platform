@@ -78,6 +78,11 @@ function broadcast(event) {
 const server = createServer(async (request, response) => {
   const url = new URL(request.url || '/', 'http://127.0.0.1');
 
+  if (request.method === 'GET' && url.pathname === '/health') {
+    writeJson(response, 200, { ok: true, clients: clients.size });
+    return;
+  }
+
   if (request.method === 'POST' && url.pathname === '/publish') {
     if (!publishSecret || request.headers['x-realtime-secret'] !== publishSecret) {
       writeJson(response, 401, { error: 'Unauthorized' });
@@ -92,6 +97,7 @@ const server = createServer(async (request, response) => {
       }
 
       broadcast({ type: 'schedule.changed', month: event.month });
+      console.log(`Published schedule.changed for ${event.month} to ${clients.size} client(s)`);
       writeJson(response, 202, { accepted: true });
     } catch {
       writeJson(response, 400, { error: 'Invalid JSON' });

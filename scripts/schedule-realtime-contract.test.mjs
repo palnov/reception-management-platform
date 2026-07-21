@@ -30,6 +30,10 @@ assert.match(realtimeHook, /setInterval/);
 const scheduleClient = read('app/schedule/ScheduleClient.tsx');
 assert.match(scheduleClient, /useScheduleRealtime/);
 assert.match(scheduleClient, /syncShiftsInBackground/);
+assert.match(scheduleClient, /invalidateOverviewCacheForMonth\(currentMonthKey\)/);
+
+const scheduleApi = read('app/schedule/schedule-api.ts');
+assert.match(scheduleApi, /cache:\s*['"]no-store['"]/);
 
 const shiftsRoute = read('app/api/shifts/route.ts');
 assert.match(shiftsRoute, /publishScheduleChange/);
@@ -38,9 +42,23 @@ assert.match(shiftsRoute, /where:\s*\{\s*id:\s*existing\.id\s*\}/s);
 
 const batchRoute = read('app/api/shifts/batch/route.ts');
 assert.match(batchRoute, /publishScheduleChange/);
+assert.match(batchRoute, /auditLog\.create/);
 assert.match(
   batchRoute,
   /existingShifts\.find\(\(shift\)\s*=>\s*shift\.id\s*===\s*op\.id\)[\s\S]*existingMap\.get/
 );
+
+const infoTooltip = read('components/InfoTooltip.tsx');
+assert.match(infoTooltip, /lastLog\.changedBy/);
+assert.match(infoTooltip, /currentUser\.role\s*===\s*['"]MANAGER['"]/);
+assert.match(infoTooltip, /isOwnShift/);
+assert.match(infoTooltip, /lastLog\.changedBy\s*===\s*currentUser\.name/);
+assert.doesNotMatch(infoTooltip, /supersededLog|latestEditor === myName/);
+
+const normsRoute = read('app/api/norms/route.ts');
+assert.match(normsRoute, /publishScheduleChange/);
+
+const monthStatusRoute = read('app/api/months/status/route.ts');
+assert.match(monthStatusRoute, /publishScheduleChange/);
 
 console.log('Schedule realtime contract checks passed.');

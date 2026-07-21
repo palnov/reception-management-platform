@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { calculateDiff } from '@/lib/audit';
 import { clampShiftCoefficient } from '@/lib/employee-roles';
 import { publishScheduleChange } from '@/lib/realtime-publisher';
 
@@ -183,13 +184,16 @@ export async function POST(request: Request) {
 
             validOperations.forEach((op) => changedMonths.add(toMonthKey(op.date)));
 
-            results.upserted = await prisma.$transaction(
-                validOperations.map(op => {
+            results.upserted = await prisma.$transaction(async (tx) => {
+                const upserted: Awaited<ReturnType<typeof prisma.shift.findMany>> = [];
+
+                for (const op of validOperations) {
                     const existing = op.id
                         ? existingShifts.find((shift) => shift.id === op.id) || existingMap.get(`${op.employeeId}_${op.date}`)
                         : existingMap.get(`${op.employeeId}_${op.date}`);
-
                     const data = {
+                        date: op.date,
+                        employeeId: op.employeeId,
                         type: op.type,
                         hours: toNumber(op.hours),
                         cabinetClosed: !!op.cabinetClosed,
@@ -197,26 +201,44 @@ export async function POST(request: Request) {
                         isActingLead: !!op.isActingLead,
                         isTrainee: !!op.isTrainee,
                         coefficient: clampShiftCoefficient(op.coefficient, employeeDateMap.get(op.employeeId)),
-                        isDeleted: false
+                        createdBy: existing?.createdBy || session.employee.name,
+                        isDeleted: false,
                     };
 
-                    if (existing) {
-                        return prisma.shift.update({
-                            where: { id: existing.id },
-                            data: { ...data, createdBy: existing.createdBy }
-                        });
-                    } else {
-                        return prisma.shift.create({
+                    const shift = existing
+                        ? await tx.shift.update({ where: { id: existing.id }, data })
+                        : await tx.shift.create({ data });
+                    upserted.push(shift);
+
+                    const details = existing
+                        ? calculateDiff(existing, data)
+                        : {
+                            type: data.type,
+                            hours: data.hours,
+                            cabinetClosed: data.cabinetClosed,
+                            centerClosed: data.centerClosed,
+                            isActingLead: data.isActingLead,
+                            isTrainee: data.isTrainee,
+                            coefficient: data.coefficient,
+                        };
+
+                    if (!existing || details) {
+                        await tx.auditLog.create({
                             data: {
-                                ...data,
-                                date: op.date,
-                                employeeId: op.employeeId,
-                                createdBy: session.employee.name
-                            }
+                                entityType: 'SHIFT',
+                                entityId: shift.id,
+                                action: existing ? 'UPDATE' : 'CREATE',
+                                changedBy: session.employee.name,
+                                changedByRole: session.employee.role,
+                                timestamp: new Date().toISOString(),
+                                details: JSON.stringify(details),
+                            },
                         });
                     }
-                })
-            );
+                }
+
+                return upserted;
+            });
         }
 
         await Promise.all([...changedMonths].map((month) => publishScheduleChange(month)));

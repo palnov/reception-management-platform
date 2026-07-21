@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { isMonthClosed } from '@/lib/monthStatus';
 import { getSession } from '@/lib/auth';
 import { requireSession } from '@/lib/api-auth';
+import { publishScheduleChange } from '@/lib/realtime-publisher';
 
 export async function GET(request: Request) {
     try {
@@ -50,5 +51,6 @@ export async function POST(request: Request) {
         create: { month, hours: parseFloat(hours) }
     });
 
+    await publishScheduleChange(month);
     return NextResponse.json(norm);
 }

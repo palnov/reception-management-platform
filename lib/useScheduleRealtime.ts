@@ -43,18 +43,23 @@ export function useScheduleRealtime({ monthKey, onMonthChanged }: ScheduleRealti
     const connect = () => {
       if (disposed) return;
       if (!realtimeUrl || typeof window.WebSocket === 'undefined') {
+        if (!realtimeUrl) {
+          console.warn('[SCHEDULE_REALTIME] WebSocket URL is not configured; using fallback polling.');
+        }
         startFallback();
         return;
       }
 
       startFallback();
-      socket = new WebSocket(realtimeUrl);
-      socket.onopen = () => {
+      const currentSocket = new WebSocket(realtimeUrl);
+      socket = currentSocket;
+      currentSocket.onopen = () => {
         stopFallback();
         if (connectedOnce) refresh();
         connectedOnce = true;
+        console.info('[SCHEDULE_REALTIME] WebSocket connected.');
       };
-      socket.onmessage = (event) => {
+      currentSocket.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
           if (message.type === 'schedule.changed' && message.month === monthKey) {
@@ -64,8 +69,15 @@ export function useScheduleRealtime({ monthKey, onMonthChanged }: ScheduleRealti
           // Ignore malformed realtime messages.
         }
       };
-      socket.onerror = () => socket?.close();
-      socket.onclose = () => {
+      currentSocket.onerror = () => {
+        console.error('[SCHEDULE_REALTIME] WebSocket connection error.');
+        currentSocket.close();
+      };
+      currentSocket.onclose = (event) => {
+        if (socket === currentSocket) socket = null;
+        if (!disposed) {
+          console.warn(`[SCHEDULE_REALTIME] WebSocket disconnected (${event.code}); using fallback until reconnect.`);
+        }
         startFallback();
         if (!disposed && reconnectTimer === null) {
           reconnectTimer = window.setTimeout(() => {

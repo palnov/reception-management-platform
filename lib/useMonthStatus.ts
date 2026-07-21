@@ -14,7 +14,7 @@ export function useMonthStatus(currentMonth: Date) {
     try {
       setIsLoading(true);
       const m = format(startOfMonth(currentMonth), 'yyyy-MM');
-      const res = await fetch(`/api/months/status?month=${m}`);
+      const res = await fetch(`/api/months/status?month=${m}&_=${Date.now()}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         if (requestId === statusRequestIdRef.current) {

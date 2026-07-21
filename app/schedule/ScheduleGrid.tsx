@@ -311,6 +311,7 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                                             logs={shift.auditLogs}
                                             currentUser={currentUser}
                                             createdBy={shift.createdBy}
+                                            isOwnShift={shift.employeeId === currentUser?.id}
                                             className="!static"
                                         />
                                     )}
@@ -335,6 +336,7 @@ const SortableEmployeeRow = memo(function SortableEmployeeRow({
                                         logs={shift.auditLogs}
                                         currentUser={currentUser}
                                         createdBy={shift.createdBy}
+                                        isOwnShift={shift.employeeId === currentUser?.id}
                                     />
                                 </div>
                             </div>

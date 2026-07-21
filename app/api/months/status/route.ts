@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireManager, requireSession } from '@/lib/api-auth';
+import { publishScheduleChange } from '@/lib/realtime-publisher';
 
 export async function GET(request: Request) {
   try {
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
       }
     });
 
+    await publishScheduleChange(month);
     return NextResponse.json(result);
   } catch (error) {
     console.error('MONTH_STATUS_POST_ERROR:', error);

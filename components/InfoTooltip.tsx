@@ -31,9 +31,10 @@ interface InfoTooltipProps {
     onAuditClick?: () => void;
     currentUser?: CurrentUser | null;
     createdBy?: string;
+    isOwnShift?: boolean;
 }
 
-export function InfoTooltip({ logs, className = "", onAuditClick, currentUser }: InfoTooltipProps) {
+export function InfoTooltip({ logs, className = "", onAuditClick, currentUser, isOwnShift = false }: InfoTooltipProps) {
     const [isVisible, setIsVisible] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -51,34 +52,11 @@ export function InfoTooltip({ logs, className = "", onAuditClick, currentUser }:
         setIsVisible(true);
     };
 
-    // Visibility Logic: "Superseded Editor" rule
-    let shouldShow = false;
-
-    if (currentUser && logs.length > 0) {
-        const myName = currentUser.name;
-        const latestEditor = logs[0].changedBy;
-
-        // 1. If I am the latest editor, I see NO icon.
-        if (latestEditor === myName) {
-            shouldShow = false;
-        } else {
-            // 2. I see the icon ONLY if I was the editor immediately before the current sequence of edits by others.
-            // Search for the first entry in logs that was NOT made by the current latestEditor.
-            const supersededLog = logs.find(l => l.changedBy !== latestEditor);
-
-            // 3. If that superseded editor was ME, then I should see the icon.
-            if (supersededLog && supersededLog.changedBy === myName) {
-                shouldShow = true;
-            }
-        }
-    } else {
-        return null;
-    }
-
-    if (!shouldShow) return null;
-
+    if (!currentUser || logs.length === 0) return null;
 
     const lastLog = logs[0];
+    const canSeeAudit = currentUser.role === 'MANAGER' || isOwnShift;
+    if (!canSeeAudit || lastLog.changedBy === currentUser.name) return null;
 
     const tooltipContent = isVisible && isClient && !showHistory ? (
         <div
