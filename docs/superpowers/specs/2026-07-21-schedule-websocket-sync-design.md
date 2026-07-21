@@ -6,13 +6,17 @@ Make schedule changes appear on all open schedule pages shortly after a successf
 
 The production deployment is a VPS running Next.js with SQLite and PM2. No managed realtime provider is required.
 
+The Vercel demo deployment remains supported. It will not start or require the self-hosted WebSocket process; the schedule client will detect the missing realtime endpoint and use the existing HTTP behavior plus fallback synchronization.
+
 ## Scope
 
 - Add a small self-hosted WebSocket server process on the same VPS.
+- Keep the WebSocket process optional at runtime so the Vercel demo can build and run without it.
 - Broadcast a lightweight schedule-change event only after a shift mutation has been committed successfully.
 - Subscribe the schedule page to the event stream and reload only the current month's shifts when a relevant event arrives.
 - Reconnect automatically after a dropped connection and synchronize once after reconnect or when the page becomes visible again.
 - Keep normal HTTP save/load behavior as the fallback when WebSocket is unsupported or temporarily unavailable. For clients without WebSocket support, use a low-frequency fallback refresh rather than making the main path depend on it.
+- On Vercel, where no realtime URL/process is configured, skip the WebSocket connection entirely and use the fallback path without showing a realtime error to users.
 - Make single-shift and batch-shift writes recover from a stale client-side shift ID by resolving the current shift by employee and date before returning a not-found error.
 - Keep SQLite as the source of truth and do not send employee or shift details through the realtime channel; the event only invalidates the affected month.
 
@@ -49,6 +53,7 @@ This keeps saves idempotent for the user-visible cell and avoids exposing a gene
 
 - Add the ws runtime dependency.
 - Add a PM2 command for the realtime process and document the required REALTIME_PORT, REALTIME_PUBLISH_SECRET, and public WebSocket URL settings.
+- Document that the VPS sets the public realtime URL and internal publish settings, while the Vercel demo leaves the realtime URL unset and uses fallback synchronization.
 - If the VPS uses a reverse proxy, configure WebSocket upgrade forwarding; if the site is accessed directly, expose the realtime port as needed.
 - No database schema migration is required.
 
@@ -58,4 +63,3 @@ This keeps saves idempotent for the user-visible cell and avoids exposing a gene
 - Add regression coverage for single and batch stale-ID resolution.
 - Add a schedule-client contract test for WebSocket connect, relevant-month refresh, reconnect synchronization, and fallback behavior.
 - Run focused tests, typecheck, lint, and a production build before completion.
-
