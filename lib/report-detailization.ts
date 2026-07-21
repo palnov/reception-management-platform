@@ -312,10 +312,14 @@ export function buildDetailizationWorkbook(data: DetailizationWorkbookData) {
     }
 
     const accruedTotal = Math.round((data.intensityBonus + data.checklistBonus + data.cardQualityBonus + data.salesBonus + data.closingBonus + data.archiveBonus + data.sickLeaveBonus + data.traineeBonus + data.cardCreationBonus + data.seniorityBonus) * 100) / 100;
+    const accruedTotalFormula: ExcelJS.CellFormulaValue = {
+        formula: 'SUM(K5:L14)',
+        result: accruedTotal,
+    };
 
     setCell(worksheet, 'A15', 'Всего начислено', { font: fontA10b, alignment: textTop });
     setCell(worksheet, 'H15', data.reportDate, { font: fontA10b, alignment: rightTop, numFmt: 'mmm-yy' });
-    setCell(worksheet, 'K15', { formula: 'SUM(K5:L14)', result: accruedTotal }, { font: fontA10b, alignment: rightTop, numFmt: '#,##0.00' });
+    setCell(worksheet, 'K15', accruedTotalFormula, { font: fontA10b, alignment: rightTop, numFmt: '#,##0.00' });
     setCell(worksheet, 'A17', 'Утверждено (руководитель службы заботы)', { font: fontA9 });
     setCell(worksheet, 'A18', 'Сотрудник', { font: fontA9 });
 

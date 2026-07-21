@@ -33,6 +33,13 @@ function loadTsModule(filePath) {
 }
 
 const { buildDetailizationWorkbook } = loadTsModule(resolve('lib/report-detailization.ts'));
+const detailizationSource = readFileSync(resolve('lib/report-detailization.ts'), 'utf8');
+
+assert.match(
+  detailizationSource,
+  /const accruedTotalFormula:\s*ExcelJS\.CellFormulaValue/,
+  'The total formula must use an explicit ExcelJS formula value type',
+);
 
 const expectedMerges = [
   'A1:K1',
