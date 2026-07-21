@@ -315,6 +315,7 @@ export function buildDetailizationWorkbook(data: DetailizationWorkbookData) {
     const accruedTotalFormula: ExcelJS.CellFormulaValue = {
         formula: 'SUM(K5:L14)',
         result: accruedTotal,
+        date1904: false,
     };
 
     setCell(worksheet, 'A15', 'Всего начислено', { font: fontA10b, alignment: textTop });

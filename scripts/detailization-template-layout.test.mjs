@@ -37,8 +37,8 @@ const detailizationSource = readFileSync(resolve('lib/report-detailization.ts'),
 
 assert.match(
   detailizationSource,
-  /const accruedTotalFormula:\s*ExcelJS\.CellFormulaValue/,
-  'The total formula must use an explicit ExcelJS formula value type',
+  /const accruedTotalFormula:\s*ExcelJS\.CellFormulaValue[\s\S]*date1904:\s*false/,
+  'The total formula must use an explicit ExcelJS formula value type with date1904',
 );
 
 const expectedMerges = [
