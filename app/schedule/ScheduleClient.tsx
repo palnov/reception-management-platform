@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSharedMonth } from '@/lib/useSharedMonth';
 import { useMonthStatus } from '@/lib/useMonthStatus';
+import { useScheduleRealtime } from '@/lib/useScheduleRealtime';
 import { addMonths, format, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, subMonths } from 'date-fns';
 import { QuickContextMenu } from '@/components/QuickContextMenu';
 import type { DragEndEvent } from '@dnd-kit/core';
@@ -317,6 +318,11 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
     const syncShiftsInBackground = useCallback(() => {
         void fetchShifts();
     }, [fetchShifts]);
+
+    useScheduleRealtime({
+        monthKey: currentMonthKey,
+        onMonthChanged: syncShiftsInBackground,
+    });
 
     const resetTransientScheduleState = useCallback(() => {
         setSelectedDate(null);

@@ -8,6 +8,7 @@
 - В Vercel обязательно должна быть переменная `DATABASE_URL` со строкой подключения Neon.
 - В локальном `.env` для команды `npm run sync-neon` нужна переменная `NEON_DATABASE_URL` с той же Neon-строкой.
 - `JWT_SECRET` должен быть одинаково задан в Vercel для всех окружений, где вы логинитесь: Production/Preview/Development, если используете preview-деплои.
+- `NEXT_PUBLIC_REALTIME_URL`, `REALTIME_PUBLISH_URL`, `REALTIME_PUBLISH_SECRET` и `REALTIME_PORT` в Vercel оставьте пустыми: demo-версия будет автоматически использовать fallback-синхронизацию.
 - `npm run sync-neon` обновляет структуру Neon и мигрирует старые plaintext-пароли в `scrypt$...`.
 
 ### Если это ПЕРВЫЙ деплой (Чистая установка):
@@ -58,6 +59,12 @@
     *   `DATABASE_URL="file:./dev.db"`
     *   `JWT_SECRET="ваша-секретная-строка"`
     *   `PORT=3005`
+    *   `REALTIME_PORT=3006`
+    *   `REALTIME_PUBLISH_URL="http://127.0.0.1:3006/publish"`
+    *   `REALTIME_PUBLISH_SECRET="длинная-случайная-строка-для-публикации"`
+    *   `NEXT_PUBLIC_REALTIME_URL="ws://ваш-домен-или-ip:3006/realtime"`
+
+    WebSocket-адрес должен быть доступен с компьютеров пользователей. Если сайт работает по HTTPS, используйте `wss://` и настройте reverse proxy с поддержкой WebSocket Upgrade. `NEXT_PUBLIC_REALTIME_URL` задаётся до `npm run build`, потому что он попадает в клиентскую сборку.
 3.  **Инициализируйте базу**:
     ```bash
     npx prisma db push
@@ -70,6 +77,8 @@
 5.  **Запустите через PM2**:
     ```bash
     pm2 start npm --name "staff-manager" -- start -- -p 3005 -H 0.0.0.0
+    pm2 start npm --name "staff-manager-realtime" -- run start:realtime
+    pm2 save
     ```
 6.  **Настройте админа**: Откройте в браузере `http://ваш-ip:3000/setup` и создайте первого пользователя.
 
@@ -77,6 +86,7 @@
 1.  **Зайдите на сервер** и подтяните код:
     ```bash
     git pull
+    npm install
     ```
 2.  **Если меняли базу данных (schema.prisma)**:
     ```bash
@@ -87,6 +97,7 @@
     ```bash
     npm run build
     pm2 restart staff-manager
+    pm2 restart staff-manager-realtime
     ```
 
 ---

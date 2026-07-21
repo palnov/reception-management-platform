@@ -4,6 +4,8 @@ This guide will help you correctly deploy or update your project.
 
 ## 1. Deployment to Vercel (Demo version with Neon DB)
 
+Leave `NEXT_PUBLIC_REALTIME_URL`, `REALTIME_PUBLISH_URL`, `REALTIME_PUBLISH_SECRET`, and `REALTIME_PORT` unset in Vercel. The demo deployment will automatically use the fallback synchronization interval.
+
 ### For FIRST-TIME Deployment (Fresh Install):
 1.  **Create a project on Vercel** and link your repository.
 2.  **Configure Environment Variables** in the Vercel dashboard:
@@ -33,6 +35,12 @@ This guide will help you correctly deploy or update your project.
     *   `DATABASE_URL="file:./dev.db"`
     *   `JWT_SECRET="your-secret-string"`
     *   `PORT=3005`
+    *   `REALTIME_PORT=3006`
+    *   `REALTIME_PUBLISH_URL="http://127.0.0.1:3006/publish"`
+    *   `REALTIME_PUBLISH_SECRET="long-random-publish-secret"`
+    *   `NEXT_PUBLIC_REALTIME_URL="ws://your-domain-or-ip:3006/realtime"`
+
+    The WebSocket address must be reachable from users' computers. If the site uses HTTPS, use `wss://` and configure a reverse proxy with WebSocket Upgrade support. Set `NEXT_PUBLIC_REALTIME_URL` before running `npm run build`, because it is embedded in the client bundle.
 3.  **Initialize the database**:
     ```bash
     npx prisma db push
@@ -44,6 +52,8 @@ This guide will help you correctly deploy or update your project.
 5.  **Start with PM2**:
     ```bash
     pm2 start npm --name "staff-manager" -- start -- -p 3005 -H 0.0.0.0
+    pm2 start npm --name "staff-manager-realtime" -- run start:realtime
+    pm2 save
     ```
 6.  **Setup the Admin**: Open `http://your-ip:3000/setup` in your browser and create the first user.
 
@@ -51,6 +61,7 @@ This guide will help you correctly deploy or update your project.
 1.  **Connect to your server** and pull the code:
     ```bash
     git pull
+    npm install
     ```
 2.  **If you modified the database (schema.prisma)**:
     ```bash
@@ -60,6 +71,7 @@ This guide will help you correctly deploy or update your project.
     ```bash
     npm run build
     pm2 restart staff-manager
+    pm2 restart staff-manager-realtime
     ```
 
 ---

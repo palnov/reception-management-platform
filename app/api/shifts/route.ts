@@ -6,6 +6,7 @@ import { calculateDiff, logAudit } from '@/lib/audit';
 import { isMonthClosed } from '@/lib/monthStatus';
 import { requireSession } from '@/lib/api-auth';
 import { clampShiftCoefficient } from '@/lib/employee-roles';
+import { publishScheduleChange } from '@/lib/realtime-publisher';
 import type { AuditLog } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
@@ -147,7 +148,10 @@ export async function POST(request: Request) {
 
         if (id) {
             // Update existing (by ID)
-            const existing = await prisma.shift.findUnique({ where: { id } });
+            const existingById = await prisma.shift.findUnique({ where: { id } });
+            const existing = existingById || await prisma.shift.findFirst({
+                where: { employeeId, date },
+            });
             if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
             if (!await canEditShiftForSession(role, session.employee.id, existing.employeeId)) {
@@ -188,13 +192,14 @@ export async function POST(request: Request) {
             const diff = calculateDiff(existing, newData);
 
             const shift = await prisma.shift.update({
-                where: { id },
+                where: { id: existing.id },
                 data: newData
             });
 
             if (diff) {
                 await logAudit('SHIFT', shift.id, 'UPDATE', diff, session);
             }
+            await publishScheduleChange(date.slice(0, 7));
             return NextResponse.json(shift);
         } else {
             // Create or Upsert (by Employee+Date)
@@ -251,6 +256,7 @@ export async function POST(request: Request) {
                     await logAudit('SHIFT', shift.id, 'UPDATE', diff, session);
                     // If it was deleted, maybe log a RESTORE event? Or UPDATE covers it (isDeleted changed from true to false).
                 }
+                await publishScheduleChange(date.slice(0, 7));
                 return NextResponse.json(shift);
             }
 
@@ -293,6 +299,7 @@ export async function POST(request: Request) {
                 isTrainee: !!isTrainee,
                 coefficient: normalizedCoefficient
             }, session);
+            await publishScheduleChange(date.slice(0, 7));
             return NextResponse.json(shift);
         }
     } catch (error) {
@@ -335,5 +342,6 @@ export async function DELETE(request: Request) {
         });
     }
 
+    await publishScheduleChange(existing.date.slice(0, 7));
     return NextResponse.json({ success: true });
 }

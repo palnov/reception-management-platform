@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "node scripts/switch-prisma-provider.js && prisma generate && next build",
     "start": "next start",
+    "start:realtime": "node scripts/realtime-server.mjs",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test:employee-coefficient": "node scripts/employee-max-coefficient.test.mjs",
@@ -20,6 +21,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@types/jsonwebtoken": "^9.0.10",
     "cookie": "^1.1.1",
+    "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
     "jose": "^6.1.3",
     "jsonwebtoken": "^9.0.3",
@@ -27,7 +29,8 @@
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "@prisma/client": "^5.10.2"
+    "@prisma/client": "^5.10.2",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

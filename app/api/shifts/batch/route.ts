@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { clampShiftCoefficient } from '@/lib/employee-roles';
+import { publishScheduleChange } from '@/lib/realtime-publisher';
 
 type BatchShiftOperation = {
     id?: string;
@@ -72,6 +73,7 @@ export async function POST(request: Request) {
         const { operations, deleteIds } = body;
 
         const results: BatchShiftResults = {};
+        const changedMonths = new Set<string>();
 
         // 1. Handle Deletions (Soft Delete with Audit)
         if (Array.isArray(deleteIds) && deleteIds.length > 0) {
@@ -97,6 +99,7 @@ export async function POST(request: Request) {
                     return NextResponse.json({ error: 'Month is closed for editing' }, { status: 403 });
                 }
 
+                shiftsToDelete.forEach((shift) => changedMonths.add(toMonthKey(shift.date)));
                 await prisma.$transaction([
                     ...shiftsToDelete.map(shift =>
                         prisma.auditLog.create({
@@ -154,7 +157,9 @@ export async function POST(request: Request) {
                     return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
                 }
 
-                const existing = op.id ? existingShifts.find(s => s.id === op.id) : existingMap.get(`${op.employeeId}_${op.date}`);
+                const existing = op.id
+                    ? existingShifts.find((shift) => shift.id === op.id) || existingMap.get(`${op.employeeId}_${op.date}`)
+                    : existingMap.get(`${op.employeeId}_${op.date}`);
                 if (isAssigningArchiveWork(role, op.type, existing?.type)) {
                     return NextResponse.json({ error: 'Cannot assign archive work' }, { status: 403 });
                 }
@@ -176,9 +181,13 @@ export async function POST(request: Request) {
                 // But wait, some might be valid. Let's just process the valid ones.
             }
 
+            validOperations.forEach((op) => changedMonths.add(toMonthKey(op.date)));
+
             results.upserted = await prisma.$transaction(
                 validOperations.map(op => {
-                    const existing = op.id ? existingShifts.find(s => s.id === op.id) : existingMap.get(`${op.employeeId}_${op.date}`);
+                    const existing = op.id
+                        ? existingShifts.find((shift) => shift.id === op.id) || existingMap.get(`${op.employeeId}_${op.date}`)
+                        : existingMap.get(`${op.employeeId}_${op.date}`);
 
                     const data = {
                         type: op.type,
@@ -210,6 +219,7 @@ export async function POST(request: Request) {
             );
         }
 
+        await Promise.all([...changedMonths].map((month) => publishScheduleChange(month)));
         return NextResponse.json({ success: true, results });
     } catch (error) {
         console.error('BATCH_SHIFT_ERROR:', error);
