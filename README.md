@@ -72,7 +72,7 @@ NEXT_PUBLIC_APP_NAME="Ваше Название"
 ### 2. VPS + SQLite — Рабочая версия
 Это стандартный режим работы, используемый по умолчанию.
 
-На VPS запускаются два процесса PM2: основное Next.js-приложение и `staff-manager-realtime`. Настройки `.env`, генерация секретов, прямой `ws://`/`wss://` через Nginx, проверка `/health` и команды обновления описаны в [DEPLOYMENT_RU.md](DEPLOYMENT_RU.md) и [рабочем workflow деплоя](.agent/workflows/deploy-vps.md).
+На VPS запускаются два процесса PM2: `pdmc-rm` (основное Next.js-приложение) и `staff-manager-realtime`. Настройки `.env`, генерация секретов, прямой `ws://`/`wss://` через Nginx, проверка `/health` и команды обновления описаны в [DEPLOYMENT_RU.md](DEPLOYMENT_RU.md) и [рабочем workflow деплоя](.agent/workflows/deploy-vps.md).
 
 **Шаги:**
 1. Следуйте подробной инструкции в [DEPLOYMENT_RU.md](DEPLOYMENT_RU.md) или [deploy-vps.md](.agent/workflows/deploy-vps.md).

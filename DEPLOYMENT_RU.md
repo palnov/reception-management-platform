@@ -142,7 +142,7 @@ sudo systemctl reload nginx
 sudo ufw allow 3006/tcp
 ```
 
-При варианте через Nginx порт `3006` наружу открывать не нужно.
+Если `ufw` разрешает порт, но внешняя проверка всё равно показывает timeout, откройте входящий TCP-порт `3006` также в firewall/security group панели VPS-провайдера. При варианте через Nginx порт `3006` наружу открывать не нужно.
 
 Важно: `NEXT_PUBLIC_REALTIME_URL` встраивается в клиентскую сборку. Его нужно задать до `npm run build`.
 
@@ -160,7 +160,7 @@ npm run build
 ### Запуск через PM2
 
 ```bash
-pm2 start npm --name "staff-manager" -- start -- -p 3005 -H 0.0.0.0
+pm2 start npm --name "pdmc-rm" -- start -- -p 3005 -H 0.0.0.0
 pm2 start npm --name "staff-manager-realtime" -- run start:realtime
 pm2 startup
 ```
@@ -185,7 +185,7 @@ npm ci
 # npm run migrate:passwords
 
 npm run build
-pm2 restart staff-manager --update-env
+pm2 restart pdmc-rm --update-env
 pm2 restart staff-manager-realtime --update-env
 pm2 save
 ```
@@ -222,6 +222,7 @@ Published schedule.changed for 2026-07 to 2 client(s)
 
 - `WebSocket URL is not configured` — `NEXT_PUBLIC_REALTIME_URL` не попал в сборку. Проверьте `.env` и повторите `npm run build`.
 - `clients: 0` при открытом графике — браузер не может подключиться: проверьте URL, firewall, Nginx и `ws`/`wss`.
+- Внутренний `/health` работает, но с компьютера порт `3006` недоступен — проверьте одновременно `ufw` и сетевой firewall/security group у VPS-провайдера.
 - `REALTIME_PUBLISH_ERROR` — realtime-процесс недоступен или `REALTIME_PUBLISH_SECRET` отличается в настройках.
 - `npm ls exceljs next --depth=0` должен показывать версии из lock-файла. После случайного `npm audit fix --force` выполните `npm ci`.
 
@@ -235,7 +236,7 @@ Published schedule.changed for 2026-07 to 2 client(s)
 | `npm run build` | Собрать production-версию; также встраивает `NEXT_PUBLIC_REALTIME_URL` |
 | `npm run start:realtime` | Запустить WebSocket-сервер вручную |
 | `curl http://127.0.0.1:3006/health` | Проверить realtime-процесс |
-| `pm2 restart staff-manager --update-env` | Перезапустить Next.js после сборки |
+| `pm2 restart pdmc-rm --update-env` | Перезапустить Next.js после сборки |
 | `pm2 restart staff-manager-realtime --update-env` | Перезапустить WebSocket-процесс |
 | `npm run sync-neon` | Синхронизировать Neon для Vercel |
 | `npx prisma db push` | Синхронизировать SQLite со схемой Prisma |

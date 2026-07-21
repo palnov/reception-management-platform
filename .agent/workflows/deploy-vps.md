@@ -6,7 +6,7 @@ description: how to deploy the application on a VPS (Production Mode)
 
 This guide covers the production setup on a Linux VPS with Next.js, Prisma, SQLite, Nginx, and two PM2 processes:
 
-- `staff-manager` — the main Next.js application;
+- `pdmc-rm` — the main Next.js application;
 - `staff-manager-realtime` — the self-hosted WebSocket server for schedule events.
 
 Vercel does not use the second process. See `DEPLOYMENT_RU.md` or `DEPLOYMENT_EN.md` for the complete deployment guide.
@@ -105,6 +105,8 @@ Open port `3006` only for the direct `ws://...:3006` option:
 sudo ufw allow 3006/tcp
 ```
 
+If the port is still unreachable from a user's computer, allow inbound TCP `3006` in the VPS provider's firewall/security group as well. When Nginx proxies `wss://` traffic, keep `3006` private instead.
+
 ## 4. Initialize and build
 
 ```bash
@@ -119,7 +121,7 @@ Run `npm run migrate:passwords` only when upgrading an existing installation tha
 ## 5. Start and persist both PM2 processes
 
 ```bash
-pm2 start npm --name "staff-manager" -- start -- -p 3005 -H 0.0.0.0
+pm2 start npm --name "pdmc-rm" -- start -- -p 3005 -H 0.0.0.0
 pm2 start npm --name "staff-manager-realtime" -- run start:realtime
 pm2 startup
 ```
@@ -139,7 +141,7 @@ cd /root/pdmc-rm
 git pull --ff-only
 npm ci
 npm run build
-pm2 restart staff-manager --update-env
+pm2 restart pdmc-rm --update-env
 pm2 restart staff-manager-realtime --update-env
 pm2 save
 ```

@@ -137,6 +137,8 @@ sudo ufw allow 3006/tcp
 
 Do not expose port `3006` publicly when Nginx proxies `wss://` traffic to it.
 
+If UFW allows the port but an external connection still times out, also allow inbound TCP port `3006` in the VPS provider's firewall/security group.
+
 `NEXT_PUBLIC_REALTIME_URL` is embedded into the browser bundle, so it must be set before `npm run build`.
 
 ### Initialize, build, and start
@@ -147,7 +149,7 @@ npx prisma db push
 npm run migrate:passwords
 npm run build
 
-pm2 start npm --name "staff-manager" -- start -- -p 3005 -H 0.0.0.0
+pm2 start npm --name "pdmc-rm" -- start -- -p 3005 -H 0.0.0.0
 pm2 start npm --name "staff-manager-realtime" -- run start:realtime
 pm2 startup
 ```
@@ -172,7 +174,7 @@ npm ci
 # npm run migrate:passwords
 
 npm run build
-pm2 restart staff-manager --update-env
+pm2 restart pdmc-rm --update-env
 pm2 restart staff-manager-realtime --update-env
 pm2 save
 ```
@@ -207,6 +209,7 @@ The browser console should show:
 
 - `WebSocket URL is not configured` means `NEXT_PUBLIC_REALTIME_URL` was missing during the build. Fix `.env` and run `npm run build` again.
 - `clients: 0` while the schedule is open means the browser cannot connect; check the public URL, firewall, Nginx, and `ws`/`wss` scheme.
+- If `/health` works inside the VPS but port `3006` times out externally, check both UFW and the VPS provider's firewall/security group.
 - `REALTIME_PUBLISH_ERROR` means the realtime process is unavailable or `REALTIME_PUBLISH_SECRET` does not match.
 - After a previous `npm audit fix --force`, run `npm ci` to restore the lockfile versions. Check with `npm ls exceljs next --depth=0`.
 
@@ -220,7 +223,7 @@ Two computers using the same account still receive realtime updates. They are on
 | `npm run build` | Build production code and embed `NEXT_PUBLIC_REALTIME_URL` |
 | `npm run start:realtime` | Start the WebSocket server manually |
 | `curl http://127.0.0.1:3006/health` | Check the realtime process |
-| `pm2 restart staff-manager --update-env` | Restart Next.js after a build |
+| `pm2 restart pdmc-rm --update-env` | Restart Next.js after a build |
 | `pm2 restart staff-manager-realtime --update-env` | Restart the WebSocket process |
 | `npm run sync-neon` | Sync Neon for Vercel |
 | `npx prisma db push` | Sync SQLite with the Prisma schema |
