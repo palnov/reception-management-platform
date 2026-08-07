@@ -82,9 +82,12 @@ const expectedMerges = [
   'A15:G15',
   'H15:J15',
   'K15:L15',
-  'M15:S15',
-  'K17:L17',
+  'A16:G16',
+  'H16:J16',
+  'K16:L16',
+  'M16:S16',
   'K18:L18',
+  'K19:L19',
 ];
 
 const workbook = await buildDetailizationWorkbook({
@@ -105,6 +108,8 @@ const workbook = await buildDetailizationWorkbook({
   sickLeaveOpening: 3,
   sickLeaveClosing: 7,
   sickLeaveBonus: 950,
+  additionalEntryCount: 3,
+  additionalEntryBonus: 150,
   traineeDays: 2,
   traineeBonus: 1000,
   cardCreationCount: 4,
@@ -152,14 +157,17 @@ assert.equal(worksheet.getCell('K7').value, 5000);
 assert.equal(worksheet.getCell('H8').value, 29280);
 assert.equal(worksheet.getCell('K8').value, 2049.6);
 assert.equal(worksheet.getCell('H11').value, '3 открытия, 7 закрытий');
+assert.equal(worksheet.getCell('A12').value, 'Дозапись');
+assert.equal(worksheet.getCell('H12').value, '3 шт.');
+assert.equal(worksheet.getCell('K12').value, 150);
 assert.equal(
   worksheet.getCell('A10').value,
   'Выполнение доп.обязанностей в пределах рабочего времени в указанном объёме, ч.',
 );
-assert.deepEqual(worksheet.getCell('H15').value, new Date('2026-01-01T00:00:00.000Z'));
-assert.deepEqual(worksheet.getCell('K15').value, { formula: 'SUM(K5:L14)', result: 28197.6 });
-assert.equal(worksheet.getCell('K15').numFmt, '#,##0.00');
-assert.equal(worksheet.getCell('A17').value, 'Утверждено (руководитель службы заботы)');
-assert.equal(worksheet.getCell('A18').value, 'Сотрудник');
+assert.deepEqual(worksheet.getCell('H16').value, new Date('2026-01-01T00:00:00.000Z'));
+assert.deepEqual(worksheet.getCell('K16').value, { formula: 'SUM(K5:L15)', result: 28347.6 });
+assert.equal(worksheet.getCell('K16').numFmt, '#,##0.00');
+assert.equal(worksheet.getCell('A18').value, 'Утверждено (руководитель службы заботы)');
+assert.equal(worksheet.getCell('A19').value, 'Сотрудник');
 
 console.log('Detailization template layout checks passed');
