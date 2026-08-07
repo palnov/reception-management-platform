@@ -36,13 +36,24 @@ export async function POST(req: NextRequest) {
         if (auth.response) return auth.response;
 
         const json = await req.json();
-        const { month, employeeId, percentage, sickLeaveOpening, sickLeaveClosing, cardCreation, closingBonus, updatedBy } = json;
+        const { month, employeeId, percentage, sickLeaveOpening, sickLeaveClosing, cardCreation, additionalEntryCount, closingBonus, updatedBy } = json;
 
         if (!month || !employeeId) {
             return NextResponse.json(
                 { error: 'Month and employeeId are required' },
                 { status: 400 }
             );
+        }
+
+        const parsedAdditionalEntryCount = additionalEntryCount === undefined
+            ? undefined
+            : Number(additionalEntryCount);
+
+        if (
+            parsedAdditionalEntryCount !== undefined &&
+            (!Number.isInteger(parsedAdditionalEntryCount) || parsedAdditionalEntryCount < 0)
+        ) {
+            return NextResponse.json({ error: 'Additional entry count must be a non-negative integer' }, { status: 400 });
         }
 
         if (await isMonthClosed(month)) {
@@ -64,6 +75,7 @@ export async function POST(req: NextRequest) {
                 ...(sickLeaveOpening !== undefined && { sickLeaveOpening: parseInt(sickLeaveOpening) }),
                 ...(sickLeaveClosing !== undefined && { sickLeaveClosing: parseInt(sickLeaveClosing) }),
                 ...(cardCreation !== undefined && { cardCreation: parseInt(cardCreation) }),
+                ...(parsedAdditionalEntryCount !== undefined && { additionalEntryCount: parsedAdditionalEntryCount }),
                 ...(closingBonus !== undefined && { closingBonus: parseInt(closingBonus) }),
                 updatedAt: now,
                 updatedBy: updatedBy || null
@@ -75,6 +87,7 @@ export async function POST(req: NextRequest) {
                 sickLeaveOpening: sickLeaveOpening !== undefined ? parseInt(sickLeaveOpening) : 0,
                 sickLeaveClosing: sickLeaveClosing !== undefined ? parseInt(sickLeaveClosing) : 0,
                 cardCreation: cardCreation !== undefined ? parseInt(cardCreation) : 0,
+                additionalEntryCount: parsedAdditionalEntryCount !== undefined ? parsedAdditionalEntryCount : 0,
                 closingBonus: closingBonus !== undefined ? parseInt(closingBonus) : 0,
                 createdAt: now,
                 updatedAt: now,

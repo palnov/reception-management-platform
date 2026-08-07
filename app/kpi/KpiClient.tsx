@@ -329,8 +329,10 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
             const ownChecklist = empChecklist ? empChecklist.percentage : 0;
             const sickLeaveOpening = empChecklist ? (empChecklist.sickLeaveOpening || 0) : 0;
             const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
+            const additionalEntryCount = empChecklist ? (empChecklist.additionalEntryCount || 0) : 0;
             const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
             const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
+            const additionalEntryBonus = additionalEntryCount * 50;
             const cardBonus = cardCreation * 60;
 
             const calcChecklist = empDailyChecklists.length > 0 ? avgDailyChecklist : ownChecklist;
@@ -372,7 +374,7 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
             }
 
             const actualClosingBonuses = closingBonuses;
-            const totalPay = basePay + coeffBonus + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus + traineeBonus + (includeActingLeadBonus ? actingLeadBonus : 0);
+            const totalPay = basePay + coeffBonus + dayOffPayTotal + actualClosingBonuses + salesBonus + qualityBonus + checklistBonus + seniorityBonus + sickLeaveBonus + additionalEntryBonus + cardBonus + traineeBonus + (includeActingLeadBonus ? actingLeadBonus : 0);
 
             // Aggregate all audit logs
             const allLogs = [
@@ -405,6 +407,8 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                 sickLeaveOpening,
                 sickLeaveClosing,
                 sickLeaveBonus,
+                additionalEntryCount,
+                additionalEntryBonus,
                 cardCreation,
                 cardBonus,
                 calcChecklist,
@@ -426,7 +430,7 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
     const visiblePayrollData = payrollData.filter(calc =>
         calc.rawHours > 0 || calc.dayOffHours > 0 || calc.totalPay > 0 || calc.seniorityBonus > 0
     );
-    const payrollColumnCount = includeActingLeadBonus ? 16 : 15;
+    const payrollColumnCount = includeActingLeadBonus ? 17 : 16;
     const canEditManualChecklistValues = currentUser?.role === 'MANAGER' && !isClosed;
 
     return (
@@ -496,6 +500,9 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                             </th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-center whitespace-nowrap min-w-[140px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за продление и закрытие больничных листов">Закр/Продл Б/Л</Tooltip>
+                            </th>
+                            <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-center whitespace-nowrap min-w-[110px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>
+                                <Tooltip content="Доплата за дозапись">Дозапись</Tooltip>
                             </th>
                             <th className="sticky top-0 z-20 bg-zinc-50 px-4 py-3 font-bold text-zinc-500 uppercase tracking-wider text-[10px] text-center whitespace-nowrap min-w-[100px]" style={{ boxShadow: 'inset 0 -2px 0 #e4e4e7' }}>
                                 <Tooltip content="Доплата за создание карточек пациентов">Карточки</Tooltip>
@@ -656,6 +663,37 @@ export default function KpiPage({ initialMonth, initialData }: KpiClientProps) {
                                                 >
                                                     {calc.sickLeaveClosing > 0 && <div className="text-emerald-600 font-medium">+{calc.sickLeaveClosing * 80}</div>}
                                                     <div className="text-[10px] text-zinc-400">{calc.sickLeaveClosing || '-'} шт.</div>
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-center text-zinc-600">
+                                            {editingCell?.empId === calc.empId && editingCell?.field === 'additionalEntryCount' ? (
+                                                <input
+                                                    autoFocus
+                                                    type="number"
+                                                    min="0"
+                                                    step="1"
+                                                    className="w-12 px-1 py-0.5 border rounded text-center text-sm"
+                                                    value={tempValue}
+                                                    onFocus={(e) => e.target.select()}
+                                                    onChange={(e) => setTempValue(e.target.value)}
+                                                    onBlur={() => handleSaveChecklist(calc.empId, 'additionalEntryCount', tempValue)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') handleSaveChecklist(calc.empId, 'additionalEntryCount', tempValue);
+                                                        if (e.key === 'Escape') setEditingCell(null);
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div
+                                                    className={canEditManualChecklistValues ? "cursor-pointer hover:text-blue-600 transition-colors" : ""}
+                                                    onClick={() => {
+                                                        if (!canEditManualChecklistValues) return;
+                                                        setEditingCell({ empId: calc.empId, field: 'additionalEntryCount' });
+                                                        setTempValue(calc.additionalEntryCount === 0 ? '' : calc.additionalEntryCount.toString());
+                                                    }}
+                                                >
+                                                    {calc.additionalEntryBonus > 0 && <div className="text-emerald-600 font-medium">+{calc.additionalEntryBonus}</div>}
+                                                    <div className="text-[10px] text-zinc-400">{calc.additionalEntryCount || '-'} шт.</div>
                                                 </div>
                                             )}
                                         </td>
@@ -835,6 +873,7 @@ interface MonthlyChecklist {
     percentage: number;
     sickLeaveOpening?: number;
     sickLeaveClosing?: number;
+    additionalEntryCount?: number;
     cardCreation?: number;
     closingBonus?: number;
 }

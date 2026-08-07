@@ -385,6 +385,7 @@ export class ReportService {
                     { header: 'Продажи', key: 'sales', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                     { header: 'Открытие Б/Л', key: 'sick_leave_open', width: 15, style: centerStyle },
                     { header: 'Закрытие/продление Б/Л', key: 'sick_leave_close', width: 25, style: centerStyle },
+                    { header: 'Дозапись', key: 'additional_entry', width: 15, style: centerStyle },
                     { header: 'Карточки', key: 'cards', width: 15, style: centerStyle },
                     { header: 'Выслуга', key: 'seniority', width: 15, style: { ...cellStyle, numFmt: '#,##0' } },
                     { header: 'Чеклист %', key: 'checklist_pct', width: 15, style: { ...centerStyle, numFmt: '0.0%' } },
@@ -570,10 +571,12 @@ export class ReportService {
                 const ownChecklist = empChecklist ? empChecklist.percentage / 100 : 0;
                 const sickLeaveOpening = empChecklist ? (empChecklist.sickLeaveOpening || 0) : 0;
                 const sickLeaveClosing = empChecklist ? (empChecklist.sickLeaveClosing || 0) : 0;
+                const additionalEntryCount = empChecklist ? (empChecklist.additionalEntryCount || 0) : 0;
                 const cardCreation = empChecklist ? (empChecklist.cardCreation || 0) : 0;
                 const calcChecklist = empDailyChecklists.length > 0 ? avgDailyChecklist : ownChecklist;
 
                 const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
+                const additionalEntryBonus = additionalEntryCount * 50;
                 const cardBonus = cardCreation * 60;
 
                 let kpiBonus = 0;
@@ -594,7 +597,7 @@ export class ReportService {
                 const seniorityBonus = seniority.bonus;
 
                 const baseShiftPay = Math.round(hourlyBase * hoursWorked);
-                const bonuses = Math.round(dayOffPayTotal + closingBonuses + actingLeadBonus + traineeBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + cardBonus);
+                const bonuses = Math.round(dayOffPayTotal + closingBonuses + actingLeadBonus + traineeBonus + salesBonus + kpiBonus + checklistBonus + seniorityBonus + sickLeaveBonus + additionalEntryBonus + cardBonus);
                 const total = Math.round(shiftPay + bonuses);
                 const totalBonuses = total - baseShiftPay;
 
@@ -611,6 +614,7 @@ export class ReportService {
                         sales: salesBonus,
                         sick_leave_open: sickLeaveOpening,
                         sick_leave_close: sickLeaveClosing,
+                        additional_entry: additionalEntryCount,
                         cards: cardCreation,
                         seniority: seniorityBonus,
                         checklist_pct: calcChecklist,
@@ -1262,6 +1266,8 @@ export class ReportService {
         const sickLeaveOpening = monthlyChecklist?.sickLeaveOpening || 0;
         const sickLeaveClosing = monthlyChecklist?.sickLeaveClosing || 0;
         const sickLeaveBonus = (sickLeaveOpening * 130) + (sickLeaveClosing * 80);
+        const additionalEntryCount = monthlyChecklist?.additionalEntryCount || 0;
+        const additionalEntryBonus = additionalEntryCount * 50;
 
         const cardCreationCount = monthlyChecklist?.cardCreation || 0;
         const cardCreationBonus = cardCreationCount * 60;
@@ -1288,6 +1294,8 @@ export class ReportService {
             sickLeaveOpening,
             sickLeaveClosing,
             sickLeaveBonus,
+            additionalEntryCount,
+            additionalEntryBonus,
             traineeDays,
             traineeBonus,
             cardCreationCount,

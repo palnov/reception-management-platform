@@ -19,6 +19,8 @@ export type DetailizationWorkbookData = {
     sickLeaveOpening: number;
     sickLeaveClosing: number;
     sickLeaveBonus: number;
+    additionalEntryCount: number;
+    additionalEntryBonus: number;
     traineeDays: number;
     traineeBonus: number;
     cardCreationCount: number;
@@ -121,8 +123,9 @@ function setupTemplateGrid(worksheet: ExcelJS.Worksheet) {
         'A12:G12', 'H12:J12', 'K12:L12',
         'A13:G13', 'H13:J13', 'K13:L13',
         'A14:G14', 'H14:J14', 'K14:L14',
-        'A15:G15', 'H15:J15', 'K15:L15', 'M15:S15',
-        'K17:L17', 'K18:L18',
+        'A15:G15', 'H15:J15', 'K15:L15',
+        'A16:G16', 'H16:J16', 'K16:L16', 'M16:S16',
+        'K18:L18', 'K19:L19',
     ];
 
     for (const range of merges) mergeCellsWithoutStyle(worksheet, range);
@@ -212,13 +215,13 @@ function applyTemplateBorders(worksheet: ExcelJS.Worksheet) {
         border(thin, thin, thin, noBorder),
     ];
 
-    for (let row = 5; row <= 15; row++) {
-        const isTotal = row === 15;
+    for (let row = 5; row <= 16; row++) {
+        const isTotal = row === 16;
         const labelFont = isTotal ? fontA10b : fontA8;
         const valueFont = isTotal ? fontA10b : fontA8;
-        const leftBorders = (row === 5 || row === 6 || row === 7 || row === 15) ? fullBorders(7) : mergedRowBorders(7);
-        const baseBorders = (row === 6 || row === 7 || row === 15) ? fullBorders(3) : mergedRowBorders(3);
-        const accruedBorders = (row === 6 || row === 7 || row === 15) ? fullBorders(2) : mergedRowBorders(2);
+        const leftBorders = (row === 5 || row === 6 || row === 7 || row === 16) ? fullBorders(7) : mergedRowBorders(7);
+        const baseBorders = (row === 6 || row === 7 || row === 16) ? fullBorders(3) : mergedRowBorders(3);
+        const accruedBorders = (row === 6 || row === 7 || row === 16) ? fullBorders(2) : mergedRowBorders(2);
 
         styleRange(worksheet, row, 1, 7, {
             font: labelFont,
@@ -227,17 +230,17 @@ function applyTemplateBorders(worksheet: ExcelJS.Worksheet) {
         });
         styleRange(worksheet, row, 8, 10, {
             font: valueFont,
-            alignment: row === 15 ? rightTop : centerWrap,
+            alignment: row === 16 ? rightTop : centerWrap,
             borders: baseBorders,
         });
         styleRange(worksheet, row, 11, 12, {
             font: valueFont,
-            alignment: row === 15 ? rightTop : center,
+            alignment: row === 16 ? rightTop : center,
             borders: accruedBorders,
         });
     }
 
-    for (let row = 5; row <= 15; row++) {
+    for (let row = 5; row <= 16; row++) {
         styleRange(worksheet, row, 13, 19, {
             font: fontA8,
             alignment: textTop,
@@ -245,7 +248,7 @@ function applyTemplateBorders(worksheet: ExcelJS.Worksheet) {
         });
     }
 
-    for (const row of [17, 18]) {
+    for (const row of [18, 19]) {
         styleRange(worksheet, row, 1, 3, {
             font: fontA9,
             borders: Array.from({ length: 3 }, () => border(noBorder, noBorder, noBorder, noBorder)),
@@ -253,7 +256,7 @@ function applyTemplateBorders(worksheet: ExcelJS.Worksheet) {
         styleRange(worksheet, row, 11, 12, {
             font: fontA9,
             alignment: center,
-            borders: row === 17
+            borders: row === 18
                 ? [border(noBorder, noBorder, thin, noBorder), border(noBorder, noBorder, thin, noBorder)]
                 : [border(thin, noBorder, thin, noBorder), border(thin, noBorder, thin, noBorder)],
         });
@@ -300,9 +303,10 @@ export function buildDetailizationWorkbook(data: DetailizationWorkbookData) {
         ['A9', 'H9', 'K9', 'Открытие/закрытие центра', formatDays(data.closingDays), data.closingBonus],
         ['A10', 'H10', 'K10', ARCHIVE_WORK_REPORT_LABEL, `${data.archiveHours} ${pluralRu(data.archiveHours, 'час', 'часа', 'часов')}`, data.archiveBonus],
         ['A11', 'H11', 'K11', 'Оформление ЭЛН', `${data.sickLeaveOpening} ${pluralRu(data.sickLeaveOpening, 'открытие', 'открытия', 'открытий')}, ${data.sickLeaveClosing} ${pluralRu(data.sickLeaveClosing, 'закрытие', 'закрытия', 'закрытий')}`, data.sickLeaveBonus],
-        ['A12', 'H12', 'K12', 'Доплата за обучение стажёра', formatDays(data.traineeDays), data.traineeBonus],
-        ['A13', 'H13', 'K13', 'Доплата за создание новых карт пациентов', `${data.cardCreationCount} ${pluralRu(data.cardCreationCount, 'штука', 'штуки', 'штук')}`, data.cardCreationBonus],
-        ['A14', 'H14', 'K14', 'Доплата за стаж работы', `${data.seniorityPercent}% от оклада`, data.seniorityBonus],
+        ['A12', 'H12', 'K12', 'Дозапись', `${data.additionalEntryCount} шт.`, data.additionalEntryBonus],
+        ['A13', 'H13', 'K13', 'Доплата за обучение стажёра', formatDays(data.traineeDays), data.traineeBonus],
+        ['A14', 'H14', 'K14', 'Доплата за создание новых карт пациентов', `${data.cardCreationCount} ${pluralRu(data.cardCreationCount, 'штука', 'штуки', 'штук')}`, data.cardCreationBonus],
+        ['A15', 'H15', 'K15', 'Доплата за стаж работы', `${data.seniorityPercent}% от оклада`, data.seniorityBonus],
     ] as const;
 
     for (const [labelCell, baseCell, accruedCell, label, base, accrued] of rows) {
@@ -311,21 +315,21 @@ export function buildDetailizationWorkbook(data: DetailizationWorkbookData) {
         setCell(worksheet, accruedCell, accrued, { font: fontA8, alignment: center });
     }
 
-    const accruedTotal = Math.round((data.intensityBonus + data.checklistBonus + data.cardQualityBonus + data.salesBonus + data.closingBonus + data.archiveBonus + data.sickLeaveBonus + data.traineeBonus + data.cardCreationBonus + data.seniorityBonus) * 100) / 100;
+    const accruedTotal = Math.round((data.intensityBonus + data.checklistBonus + data.cardQualityBonus + data.salesBonus + data.closingBonus + data.archiveBonus + data.sickLeaveBonus + data.additionalEntryBonus + data.traineeBonus + data.cardCreationBonus + data.seniorityBonus) * 100) / 100;
     const accruedTotalFormula: ExcelJS.CellFormulaValue = {
-        formula: 'SUM(K5:L14)',
+        formula: 'SUM(K5:L15)',
         result: accruedTotal,
         date1904: false,
     };
 
-    setCell(worksheet, 'A15', 'Всего начислено', { font: fontA10b, alignment: textTop });
-    setCell(worksheet, 'H15', data.reportDate, { font: fontA10b, alignment: rightTop, numFmt: 'mmm-yy' });
-    setCell(worksheet, 'K15', accruedTotalFormula, { font: fontA10b, alignment: rightTop, numFmt: '#,##0.00' });
-    setCell(worksheet, 'A17', 'Утверждено (руководитель службы заботы)', { font: fontA9 });
-    setCell(worksheet, 'A18', 'Сотрудник', { font: fontA9 });
+    setCell(worksheet, 'A16', 'Всего начислено', { font: fontA10b, alignment: textTop });
+    setCell(worksheet, 'H16', data.reportDate, { font: fontA10b, alignment: rightTop, numFmt: 'mmm-yy' });
+    setCell(worksheet, 'K16', accruedTotalFormula, { font: fontA10b, alignment: rightTop, numFmt: '#,##0.00' });
+    setCell(worksheet, 'A18', 'Утверждено (руководитель службы заботы)', { font: fontA9 });
+    setCell(worksheet, 'A19', 'Сотрудник', { font: fontA9 });
 
     worksheet.getCell('K8').numFmt = '#,##0.00';
-    worksheet.getCell('K15').numFmt = '#,##0.00';
+    worksheet.getCell('K16').numFmt = '#,##0.00';
 
     return workbook;
 }

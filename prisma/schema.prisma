@@ -102,6 +102,7 @@ model MonthlyChecklist {
   sickLeaveOpening Int      @default(0)
   sickLeaveClosing Int      @default(0)
   cardCreation     Int      @default(0)
+  additionalEntryCount Int  @default(0)
   closingBonus     Int      @default(0)
   createdAt        String   @default("")
   updatedAt        String   @default("")

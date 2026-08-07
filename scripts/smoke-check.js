@@ -24,6 +24,7 @@ const REQUIRED_COLUMNS = {
   ClosedMonth: ['month', 'isClosed'],
   EmployeeRoleHistory: ['employeeId', 'role', 'seniorId', 'startDate', 'endDate'],
   EmployeeSalaryHistory: ['employeeId', 'baseSalary', 'hourlyRate', 'startDate', 'endDate'],
+  MonthlyChecklist: ['additionalEntryCount'],
 };
 
 function ok(message) {
