@@ -1,52 +1,8 @@
 # Инструкция по деплою
 
-Проект поддерживает два режима:
+Проект разворачивается вручную на VPS: Next.js + SQLite, помимо приложения отдельным PM2-процессом запускается WebSocket-сервер.
 
-- Vercel + Neon — демонстрационная версия. Отдельный realtime-процесс не запускается, используется fallback-синхронизация.
-- VPS + SQLite — рабочая версия. Помимо Next.js-приложения запускается отдельный WebSocket-процесс через PM2.
-
-## 1. Деплой на Vercel
-
-В Vercel задайте:
-
-- `DATABASE_URL` — строка подключения к Neon.
-- `JWT_SECRET` — длинный секрет авторизации. Он должен быть одинаковым во всех Vercel-окружениях, где используются логины.
-
-Эти переменные для realtime в Vercel оставьте пустыми или не задавайте:
-
-- `NEXT_PUBLIC_REALTIME_URL`
-- `REALTIME_PUBLISH_URL`
-- `REALTIME_PUBLISH_SECRET`
-- `REALTIME_PORT`
-
-В таком режиме демо-версия не пытается подключаться к WebSocket и автоматически использует fallback-обновление.
-
-### Первый деплой
-
-1. Создайте проект в Vercel и подключите GitHub-репозиторий.
-2. Добавьте `DATABASE_URL` и `JWT_SECRET` в Project → Settings → Environment Variables.
-3. Для первичной синхронизации Neon локально задайте `NEON_DATABASE_URL` и выполните:
-
-   ```bash
-   npm run sync-neon
-   ```
-
-4. Если база пустая, откройте `/setup` на Vercel-домене и создайте первого пользователя.
-
-### Обновление проекта
-
-1. Отправьте изменения в GitHub — Vercel запустит новую сборку.
-2. Если менялась схема базы, после пуша выполните локально:
-
-   ```bash
-   npm run sync-neon
-   ```
-
-3. После изменения переменных окружения сделайте Redeploy в Vercel.
-
-Не добавляйте секреты realtime в GitHub и не запускайте WebSocket-процесс на Vercel.
-
-## 2. Деплой на VPS
+## Деплой на VPS
 
 Ниже предполагается каталог `/root/pdmc-rm`, приложение на порту `3005` и realtime-сервер на порту `3006`. Если каталог или порты у вас другие, замените их в командах.
 
@@ -238,5 +194,4 @@ Published schedule.changed for 2026-07 to 2 client(s)
 | `curl http://127.0.0.1:3006/health` | Проверить realtime-процесс |
 | `pm2 restart pdmc-rm --update-env` | Перезапустить Next.js после сборки |
 | `pm2 restart staff-manager-realtime --update-env` | Перезапустить WebSocket-процесс |
-| `npm run sync-neon` | Синхронизировать Neon для Vercel |
 | `npx prisma db push` | Синхронизировать SQLite со схемой Prisma |

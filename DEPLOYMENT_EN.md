@@ -1,47 +1,8 @@
 # Deployment Guide
 
-The project supports two deployment modes:
+The project is deployed manually to a VPS: Next.js + SQLite, plus a separate PM2 process for the WebSocket realtime server.
 
-- Vercel + Neon — demo deployment. It does not run a separate realtime process and uses fallback synchronization.
-- VPS + SQLite — production deployment. It runs the Next.js application and a separate WebSocket process managed by PM2.
-
-## 1. Vercel deployment
-
-Configure these variables in Vercel:
-
-- `DATABASE_URL` — the Neon connection string.
-- `JWT_SECRET` — a long authentication secret. Keep it the same in every Vercel environment where users log in.
-
-Leave these realtime variables unset or empty in Vercel:
-
-- `NEXT_PUBLIC_REALTIME_URL`
-- `REALTIME_PUBLISH_URL`
-- `REALTIME_PUBLISH_SECRET`
-- `REALTIME_PORT`
-
-The demo will skip the WebSocket connection and use fallback synchronization automatically.
-
-### First deployment
-
-1. Create a Vercel project and connect the GitHub repository.
-2. Add `DATABASE_URL` and `JWT_SECRET` in Project → Settings → Environment Variables.
-3. For the initial Neon setup, add `NEON_DATABASE_URL` to the local `.env` and run:
-
-   ```bash
-   npm run sync-neon
-   ```
-
-4. If the database is empty, open `/setup` on the Vercel domain and create the first user.
-
-### Updating the project
-
-1. Push changes to GitHub; Vercel will start a new deployment.
-2. If `schema.prisma` changed, run `npm run sync-neon` locally after the push.
-3. Redeploy after changing Vercel environment variables.
-
-Do not add VPS realtime secrets to GitHub or try to start the WebSocket process on Vercel.
-
-## 2. VPS deployment
+## VPS deployment
 
 The examples below use `/root/pdmc-rm`, Next.js port `3005`, and realtime port `3006`. Replace them if your server uses different paths or ports.
 
@@ -225,5 +186,4 @@ Two computers using the same account still receive realtime updates. They are on
 | `curl http://127.0.0.1:3006/health` | Check the realtime process |
 | `pm2 restart pdmc-rm --update-env` | Restart Next.js after a build |
 | `pm2 restart staff-manager-realtime --update-env` | Restart the WebSocket process |
-| `npm run sync-neon` | Sync Neon for Vercel |
 | `npx prisma db push` | Sync SQLite with the Prisma schema |

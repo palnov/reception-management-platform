@@ -13,7 +13,7 @@
 ## Технологический стек
 
 - **Frontend**: Next.js 16 (App Router), Tailwind CSS, Lucide React, dnd-kit.
-- **Backend/DB**: Prisma ORM, SQLite.
+- **Backend/DB**: Prisma ORM, SQLite (деплой на VPS через PM2 + Nginx).
 - **Data**: Гибкое хранение дат (String-based) для обеспечения максимальной совместимости.
 
 ## Запуск проекта
@@ -53,24 +53,7 @@ NEXT_PUBLIC_APP_NAME="Ваше Название"
 
 ## Развертывание (Deployment)
 
-Проект поддерживает два типа развертывания без изменения кода:
-
-### 1. Vercel + Neon (PostgreSQL) — Демо-версия
-При деплое на Vercel скрипт `scripts/switch-prisma-provider.js` автоматически переключает провайдера Prisma на `postgresql`.
-
-В Vercel не задавайте `NEXT_PUBLIC_REALTIME_URL`, `REALTIME_PUBLISH_URL`, `REALTIME_PUBLISH_SECRET` и `REALTIME_PORT`. Демо-версия использует fallback-синхронизацию без отдельного WebSocket-процесса.
-
-**Шаги:**
-1. Подключите репозиторий к Vercel.
-2. Добавьте переменную окружения `DATABASE_URL` (строка подключения Neon).
-3. При первой установке (или изменении схемы) выполните в локальном терминале (с установленной DATABASE_URL в .env):
-   ```bash
-   npx prisma db push
-   ```
-4. Vercel выполнит `npm run build`, который сам запустит генерацию клиента для Postgres.
-
-### 2. VPS + SQLite — Рабочая версия
-Это стандартный режим работы, используемый по умолчанию.
+Проект деплоится вручную на VPS (Next.js + SQLite).
 
 На VPS запускаются два процесса PM2: `pdmc-rm` (основное Next.js-приложение) и `staff-manager-realtime`. Настройки `.env`, генерация секретов, прямой `ws://`/`wss://` через Nginx, проверка `/health` и команды обновления описаны в [DEPLOYMENT_RU.md](DEPLOYMENT_RU.md) и [рабочем workflow деплоя](.agent/workflows/deploy-vps.md).
 

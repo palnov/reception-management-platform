@@ -9,7 +9,7 @@ type SessionToken = JWTPayload & {
     };
 };
 
-const PUBLIC_PATHS = new Set(['/login', '/setup']);
+const PUBLIC_PATHS = new Set(['/login']);
 const MANAGER_PATHS = ['/employees', '/data'];
 
 function getJwtSecret() {

@@ -24,18 +24,6 @@ export default function LoginPage() {
     }, []);
 
     useEffect(() => {
-        // Проверка инициализации системы
-        fetch('/api/setup/status')
-            .then(res => res.json())
-            .then(data => {
-                if (data.dbConnected && !data.isInitialized) {
-                    router.push('/setup');
-                }
-            })
-            .catch(err => console.error('Setup check failed:', err));
-    }, [router]);
-
-    useEffect(() => {
         fetch('/api/employees?activeOnly=true')
             .then(res => res.json())
             .then(data => {

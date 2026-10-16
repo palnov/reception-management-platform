@@ -60,3 +60,13 @@ test-report.xlsx
 .agents/
 .superpowers/
 skills-lock.json
+
+# sample outputs
+detailization-generated-sample.xlsx
+last_restore_output.txt
+
+# graphify output
+graphify-out/
+
+# codegraph index
+.codegraph/
