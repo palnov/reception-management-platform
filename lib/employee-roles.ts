@@ -34,6 +34,11 @@ export type SeniorityBonusResult = {
     bonus: number;
 };
 
+// Roles that may only adjust closing flags, trainee mark and coefficient on their own existing shifts.
+export function isSelfServiceShiftRole(role: string | null | undefined) {
+    return role === EMPLOYEE_ROLES.ADMIN || role === EMPLOYEE_ROLES.HOSPITALIZATION_MANAGER;
+}
+
 export function canCustomizeMaxCoefficient(role: string | null | undefined) {
     return role === EMPLOYEE_ROLES.HOSPITALIZATION_MANAGER;
 }

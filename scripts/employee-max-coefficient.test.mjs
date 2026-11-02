@@ -44,3 +44,12 @@ assert.doesNotMatch(kpiClient, /if \(seniorityYears >= 3\)/, 'KPI screen must no
 assert.doesNotMatch(reportService, /if \(seniorityYears >= 3\)/, 'Excel reports must not duplicate seniority thresholds');
 
 console.log('employee max coefficient checks passed');
+
+// Hospitalization managers edit their own existing shifts (coefficient, closing flags) like admins do.
+{
+  const { readFileSync } = await import('node:fs');
+  const shiftRoute = readFileSync(new URL('../app/api/shifts/route.ts', import.meta.url), 'utf8');
+  assert.match(shiftRoute, /isSelfServiceShiftRole/, 'Shifts API must allow self-service roles (admin and hospitalization manager)');
+  assert.doesNotMatch(shiftRoute, /role !== 'SENIOR' && role !== 'ADMIN'\)/, 'Shifts API must not hardcode ADMIN as the only self-service role');
+  console.log('hospitalization manager self-service shift checks passed');
+}

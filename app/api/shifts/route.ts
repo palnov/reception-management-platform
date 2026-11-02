@@ -5,7 +5,7 @@ import { getSession } from '@/lib/auth';
 import { calculateDiff, logAudit } from '@/lib/audit';
 import { isMonthClosed } from '@/lib/monthStatus';
 import { requireSession } from '@/lib/api-auth';
-import { clampShiftCoefficient } from '@/lib/employee-roles';
+import { clampShiftCoefficient, isSelfServiceShiftRole } from '@/lib/employee-roles';
 import { publishScheduleChange } from '@/lib/realtime-publisher';
 import type { AuditLog } from '@prisma/client';
 
@@ -31,7 +31,7 @@ function toNumber(value: string | number | undefined, fallback = 0) {
 
 async function canEditShiftForSession(role: string | undefined, sessionEmployeeId: string, employeeId: string) {
     if (role === 'MANAGER') return true;
-    if (role === 'ADMIN') return employeeId === sessionEmployeeId;
+    if (isSelfServiceShiftRole(role)) return employeeId === sessionEmployeeId;
     if (role !== 'SENIOR') return false;
 
     const employee = await prisma.employee.findUnique({
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const role = session.employee?.role;
-    if (role !== 'MANAGER' && role !== 'SENIOR' && role !== 'ADMIN') {
+    if (role !== 'MANAGER' && role !== 'SENIOR' && !isSelfServiceShiftRole(role)) {
         return NextResponse.json({ error: 'Access Denied' }, { status: 403 });
     }
 
@@ -159,12 +159,12 @@ export async function POST(request: Request) {
             }
 
             // ADMIN self-service can only change opening/closing flags on their own existing shift.
-            if (role === 'ADMIN') {
+            if (isSelfServiceShiftRole(role)) {
                 if (existing.employeeId !== session.employee.id) {
-                    return NextResponse.json({ error: 'Admins can edit only their own shifts' }, { status: 403 });
+                    return NextResponse.json({ error: 'Self-service roles can edit only their own shifts' }, { status: 403 });
                 }
                 if (employeeId !== existing.employeeId || date !== existing.date) {
-                    return NextResponse.json({ error: 'Admins cannot move shifts' }, { status: 403 });
+                    return NextResponse.json({ error: 'Self-service roles cannot move shifts' }, { status: 403 });
                 }
                 type = existing.type;
                 hours = existing.hours;
@@ -216,12 +216,12 @@ export async function POST(request: Request) {
                 }
 
                 // ADMIN self-service can only change opening/closing flags on their own existing shift.
-                if (role === 'ADMIN') {
+                if (isSelfServiceShiftRole(role)) {
                     if (existing.employeeId !== session.employee.id) {
-                        return NextResponse.json({ error: 'Admins can edit only their own shifts' }, { status: 403 });
+                        return NextResponse.json({ error: 'Self-service roles can edit only their own shifts' }, { status: 403 });
                     }
                     if (employeeId !== existing.employeeId || date !== existing.date) {
-                        return NextResponse.json({ error: 'Admins cannot move shifts' }, { status: 403 });
+                        return NextResponse.json({ error: 'Self-service roles cannot move shifts' }, { status: 403 });
                     }
                     type = existing.type;
                     hours = existing.hours;
@@ -261,8 +261,8 @@ export async function POST(request: Request) {
             }
 
             // If it's a new shift and user is ADMIN, block it
-            if (role === 'ADMIN') {
-                return NextResponse.json({ error: 'Admins cannot create new shifts. Only Manager/Senior can.' }, { status: 403 });
+            if (isSelfServiceShiftRole(role)) {
+                return NextResponse.json({ error: 'Only Manager/Senior can create new shifts.' }, { status: 403 });
             }
 
             if (!await canEditShiftForSession(role, session.employee.id, employeeId)) {

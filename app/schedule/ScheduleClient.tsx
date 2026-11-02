@@ -10,7 +10,7 @@ import type { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { ScheduleOverview } from '@/lib/overview-data';
 import { shouldIncludeActingLeadBonus } from '@/lib/acting-lead-policy';
-import { clampShiftCoefficient, getEmployeeShiftCoefficientLimit } from '@/lib/employee-roles';
+import { clampShiftCoefficient, getEmployeeShiftCoefficientLimit, isSelfServiceShiftRole } from '@/lib/employee-roles';
 import { ScheduleToolbar } from './ScheduleToolbar';
 import { ScheduleNormModal } from './ScheduleNormModal';
 import { ScheduleShiftModal } from './ScheduleShiftModal';
@@ -680,7 +680,7 @@ export default function SchedulePage({ initialMonth, initialData }: ScheduleClie
         e.preventDefault();
         const sourceShift = shiftsByEmployee[empId]?.[date];
         const employee = employees.find(emp => emp.id === empId);
-        const isActuallyAdmin = userData?.role === 'ADMIN';
+        const isActuallyAdmin = isSelfServiceShiftRole(userData?.role);
         const currentSelection = selectionRef.current;
         const currentContextMenu = contextMenuRef.current;
 
