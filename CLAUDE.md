@@ -19,7 +19,7 @@
 - `docs/superpowers/{specs,plans}` — дизайн-спеки и планы фич
 
 ## Команды
-- `npm run dev` — dev-сервер; `npm run build` = `prisma generate && next build`
+- `npm run dev` — dev-сервер; `npm run build` = очистка `.next/dev` (устаревшие типы dev-сервера ломали typecheck) + `prisma generate && next build`
 - `npm run check` — lint + typecheck + coefficient-тест + smoke
 - Все тесты: `for f in scripts/*.test.mjs; do node $f || break; done`
 - Схема БД меняется через `npx prisma db push` (миграции в `prisma/migrations` — история, на VPS используется `db push`)
